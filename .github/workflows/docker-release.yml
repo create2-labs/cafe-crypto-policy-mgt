@@ -1,0 +1,39 @@
+name: Docker Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+env:
+  DOCKER_BUILDKIT: "1"
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Extract version and SHA from tag
+        id: version
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          FULL_SHA=$(git rev-list -n 1 "$TAG")
+          SHORT_SHA=$(echo "$FULL_SHA" | cut -c1-7)
+          echo "full_version=$TAG" >> $GITHUB_OUTPUT
+          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+
+      - name: Document release promotion policy
+        run: |
+          echo "Release must promote existing RC sha tags without rebuild."
+          echo "Concrete registry promotion commands are intentionally deferred to follow-up CI/CD hardening PR."
