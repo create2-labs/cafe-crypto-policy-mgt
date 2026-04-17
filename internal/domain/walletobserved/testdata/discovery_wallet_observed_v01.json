@@ -1,0 +1,22 @@
+{
+  "event_id": "evt_disc_0001",
+  "event_type": "discovery.wallet.observed",
+  "event_version": "v0.1",
+  "occurred_at": "2026-04-17T10:00:00Z",
+  "correlation_id": "corr_scan_0001",
+  "causation_id": "scan_job_0001",
+  "producer": "cafe-discovery",
+  "subject": {
+    "type": "wallet",
+    "id": "wallet:0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
+  },
+  "payload": {
+    "chain_ids": [1, 8453],
+    "account_kind": "eoa",
+    "current_algorithm": "secp256k1_ecrecover",
+    "current_pq_posture": "classical_only",
+    "public_key_exposed": true,
+    "is_multichain": true,
+    "observed_at": "2026-04-17T09:59:58Z"
+  }
+}
