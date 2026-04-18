@@ -23,6 +23,12 @@
 - placeholder packages for API, policy domain, NATS integration, and persistence
 - baseline GitHub Actions workflow skeleton aligned with `cafe-discovery`
 
+## Discovery → CPM observation contract (PR1)
+
+- Normative event model: `internal/domain/walletobserved` (`discovery.wallet.observed` v0.1).
+- Shared exported vocabulary (account kinds, algorithms, PQ posture, subject types): `internal/domain/vocabulary`.
+- Canonical JSON fixture: `internal/domain/walletobserved/testdata/discovery_wallet_observed_v01.json`.
+
 ## Run locally
 
 ```bash
