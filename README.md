@@ -4,7 +4,7 @@
 
 ## Role and boundaries
 
-- Discovery observes wallets, persists scan artifacts, and (on the export path) maps observations to the CPM-owned wire contract.
+- Discovery observes wallets, persists scan artifacts, and (on the export path) maps observations to the shared wire contract from `cafe-contracts`.
 - CPM validates policy documents, selects compatible routes, assesses observations, and emits policy outcomes. 
 - Remediation consumes policy outcomes and plans or executes migration work.
 
@@ -16,7 +16,7 @@ CPM does not depend on Discovery’s database or internal domain structs. Inboun
 | --- | --- |
 | `cmd/cafe-cpm` | Service entrypoint |
 | `internal/app`, `internal/config` | Bootstrap and configuration |
-| `internal/domain/walletobserved` | Normative `discovery.wallet.observed` v0.1 event type and `Validate()` |
+| `internal/domain/walletobserved` | Thin re-export of shared `discovery.wallet.observed` v0.1 wire types |
 | `internal/domain/vocabulary` | Exported strings for account kind, algorithms, PQ posture, subject type |
 | `internal/domain/policy`, `internal/api`, `internal/integration/nats`, `internal/persistence` | Placeholders for later PRs |
 
@@ -25,6 +25,8 @@ CPM does not depend on Discovery’s database or internal domain structs. Inboun
 Implementation order, NATS rules, and acceptance criteria: [`cafe_cpm_v1_prompts_0.5.md`](./cafe_cpm_v1_prompts_0.5.md) (pack v0.5, service model v0.1).
 
 ## Discovery → CPM contract (`discovery.wallet.observed` v0.1)
+
+`internal/domain/walletobserved` re-exports the shared contract from `github.com/create2-labs/cafe-contracts/discoverywalletobserved/v01` so CPM code can keep stable local imports without duplicating wire structs.
 
 Normative identifiers (see `internal/domain/walletobserved/contract.go`):
 
@@ -62,7 +64,7 @@ Observed (policy inputs from Discovery / scanners):
 | --- | --- |
 | `current_pq_posture` | `classical_only` \| `hybrid` \| `full_pq` \| `unknown` |
 
-### Exported vocabulary (`internal/domain/vocabulary`)
+### Exported vocabulary
 
 Subject type (v0.1): `wallet`.
 
@@ -72,7 +74,7 @@ Algorithms: `secp256k1_ecrecover`, `mldsa44`, `mldsa65`, `falcon512`, or any non
 
 PQ posture: `classical_only`, `hybrid`, `full_pq`, `unknown`.
 
-`Event.Validate()` checks envelope constants, producer, subject type and id, and payload vocabulary. 
+`Event.Validate()` is provided by the shared `cafe-contracts` type and checks envelope constants, producer, subject type/id, and payload vocabulary.
 
 ### Canonical fixture
 

@@ -1,3 +1,3 @@
-// Package walletobserved defines the normative CPM-owned contract for
-// discovery.wallet.observed v0.1 messages from Discovery.
+// Package walletobserved re-exports the shared discovery.wallet.observed v0.1
+// wire contract from cafe-contracts to keep CPM-local imports stable.
 package walletobserved
