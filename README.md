@@ -1,10 +1,10 @@
-# cafe-cpm
+# CAFE Crypto Policy Management
 
-`cafe-cpm` is the standalone Crypto Policy Management service for CAFE (Go module `github.com/create2-labs/cafe-cpm`).
+`CAFE Crypto Policy Management` (*`CPM`*) is the Crypto Policy Management service for CAFE [cafe-crypto-policy-mgt](github.com/create2-labs/cafe-crypto-policy-mgt).
 
 ## Role and boundaries
 
-- Discovery observes wallets, persists scan artifacts, and (on the export path) maps observations to the shared wire contract from `cafe-contracts`.
+- Discovery observes wallets, persists scan artifacts, and  maps observations to the shared wire contract from `cafe-contracts`.
 - CPM validates policy documents, selects compatible routes, assesses observations, and emits policy outcomes. 
 - Remediation consumes policy outcomes and plans or executes migration work.
 
@@ -18,12 +18,8 @@ CPM does not depend on Discovery’s database or internal domain structs. Inboun
 | `internal/app`, `internal/config` | Bootstrap and configuration |
 | `internal/domain/walletobserved` | Thin re-export of shared `discovery.wallet.observed` v0.1 wire types |
 | `internal/domain/vocabulary` | Exported strings for account kind, algorithms, PQ posture, subject type |
-| `internal/domain/policy` | Policy domain contracts, starting with `PolicySelectionRequest` |
+| `internal/domain/policy` | Policy domain contracts (`PolicySelectionRequest`, `PolicyGraphCatalog`) |
 | `internal/api`, `internal/integration/nats`, `internal/persistence` | Placeholders for later PRs |
-
-## Execution pack
-
-Implementation order, NATS rules, and acceptance criteria: [`cafe_cpm_v1_prompts_0.7.md`](./cafe_cpm_v1_prompts_0.7.md) (pack v0.7, service model v0.1).
 
 ## Discovery → CPM contract (`discovery.wallet.observed` v0.1)
 
@@ -85,11 +81,6 @@ Golden JSON: [`internal/domain/walletobserved/testdata/discovery_wallet_observed
 
 - Discovery README: [Data structure (CPM export contract)](https://github.com/create2-labs/cafe-discovery/blob/main/README.md#data-structure-cpm-export-contract)
 - CAFE developer guide: [Discovery to CPM](https://github.com/create2-labs/cafe-documentation/blob/main/03-cafe-developer-guide.md#discovery-to-cpm-normalized-wallet-observation)
-
-## Bootstrap (PR0)
-
-- Go service skeleton, env-based config, `/healthz`
-- Baseline GitHub Actions aligned with `cafe-discovery`
 
 ## Run locally
 

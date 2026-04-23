@@ -1,0 +1,45 @@
+{
+  "version": "v0.1",
+  "nodes": {
+    "NODE_EOA_ENTRY": {
+      "id": "NODE_EOA_ENTRY",
+      "kind": "account",
+      "display_name": "EOA entry",
+      "maturity": 5
+    },
+    "NODE_SIG_EIP7932": {
+      "id": "NODE_SIG_EIP7932",
+      "kind": "signature",
+      "display_name": "EIP-7932 hybrid signature",
+      "parameter_schemas": [
+        {
+          "name": "profile",
+          "type": "enum",
+          "required": true,
+          "allowed_values": ["hybrid_p256_mldsa65"]
+        }
+      ],
+      "supported_postures": ["hybrid"],
+      "maturity": 3
+    },
+    "NODE_TARGET_HYBRID": {
+      "id": "NODE_TARGET_HYBRID",
+      "kind": "target_posture",
+      "display_name": "Target hybrid posture",
+      "supported_postures": ["hybrid"],
+      "maturity": 4
+    }
+  },
+  "compatibility_rules": [
+    {
+      "from_node_id": "NODE_EOA_ENTRY",
+      "to_node_id": "NODE_SIG_EIP7932",
+      "allowed": true
+    },
+    {
+      "from_node_id": "NODE_SIG_EIP7932",
+      "to_node_id": "NODE_TARGET_HYBRID",
+      "allowed": true
+    }
+  ]
+}
