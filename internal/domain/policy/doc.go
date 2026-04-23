@@ -3,4 +3,6 @@
 // PolicySelectionRequest is the stable input contract for policy selection.
 // PolicyGraphCatalog is the authoritative typed catalog for node definitions
 // and compatibility transition semantics.
+// CryptoPolicyTemplate defines reusable ordered-node policy path templates
+// validated against the catalog.
 package policy
