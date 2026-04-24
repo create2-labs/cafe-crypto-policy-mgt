@@ -1,0 +1,36 @@
+{
+  "id": "cpx_invalid_missing_required",
+  "name": "Invalid missing required node param",
+  "catalog_version": "v0.1",
+  "node_path": ["NODE_EOA_ENTRY", "NODE_SIG_EIP7932", "NODE_TARGET_HYBRID"],
+  "scope": {
+    "name": "production",
+    "chain_ids": [1],
+    "require_multichain": false
+  },
+  "global_parameters": {
+    "target_posture": "hybrid",
+    "minimum_maturity": 1,
+    "approval_mode": "manual",
+    "allow_research": false,
+    "allow_new_wallet": false,
+    "address_continuity_required": true,
+    "key_rotation_required": true,
+    "recovery_required": true,
+    "allowed_provider_modes": ["third_party"],
+    "require_bundler_available": true,
+    "require_paymaster_available": false
+  },
+  "node_parameters": {
+    "NODE_SIG_EIP7932": {
+      "profile": {
+        "type": "enum",
+        "string_value": "hybrid"
+      },
+      "strict": {
+        "type": "bool",
+        "bool_value": true
+      }
+    }
+  }
+}

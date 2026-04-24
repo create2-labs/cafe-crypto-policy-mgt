@@ -1,0 +1,31 @@
+{
+  "id": "cpx_hybrid_prod",
+  "name": "Hybrid production baseline",
+  "catalog_version": "v0.1",
+  "template_id": "tpl_hybrid_baseline",
+  "scope": {
+    "name": "production",
+    "subject_type": "wallet",
+    "subject_ids": ["wallet_abc", "wallet_abc"],
+    "chain_ids": [8453, 1, 8453],
+    "require_multichain": true
+  },
+  "global_parameters": {
+    "target_posture": "hybrid",
+    "minimum_maturity": 0,
+    "approval_mode": "",
+    "allow_research": false,
+    "allow_new_wallet": false,
+    "address_continuity_required": true,
+    "key_rotation_required": true,
+    "recovery_required": true,
+    "allowed_provider_modes": ["third_party", "third_party", "user_managed"],
+    "require_bundler_available": true,
+    "require_paymaster_available": false
+  },
+  "governance": {
+    "owner_team": "platform-security",
+    "change_ticket_id": "CHG-1234",
+    "tags": ["baseline", "baseline", "prod"]
+  }
+}
