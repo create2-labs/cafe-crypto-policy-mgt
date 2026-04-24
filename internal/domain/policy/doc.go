@@ -7,4 +7,6 @@
 // validated against the catalog.
 // CryptoPolicyInstance defines the concrete scope-bound policy document with
 // typed global/per-node parameters and catalog-backed validation.
+// CryptoPolicyValidationResult and CryptoPolicyInstanceValidator provide
+// typed, serializable instance-validation outputs for assessment pipelines.
 package policy
