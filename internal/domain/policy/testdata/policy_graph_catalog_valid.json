@@ -13,10 +13,20 @@
       "display_name": "EIP-7932 hybrid signature",
       "parameter_schemas": [
         {
+          "name": "threshold",
+          "type": "int",
+          "required": true
+        },
+        {
+          "name": "strict",
+          "type": "bool",
+          "required": true
+        },
+        {
           "name": "profile",
           "type": "enum",
           "required": true,
-          "allowed_values": ["hybrid_p256_mldsa65"]
+          "allowed_values": ["hybrid", "hybrid_p256_mldsa65"]
         }
       ],
       "supported_postures": ["hybrid"],

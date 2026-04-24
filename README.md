@@ -18,7 +18,7 @@ CPM does not depend on Discovery’s database or internal domain structs. Inboun
 | `internal/app`, `internal/config` | Bootstrap and configuration |
 | `internal/domain/walletobserved` | Thin re-export of shared `discovery.wallet.observed` v0.1 wire types |
 | `internal/domain/vocabulary` | Exported strings for account kind, algorithms, PQ posture, subject type |
-| `internal/domain/policy` | Policy domain contracts (`PolicySelectionRequest`, `PolicyGraphCatalog`, `CryptoPolicyTemplate`) |
+| `internal/domain/policy` | Policy domain contracts (`PolicySelectionRequest`, `PolicyGraphCatalog`, `CryptoPolicyTemplate`, `CryptoPolicyInstance`) |
 | `internal/api`, `internal/integration/nats`, `internal/persistence` | Placeholders for later PRs |
 
 ## Discovery → CPM contract (`discovery.wallet.observed` v0.1)
