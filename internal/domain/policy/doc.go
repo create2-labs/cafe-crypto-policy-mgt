@@ -11,4 +11,7 @@
 // typed, serializable instance-validation outputs for assessment pipelines.
 // CryptoPolicyAssessmentResult provides a separate, serializable assessment
 // outcome model for compatibility/deployability evaluation outputs.
+// PolicyCompatibilityEvaluator and PolicyCompatibilityResult implement
+// observation+request+instance compatibility classification (PR12) before
+// ranking (PR13).
 package policy
