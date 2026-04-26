@@ -9,4 +9,6 @@
 // typed global/per-node parameters and catalog-backed validation.
 // CryptoPolicyValidationResult and CryptoPolicyInstanceValidator provide
 // typed, serializable instance-validation outputs for assessment pipelines.
+// CryptoPolicyAssessmentResult provides a separate, serializable assessment
+// outcome model for compatibility/deployability evaluation outputs.
 package policy
