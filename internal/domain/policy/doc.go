@@ -14,4 +14,6 @@
 // PolicyCompatibilityEvaluator and PolicyCompatibilityResult implement
 // observation+request+instance compatibility classification (PR12) before
 // ranking (PR13).
+// PolicyDecisionEvaluator builds deterministic ranked/rejected candidate output
+// and selected policy decision from compatibility results (PR13).
 package policy
