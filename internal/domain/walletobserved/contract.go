@@ -1,6 +1,6 @@
 package walletobserved
 
-import v01 "github.com/create2-labs/cafe-contracts/discoverywalletobserved/v01"
+import v01 "github.com/create2-labs/cafe-contracts/observation/wallet/v01"
 
 // Normative contract identifiers re-exported from the shared wire contract.
 const (

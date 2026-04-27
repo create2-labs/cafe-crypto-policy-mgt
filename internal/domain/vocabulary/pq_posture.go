@@ -1,7 +1,7 @@
 package vocabulary
 
 // CurrentPQPosture summarizes the wallet's post-quantum readiness as exported on the
-// Discovery → CPM boundary. Values are normative for discovery.wallet.observed v0.1 payloads;
+// Discovery → CPM boundary. Values are normative for cafe.discovery.wallet.observed v0.1 payloads;
 // derivation rules live in Discovery (see execution pack PR3).
 type CurrentPQPosture string
 
