@@ -1,8 +1,8 @@
 package walletobserved
 
-import v01 "github.com/create2-labs/cafe-contracts/discoverywalletobserved/v01"
+import v01 "github.com/create2-labs/cafe-contracts/observation/wallet/v01"
 
-// Event is the shared discovery.wallet.observed envelope (wire contract v0.1).
+// Event is the shared cafe.discovery.wallet.observed envelope (wire contract v0.1).
 type Event = v01.Event
 
 // Subject identifies the observed wallet for this contract family.

@@ -8,7 +8,7 @@
 - CPM validates policy documents, selects compatible routes, assesses observations, and emits policy outcomes. 
 - Remediation consumes policy outcomes and plans or executes migration work.
 
-CPM does not depend on Discovery’s database or internal domain structs. Inbound integration uses the explicit `discovery.wallet.observed` contract only.
+CPM does not depend on Discovery’s database or internal domain structs. Inbound integration uses the explicit `cafe.discovery.wallet.observed` contract only.
 
 ## Repository layout
 
@@ -16,18 +16,18 @@ CPM does not depend on Discovery’s database or internal domain structs. Inboun
 | --- | --- |
 | `cmd/cafe-cpm` | Service entrypoint |
 | `internal/app`, `internal/config` | Bootstrap and configuration |
-| `internal/domain/walletobserved` | Thin re-export of shared `discovery.wallet.observed` v0.1 wire types |
+| `internal/domain/walletobserved` | Thin re-export of shared `cafe.discovery.wallet.observed` v0.1 wire types |
 | `internal/domain/vocabulary` | Exported strings for account kind, algorithms, PQ posture, subject type |
 | `internal/domain/policy` | Policy domain contracts (`PolicySelectionRequest`, `PolicyGraphCatalog`, `CryptoPolicyTemplate`, `CryptoPolicyInstance`, `CryptoPolicyValidationResult`, `CryptoPolicyAssessmentResult`, `PolicyCompatibilityResult` + `PolicyCompatibilityEvaluator`, and PR13 `PolicyDecision` models/evaluator) |
 | `internal/api`, `internal/integration/nats`, `internal/persistence` | Placeholders for later PRs |
 
-## Discovery → CPM contract (`discovery.wallet.observed` v0.1)
+## Discovery → CPM contract (`cafe.discovery.wallet.observed` v0.1)
 
-`internal/domain/walletobserved` re-exports the shared contract from `github.com/create2-labs/cafe-contracts/discoverywalletobserved/v01` so CPM code can keep stable local imports without duplicating wire structs.
+`internal/domain/walletobserved` re-exports the shared contract from `github.com/create2-labs/cafe-contracts/observation/wallet/v01` so CPM code can keep stable local imports without duplicating wire structs.
 
 Normative identifiers (see `internal/domain/walletobserved/contract.go`):
 
-- `event_type`: `discovery.wallet.observed`
+- `event_type`: `cafe.discovery.wallet.observed`
 - `event_version`: `v0.1`
 - `producer`: `cafe-discovery` (required by `Event.Validate()` for v0.1)
 

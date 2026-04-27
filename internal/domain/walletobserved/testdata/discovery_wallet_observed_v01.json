@@ -1,6 +1,6 @@
 {
   "event_id": "evt_disc_0001",
-  "event_type": "discovery.wallet.observed",
+  "event_type": "cafe.discovery.wallet.observed",
   "event_version": "v0.1",
   "occurred_at": "2026-04-17T10:00:00Z",
   "correlation_id": "corr_scan_0001",
