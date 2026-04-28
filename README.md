@@ -18,8 +18,9 @@ CPM does not depend on Discovery’s database or internal domain structs. Inboun
 | `internal/app`, `internal/config` | Bootstrap and configuration |
 | `internal/domain/walletobserved` | Thin re-export of shared `cafe.discovery.wallet.observed` v0.1 wire types |
 | `internal/domain/vocabulary` | Exported strings for account kind, algorithms, PQ posture, subject type |
-| `internal/domain/policy` | Policy domain contracts (`PolicySelectionRequest`, `PolicyGraphCatalog`, `CryptoPolicyTemplate`, `CryptoPolicyInstance`, `CryptoPolicyValidationResult`, `CryptoPolicyAssessmentResult`, `PolicyCompatibilityResult` + `PolicyCompatibilityEvaluator`, and PR13 `PolicyDecision` models/evaluator) |
-| `internal/api`, `internal/integration/nats`, `internal/persistence` | Placeholders for later PRs |
+| `internal/domain/policy` | Policy domain contracts (`PolicySelectionRequest`, `PolicyGraphCatalog`, `CryptoPolicyTemplate`, `CryptoPolicyInstance`, `CryptoPolicyValidationResult`, `CryptoPolicyAssessmentResult`, `PolicyCompatibilityResult` + `PolicyCompatibilityEvaluator`, and  `PolicyDecision` models/evaluator) |
+| `internal/api`, `internal/persistence` | Placeholders for later PRs |
+| `internal/integration/nats` | inbound consumer for `policy.assessment.requested.v0.1` with idempotence |
 
 ## Discovery → CPM contract (`cafe.discovery.wallet.observed` v0.1)
 
@@ -81,11 +82,11 @@ Golden JSON: [`internal/domain/walletobserved/testdata/discovery_wallet_observed
 
 `internal/domain/policy/assessment_result.go` defines `CryptoPolicyAssessmentResult` as a standalone typed output model for policy assessment results. It is intentionally separate from `CryptoPolicyInstance` so policy content and runtime assessment outcomes remain decoupled for persistence and future API/event payloads.
 
-## Compatibility evaluation (PR12)
+## Compatibility evaluation 
 
 `internal/domain/policy/compatibility_result.go` defines `PolicyCompatibilityEvaluator`, which classifies a single validated `CryptoPolicyInstance` against a `walletobserved.Payload` and `PolicySelectionRequest`. It returns `PolicyCompatibilityResult` with one of: `compatible_and_deployable`, `compatible_but_not_deployable` (e.g. empty instance scope `chain_ids`), or `incompatible`, with structured `AssessmentFinding` entries. Template-backed instances that omit `node_path` must pass the matching `CryptoPolicyTemplate` so the node path can be resolved.
 
-## Ranking and policy decision output (PR13)
+## Ranking and policy decision output 
 
 `internal/domain/policy/policy_decision.go` defines `PolicyDecisionEvaluator`, `PolicyDecision`, `RankedPolicy`, and `RejectedPolicy`. It applies deterministic first-version ranking over compatible candidates:
 1) exclude incompatible routes,
@@ -95,6 +96,25 @@ Golden JSON: [`internal/domain/walletobserved/testdata/discovery_wallet_observed
 5) better address-continuity matching,
 6) avoid new wallet creation when allowed,
 7) final lexical tie-break on normalized stable `policy_id` (derived from instance id while no dedicated policy id exists).
+
+## Inbound explicit assessment request 
+
+`internal/integration/nats` now contains a consumer for `policy.assessment.requested.v0.1` (`cafenatsv01.NATSSubjectPolicyAssessmentRequestedV01`).
+
+Behavior:
+- validates inbound payloads with shared `cafe-contracts/cafenatsv01` contracts.
+- maps `selection_request` into `policy.PolicySelectionRequest` and delegates execution to a thin handler interface.
+- uses inbound `event_id` as idempotence key via `IdempotencyStore`.
+- treats duplicate deliveries and replayed `event_id` values as no-op.
+- releases in-flight claim on handler failure so retry is allowed.
+- ignores non-matching subjects (including informational `cafe.discovery.wallet.observed`), so observation publications do not auto-trigger assessment.
+
+Tests in `internal/integration/nats/assessment_consumer_test.go` cover:
+- first delivery
+- duplicate delivery suppression
+- replay after preloaded processed state (simulated post-restart behavior)
+- retry after transient handler failure
+- non-triggering behavior for `cafe.discovery.wallet.observed`
 
 ### Producer-side documentation
 
