@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/create2-labs/cafe-cpm/internal/domain/vocabulary"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/vocabulary"
 )
 
 // ApprovalMode defines the operator approval behavior for the selected policy path.

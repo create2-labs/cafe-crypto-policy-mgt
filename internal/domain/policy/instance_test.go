@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/create2-labs/cafe-cpm/internal/domain/vocabulary"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/vocabulary"
 )
 
 func TestLoadCryptoPolicyInstanceFromFile_Valid(t *testing.T) {

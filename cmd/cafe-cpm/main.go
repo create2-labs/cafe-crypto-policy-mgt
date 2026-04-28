@@ -3,8 +3,8 @@ package main
 import (
 	"log"
 
-	"github.com/create2-labs/cafe-cpm/internal/app"
-	"github.com/create2-labs/cafe-cpm/internal/config"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/app"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/config"
 )
 
 func main() {

@@ -3,11 +3,30 @@ package app
 import (
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"testing"
+
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/api"
 )
 
 func TestHandlerHealthz(t *testing.T) {
-	h := handler("cafe-cpm")
+	store, err := api.LoadReadStore(api.ReadStoreOptions{
+		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
+		TemplatePaths: []string{
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_valid.json"),
+		},
+		InstancePaths: []string{
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_valid.json"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("LoadReadStore: %v", err)
+	}
+
+	h, err := handler("cafe-cpm", store)
+	if err != nil {
+		t.Fatalf("handler: %v", err)
+	}
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	res := httptest.NewRecorder()
 

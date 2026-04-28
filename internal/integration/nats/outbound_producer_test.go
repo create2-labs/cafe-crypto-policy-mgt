@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/create2-labs/cafe-contracts/cafenatsv01"
-	"github.com/create2-labs/cafe-cpm/internal/domain/policy"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/policy"
 )
 
 func TestPublishAssessmentCompletedPublishesExpectedEvent(t *testing.T) {
@@ -19,15 +19,15 @@ func TestPublishAssessmentCompletedPublishesExpectedEvent(t *testing.T) {
 	producer := newProducerForTests(t, publisher, store)
 
 	err := producer.PublishAssessmentCompleted(context.Background(), AssessmentCompletedInput{
-		EventID:       "evt_assess_1",
-		OccurredAt:    time.Date(2026, time.April, 28, 9, 0, 0, 0, time.UTC),
-		CorrelationID: "corr_1",
-		CausationID:   "evt_req_1",
+		EventID:                 "evt_assess_1",
+		OccurredAt:              time.Date(2026, time.April, 28, 9, 0, 0, 0, time.UTC),
+		CorrelationID:           "corr_1",
+		CausationID:             "evt_req_1",
 		SubjectPolicyInstanceID: "CP001",
-		AssessmentID:  "assess_1",
-		InstanceID:    "CP001",
-		Status:        policy.AssessmentStatusCompatibleAndDeployable,
-		FindingCount:  2,
+		AssessmentID:            "assess_1",
+		InstanceID:              "CP001",
+		Status:                  policy.AssessmentStatusCompatibleAndDeployable,
+		FindingCount:            2,
 	})
 	if err != nil {
 		t.Fatalf("publish assessment completed: %v", err)
@@ -62,17 +62,17 @@ func TestPublishRemediationRequestedSupportsAutoStartBranches(t *testing.T) {
 		producer := newProducerForTests(t, publisher, store)
 
 		err := producer.PublishRemediationRequested(context.Background(), RemediationRequestedInput{
-			EventID:              "evt_rem_1",
-			OccurredAt:           time.Date(2026, time.April, 28, 9, 1, 0, 0, time.UTC),
-			CorrelationID:        "corr_1",
-			CausationID:          "evt_assess_1",
+			EventID:                 "evt_rem_1",
+			OccurredAt:              time.Date(2026, time.April, 28, 9, 1, 0, 0, time.UTC),
+			CorrelationID:           "corr_1",
+			CausationID:             "evt_assess_1",
 			SubjectPolicyInstanceID: "CP001",
-			InstanceID:           "CP001",
-			RemediationID:        "rem_1",
-			ReasonCode:           "non_compliant",
-			RequestedBy:          "cpm",
-			CorrelationRef:       "assessment_id=assess_1",
-			AutoStartRemediation: true,
+			InstanceID:              "CP001",
+			RemediationID:           "rem_1",
+			ReasonCode:              "non_compliant",
+			RequestedBy:             "cpm",
+			CorrelationRef:          "assessment_id=assess_1",
+			AutoStartRemediation:    true,
 		})
 		if err != nil {
 			t.Fatalf("publish remediation requested: %v", err)
@@ -90,17 +90,17 @@ func TestPublishRemediationRequestedSupportsAutoStartBranches(t *testing.T) {
 		producer := newProducerForTests(t, publisher, store)
 
 		err := producer.PublishRemediationRequested(context.Background(), RemediationRequestedInput{
-			EventID:              "evt_rem_2",
-			OccurredAt:           time.Date(2026, time.April, 28, 9, 2, 0, 0, time.UTC),
-			CorrelationID:        "corr_2",
-			CausationID:          "evt_assess_2",
+			EventID:                 "evt_rem_2",
+			OccurredAt:              time.Date(2026, time.April, 28, 9, 2, 0, 0, time.UTC),
+			CorrelationID:           "corr_2",
+			CausationID:             "evt_assess_2",
 			SubjectPolicyInstanceID: "CP002",
-			InstanceID:           "CP002",
-			RemediationID:        "rem_2",
-			ReasonCode:           "needs_rotation",
-			RequestedBy:          "cpm",
-			CorrelationRef:       "assessment_id=assess_2",
-			AutoStartRemediation: false,
+			InstanceID:              "CP002",
+			RemediationID:           "rem_2",
+			ReasonCode:              "needs_rotation",
+			RequestedBy:             "cpm",
+			CorrelationRef:          "assessment_id=assess_2",
+			AutoStartRemediation:    false,
 		})
 		if err != nil {
 			t.Fatalf("publish remediation requested: %v", err)
@@ -121,15 +121,15 @@ func TestPublishAssessmentCompletedSuppressesIdenticalDuplicate(t *testing.T) {
 	store := newMemoryStore()
 	producer := newProducerForTests(t, publisher, store)
 	input := AssessmentCompletedInput{
-		EventID:       "evt_assess_dup",
-		OccurredAt:    time.Date(2026, time.April, 28, 9, 0, 0, 0, time.UTC),
-		CorrelationID: "corr_dup",
-		CausationID:   "evt_req_dup",
+		EventID:                 "evt_assess_dup",
+		OccurredAt:              time.Date(2026, time.April, 28, 9, 0, 0, 0, time.UTC),
+		CorrelationID:           "corr_dup",
+		CausationID:             "evt_req_dup",
 		SubjectPolicyInstanceID: "CP003",
-		AssessmentID:  "assess_dup",
-		InstanceID:    "CP003",
-		Status:        policy.AssessmentStatusCompatibleAndDeployable,
-		FindingCount:  1,
+		AssessmentID:            "assess_dup",
+		InstanceID:              "CP003",
+		Status:                  policy.AssessmentStatusCompatibleAndDeployable,
+		FindingCount:            1,
 	}
 
 	if err := producer.PublishAssessmentCompleted(context.Background(), input); err != nil {
@@ -155,15 +155,15 @@ func TestPublishAssessmentCompletedRejectsDivergentDuplicate(t *testing.T) {
 	producer := newProducerForTests(t, publisher, store)
 
 	base := AssessmentCompletedInput{
-		EventID:       "evt_assess_dup_divergent",
-		OccurredAt:    time.Date(2026, time.April, 28, 9, 0, 0, 0, time.UTC),
-		CorrelationID: "corr_dup_divergent",
-		CausationID:   "evt_req_dup_divergent",
+		EventID:                 "evt_assess_dup_divergent",
+		OccurredAt:              time.Date(2026, time.April, 28, 9, 0, 0, 0, time.UTC),
+		CorrelationID:           "corr_dup_divergent",
+		CausationID:             "evt_req_dup_divergent",
 		SubjectPolicyInstanceID: "CP004",
-		AssessmentID:  "assess_dup_divergent",
-		InstanceID:    "CP004",
-		Status:        policy.AssessmentStatusCompatibleAndDeployable,
-		FindingCount:  1,
+		AssessmentID:            "assess_dup_divergent",
+		InstanceID:              "CP004",
+		Status:                  policy.AssessmentStatusCompatibleAndDeployable,
+		FindingCount:            1,
 	}
 
 	if err := producer.PublishAssessmentCompleted(context.Background(), base); err != nil {

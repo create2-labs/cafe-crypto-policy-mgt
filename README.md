@@ -18,9 +18,9 @@ CPM does not depend on Discovery’s database or internal domain structs. Inboun
 | `internal/app`, `internal/config` | Bootstrap and configuration |
 | `internal/domain/walletobserved` | Thin re-export of shared `cafe.discovery.wallet.observed` v0.1 wire types |
 | `internal/domain/vocabulary` | Exported strings for account kind, algorithms, PQ posture, subject type |
-<<<<<<< HEAD
 | `internal/domain/policy` | Policy domain contracts (`PolicySelectionRequest`, `PolicyGraphCatalog`, `CryptoPolicyTemplate`, `CryptoPolicyInstance`, `CryptoPolicyValidationResult`, `CryptoPolicyAssessmentResult`, `PolicyCompatibilityResult` + `PolicyCompatibilityEvaluator`, and PR13 `PolicyDecision` models/evaluator) |
-| `internal/api`, `internal/persistence` | Placeholders for later PRs |
+| `internal/api` | PR17 read-only HTTP APIs for policy inspection and decision exploration |
+| `internal/persistence` | Placeholder for future persistence adapters |
 | `internal/integration/nats` | NATS integration for inbound explicit assessment requests + outbound CPM event publication |
 
 ## Discovery → CPM contract (`cafe.discovery.wallet.observed` v0.1)
@@ -136,6 +136,34 @@ Producer behavior is replay-safe and deterministic:
 
 - Discovery README: [Data structure (CPM export contract)](https://github.com/create2-labs/cafe-discovery/blob/main/README.md#data-structure-cpm-export-contract)
 - CAFE developer guide: [Discovery to CPM](https://github.com/create2-labs/cafe-documentation/blob/main/03-cafe-developer-guide.md#discovery-to-cpm-normalized-wallet-observation)
+
+## Read APIs (PR17)
+
+CPM now exposes read-only APIs backed by local policy files loaded at startup. These endpoints are for inspection and exploration only.
+
+Environment variables:
+
+- `CPM_POLICY_CATALOG_PATH` (default: `internal/domain/policy/testdata/policy_graph_catalog_valid.json`)
+- `CPM_POLICY_TEMPLATE_PATHS` (comma-separated, default: `internal/domain/policy/testdata/crypto_policy_template_valid.json`)
+- `CPM_POLICY_INSTANCE_PATHS` (comma-separated, default: `internal/domain/policy/testdata/crypto_policy_instance_valid.json`)
+
+Endpoints:
+
+- `GET /api/v1/policies/catalog`
+- `GET /api/v1/policies/templates`
+- `GET /api/v1/policies/instances`
+- `POST /api/v1/policies/decisions/explore`
+
+`POST /api/v1/policies/decisions/explore` accepts:
+
+- `observation` (`walletobserved.Payload`)
+- `selection_request` (`PolicySelectionRequest`)
+
+and returns `PolicyDecision` output that keeps the distinction between:
+
+- `incompatible`
+- `compatible_but_not_deployable`
+- `compatible_and_deployable`
 
 ## Run locally
 
