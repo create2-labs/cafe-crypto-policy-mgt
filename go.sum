@@ -1,2 +1,6 @@
 github.com/create2-labs/cafe-contracts v0.0.2-0.20260427135040-13e8ec5f9ea0 h1:0EyKPn5VqS8M12A03WptrZsan46s8J+VQVuIbJNB+8Q=
 github.com/create2-labs/cafe-contracts v0.0.2-0.20260427135040-13e8ec5f9ea0/go.mod h1:LPgsYMVjJPL72fI/MZ2HUshG2pDwH7Z61yNUpoFYOdk=
+github.com/create2-labs/cafe-contracts v0.0.1 h1:At3hnb5oIitRUYXSEfWEbSxKKRGTGRh4vDCIrXV/QR0=
+github.com/create2-labs/cafe-contracts v0.0.1/go.mod h1:LPgsYMVjJPL72fI/MZ2HUshG2pDwH7Z61yNUpoFYOdk=
+github.com/create2-labs/cafe-contracts v0.0.2-0.20260427141324-4a96a8df5546 h1:6aeSRCsptu10b7TR2dM4l3yeiSbWMpaQ0i0l1uxYArE=
+github.com/create2-labs/cafe-contracts v0.0.2-0.20260427141324-4a96a8df5546/go.mod h1:LPgsYMVjJPL72fI/MZ2HUshG2pDwH7Z61yNUpoFYOdk=
