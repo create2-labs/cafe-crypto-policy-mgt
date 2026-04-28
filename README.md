@@ -8,7 +8,7 @@
 - CPM validates policy documents, selects compatible routes, assesses observations, and emits policy outcomes. 
 - Remediation consumes policy outcomes and plans or executes migration work.
 
-CPM does not depend on Discovery’s database or internal domain structs. Inbound integration uses the explicit `cafe.discovery.wallet.observed` contract only.
+CPM does not depend on Discovery’s database or internal domain structs. Inbound integration is explicitly user-triggered via `policy.assessment.requested.v0.1`; `cafe.discovery.wallet.observed` remains informational.
 
 ## Repository layout
 
@@ -18,9 +18,10 @@ CPM does not depend on Discovery’s database or internal domain structs. Inboun
 | `internal/app`, `internal/config` | Bootstrap and configuration |
 | `internal/domain/walletobserved` | Thin re-export of shared `cafe.discovery.wallet.observed` v0.1 wire types |
 | `internal/domain/vocabulary` | Exported strings for account kind, algorithms, PQ posture, subject type |
-| `internal/domain/policy` | Policy domain contracts (`PolicySelectionRequest`, `PolicyGraphCatalog`, `CryptoPolicyTemplate`, `CryptoPolicyInstance`, `CryptoPolicyValidationResult`, `CryptoPolicyAssessmentResult`, `PolicyCompatibilityResult` + `PolicyCompatibilityEvaluator`, and  `PolicyDecision` models/evaluator) |
+<<<<<<< HEAD
+| `internal/domain/policy` | Policy domain contracts (`PolicySelectionRequest`, `PolicyGraphCatalog`, `CryptoPolicyTemplate`, `CryptoPolicyInstance`, `CryptoPolicyValidationResult`, `CryptoPolicyAssessmentResult`, `PolicyCompatibilityResult` + `PolicyCompatibilityEvaluator`, and PR13 `PolicyDecision` models/evaluator) |
 | `internal/api`, `internal/persistence` | Placeholders for later PRs |
-| `internal/integration/nats` | inbound consumer for `policy.assessment.requested.v0.1` with idempotence |
+| `internal/integration/nats` | NATS integration for inbound explicit assessment requests + outbound CPM event publication |
 
 ## Discovery → CPM contract (`cafe.discovery.wallet.observed` v0.1)
 
@@ -97,7 +98,7 @@ Golden JSON: [`internal/domain/walletobserved/testdata/discovery_wallet_observed
 6) avoid new wallet creation when allowed,
 7) final lexical tie-break on normalized stable `policy_id` (derived from instance id while no dedicated policy id exists).
 
-## Inbound explicit assessment request 
+## Inbound explicit assessment request
 
 `internal/integration/nats` now contains a consumer for `policy.assessment.requested.v0.1` (`cafenatsv01.NATSSubjectPolicyAssessmentRequestedV01`).
 
@@ -115,6 +116,21 @@ Tests in `internal/integration/nats/assessment_consumer_test.go` cover:
 - replay after preloaded processed state (simulated post-restart behavior)
 - retry after transient handler failure
 - non-triggering behavior for `cafe.discovery.wallet.observed`
+
+## Outbound CPM events (PR16)
+
+`internal/integration/nats/outbound_producer.go` publishes shared `cafenatsv01` contracts:
+
+- `cafe.cpm.events.policy.assessment.completed.v0_1`
+- `cafe.cpm.events.policy.remediation.requested.v0_1`
+
+Producer behavior is replay-safe and deterministic:
+
+- duplicate identity key: `{subject}:{event_id}`
+- duplicate with same payload hash: allowed and deterministic (same JSON projection)
+- duplicate with divergent payload hash: rejected
+
+`PolicyRemediationRequested` mapping keeps `auto_start_remediation` intent explicit by appending `informational_only=true` to `correlation_ref` when auto-start is false.
 
 ### Producer-side documentation
 
