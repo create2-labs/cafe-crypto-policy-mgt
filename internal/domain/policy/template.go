@@ -6,69 +6,69 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/create2-labs/cafe-cpm/internal/domain/vocabulary"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/vocabulary"
 )
 
 var (
 	// ErrTemplateIDRequired indicates a missing template identifier.
-	ErrTemplateIDRequired                = errors.New("template id is required")
+	ErrTemplateIDRequired = errors.New("template id is required")
 	// ErrTemplateNameRequired indicates a missing template name.
-	ErrTemplateNameRequired              = errors.New("template name is required")
+	ErrTemplateNameRequired = errors.New("template name is required")
 	// ErrTemplateVersionRequired indicates a missing template version.
-	ErrTemplateVersionRequired           = errors.New("template version is required")
+	ErrTemplateVersionRequired = errors.New("template version is required")
 	// ErrTemplateCatalogVersionRequired indicates a missing catalog version reference.
-	ErrTemplateCatalogVersionRequired    = errors.New("template catalog_version is required")
+	ErrTemplateCatalogVersionRequired = errors.New("template catalog_version is required")
 	// ErrTemplateTargetPostureRequired indicates a missing target posture.
-	ErrTemplateTargetPostureRequired     = errors.New("template target_posture is required")
+	ErrTemplateTargetPostureRequired = errors.New("template target_posture is required")
 	// ErrTemplateTargetPostureInvalid indicates an invalid target posture.
-	ErrTemplateTargetPostureInvalid      = errors.New("template target_posture is invalid")
+	ErrTemplateTargetPostureInvalid = errors.New("template target_posture is invalid")
 	// ErrTemplateNodePathRequired indicates a missing ordered node path.
-	ErrTemplateNodePathRequired          = errors.New("template must define at least one node in node_path")
+	ErrTemplateNodePathRequired = errors.New("template must define at least one node in node_path")
 	// ErrTemplateNodeUnknown indicates a node not present in the catalog.
-	ErrTemplateNodeUnknown               = errors.New("template node_path references unknown node")
+	ErrTemplateNodeUnknown = errors.New("template node_path references unknown node")
 	// ErrTemplateTransitionInvalid indicates a disallowed transition in node_path.
-	ErrTemplateTransitionInvalid         = errors.New("template node_path transition is not allowed by catalog rules")
+	ErrTemplateTransitionInvalid = errors.New("template node_path transition is not allowed by catalog rules")
 	// ErrTemplateMinMaturityRange indicates a maturity value outside [1, 5].
-	ErrTemplateMinMaturityRange          = errors.New("template constraints minimum_maturity must be between 1 and 5")
+	ErrTemplateMinMaturityRange = errors.New("template constraints minimum_maturity must be between 1 and 5")
 	// ErrTemplateChainIDInvalid indicates non-positive target chain IDs.
-	ErrTemplateChainIDInvalid            = errors.New("template constraints target_chain_ids must contain only positive values")
+	ErrTemplateChainIDInvalid = errors.New("template constraints target_chain_ids must contain only positive values")
 	// ErrTemplateMultichainRequiresTargets indicates invalid multichain constraints.
 	ErrTemplateMultichainRequiresTargets = errors.New("template constraints require_multichain requires at least two target_chain_ids when target_chain_ids is specified")
 	// ErrTemplateMetadataPostureMismatch indicates inconsistent posture metadata.
-	ErrTemplateMetadataPostureMismatch   = errors.New("template metadata target_posture must match template target_posture")
+	ErrTemplateMetadataPostureMismatch = errors.New("template metadata target_posture must match template target_posture")
 	// ErrTemplateSelectionPostureMismatch indicates inconsistent default selection posture.
-	ErrTemplateSelectionPostureMismatch  = errors.New("template default_selection target_posture must match template target_posture")
+	ErrTemplateSelectionPostureMismatch = errors.New("template default_selection target_posture must match template target_posture")
 )
 
 // CryptoPolicyTemplate defines a reusable, named ordered path of catalog nodes.
 // The template can provide stable defaults and template-level constraints, but
 // it cannot invent nodes or edge parameters outside the catalog.
 type CryptoPolicyTemplate struct {
-	ID             string                    `json:"id"`
-	Name           string                    `json:"name"`
-	Version        string                    `json:"version"`
-	CatalogVersion string                    `json:"catalog_version"`
-	Description    string                    `json:"description,omitempty"`
+	ID             string                      `json:"id"`
+	Name           string                      `json:"name"`
+	Version        string                      `json:"version"`
+	CatalogVersion string                      `json:"catalog_version"`
+	Description    string                      `json:"description,omitempty"`
 	TargetPosture  vocabulary.CurrentPQPosture `json:"target_posture"`
-	NodePath       []string                  `json:"node_path"`
-	Defaults       PolicySelectionRequest    `json:"default_selection"`
-	Constraints    TemplateConstraints       `json:"constraints,omitempty"`
-	Metadata       TemplateMetadata          `json:"metadata,omitempty"`
+	NodePath       []string                    `json:"node_path"`
+	Defaults       PolicySelectionRequest      `json:"default_selection"`
+	Constraints    TemplateConstraints         `json:"constraints,omitempty"`
+	Metadata       TemplateMetadata            `json:"metadata,omitempty"`
 }
 
 // TemplateConstraints captures template-level restrictions independent from
 // runtime observation compatibility checks.
 type TemplateConstraints struct {
-	MinimumMaturity  int     `json:"minimum_maturity,omitempty"`
+	MinimumMaturity   int     `json:"minimum_maturity,omitempty"`
 	RequireMultichain bool    `json:"require_multichain"`
-	TargetChainIDs   []int64 `json:"target_chain_ids,omitempty"`
+	TargetChainIDs    []int64 `json:"target_chain_ids,omitempty"`
 }
 
 // TemplateMetadata stores optional documentation and discoverability attributes.
 type TemplateMetadata struct {
-	OwnerTeam     string   `json:"owner_team,omitempty"`
+	OwnerTeam     string                      `json:"owner_team,omitempty"`
 	TargetPosture vocabulary.CurrentPQPosture `json:"target_posture,omitempty"`
-	Tags          []string `json:"tags,omitempty"`
+	Tags          []string                    `json:"tags,omitempty"`
 }
 
 // LoadCryptoPolicyTemplateFromFile reads, decodes, normalizes, and validates a
@@ -182,4 +182,3 @@ func (t *CryptoPolicyTemplate) NormalizeAndValidate(catalog *PolicyGraphCatalog)
 	t.Normalize()
 	return t.Validate(catalog)
 }
-

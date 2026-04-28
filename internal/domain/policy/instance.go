@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/create2-labs/cafe-cpm/internal/domain/vocabulary"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/vocabulary"
 )
 
 var (

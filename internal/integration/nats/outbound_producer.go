@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/create2-labs/cafe-contracts/cafenatsv01"
-	"github.com/create2-labs/cafe-cpm/internal/domain/policy"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/policy"
 )
 
 var (
@@ -65,30 +65,30 @@ func NewOutboundProducer(publisher Publisher, store OutboundDedupStore) (*Outbou
 
 // AssessmentCompletedInput carries stable references for outbound projection.
 type AssessmentCompletedInput struct {
-	EventID       string
-	OccurredAt    time.Time
-	CorrelationID string
-	CausationID   string
+	EventID                 string
+	OccurredAt              time.Time
+	CorrelationID           string
+	CausationID             string
 	SubjectPolicyInstanceID string
-	AssessmentID  string
-	InstanceID    string
-	Status        policy.AssessmentStatus
-	FindingCount  int
+	AssessmentID            string
+	InstanceID              string
+	Status                  policy.AssessmentStatus
+	FindingCount            int
 }
 
 // RemediationRequestedInput carries stable references for outbound projection.
 type RemediationRequestedInput struct {
-	EventID              string
-	OccurredAt           time.Time
-	CorrelationID        string
-	CausationID          string
+	EventID                 string
+	OccurredAt              time.Time
+	CorrelationID           string
+	CausationID             string
 	SubjectPolicyInstanceID string
-	InstanceID           string
-	RemediationID        string
-	ReasonCode           string
-	RequestedBy          string
-	CorrelationRef       string
-	AutoStartRemediation bool
+	InstanceID              string
+	RemediationID           string
+	ReasonCode              string
+	RequestedBy             string
+	CorrelationRef          string
+	AutoStartRemediation    bool
 }
 
 // PublishAssessmentCompleted projects and publishes policy.assessment.completed.

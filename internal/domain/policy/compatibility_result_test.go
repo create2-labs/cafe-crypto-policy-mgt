@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/create2-labs/cafe-cpm/internal/domain/vocabulary"
-	"github.com/create2-labs/cafe-cpm/internal/domain/walletobserved"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/vocabulary"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/walletobserved"
 )
 
 func testdataPath(t *testing.T, name string) string {

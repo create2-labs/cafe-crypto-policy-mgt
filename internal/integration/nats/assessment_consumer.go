@@ -6,9 +6,9 @@ import (
 	"errors"
 
 	"github.com/create2-labs/cafe-contracts/cafenatsv01"
-	"github.com/create2-labs/cafe-cpm/internal/domain/policy"
-	"github.com/create2-labs/cafe-cpm/internal/domain/vocabulary"
-	"github.com/create2-labs/cafe-cpm/internal/domain/walletobserved"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/policy"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/vocabulary"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/walletobserved"
 )
 
 var (

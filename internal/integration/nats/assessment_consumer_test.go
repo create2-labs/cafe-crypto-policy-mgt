@@ -9,7 +9,7 @@ import (
 
 	"github.com/create2-labs/cafe-contracts/cafenatsv01"
 	walletv01 "github.com/create2-labs/cafe-contracts/observation/wallet/v01"
-	"github.com/create2-labs/cafe-cpm/internal/domain/vocabulary"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/vocabulary"
 )
 
 func TestAssessmentRequestConsumer_FirstDeliveryAndDuplicate(t *testing.T) {

@@ -1,4 +1,4 @@
-module github.com/create2-labs/cafe-cpm
+module github.com/create2-labs/cafe-crypto-policy-mgt
 
 go 1.26.2
 
