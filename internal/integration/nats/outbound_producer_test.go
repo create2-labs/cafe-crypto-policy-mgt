@@ -178,7 +178,7 @@ func TestPublishAssessmentCompletedRejectsDivergentDuplicate(t *testing.T) {
 	}
 }
 
-func newProducerForTests(t *testing.T, publisher Publisher, store IdempotencyStore) *OutboundProducer {
+func newProducerForTests(t *testing.T, publisher Publisher, store OutboundDedupStore) *OutboundProducer {
 	t.Helper()
 	producer, err := NewOutboundProducer(publisher, store)
 	if err != nil {

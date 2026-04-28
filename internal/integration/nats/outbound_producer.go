@@ -35,8 +35,8 @@ type Publisher interface {
 	Publish(ctx context.Context, subject string, payload []byte) error
 }
 
-// IdempotencyStore tracks published event ids and payload hash for replay safety.
-type IdempotencyStore interface {
+// OutboundDedupStore tracks published event ids and payload hash for replay safety.
+type OutboundDedupStore interface {
 	Get(ctx context.Context, key string) (payloadHash string, found bool, err error)
 	Put(ctx context.Context, key, payloadHash string) error
 }
@@ -44,12 +44,12 @@ type IdempotencyStore interface {
 // OutboundProducer publishes CPM outbound events for remediation workflows.
 type OutboundProducer struct {
 	publisher Publisher
-	store     IdempotencyStore
+	store     OutboundDedupStore
 	now       func() time.Time
 }
 
 // NewOutboundProducer builds a producer with explicit idempotent behavior.
-func NewOutboundProducer(publisher Publisher, store IdempotencyStore) (*OutboundProducer, error) {
+func NewOutboundProducer(publisher Publisher, store OutboundDedupStore) (*OutboundProducer, error) {
 	if publisher == nil {
 		return nil, ErrNilPublisher
 	}
