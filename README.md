@@ -105,6 +105,7 @@ Golden JSON: [`internal/domain/walletobserved/testdata/discovery_wallet_observed
 Behavior:
 - validates inbound payloads with shared `cafe-contracts/cafenatsv01` contracts.
 - maps `selection_request` into `policy.PolicySelectionRequest` and delegates execution to a thin handler interface.
+- normalizes wallet subject identifiers (`wallet:0x...`) to canonical lowercase for machine-facing consistency.
 - uses inbound `event_id` as idempotence key via `IdempotencyStore`.
 - treats duplicate deliveries and replayed `event_id` values as no-op.
 - releases in-flight claim on handler failure so retry is allowed.
@@ -116,6 +117,11 @@ Tests in `internal/integration/nats/assessment_consumer_test.go` cover:
 - replay after preloaded processed state (simulated post-restart behavior)
 - retry after transient handler failure
 - non-triggering behavior for `cafe.discovery.wallet.observed`
+- canonical lowercase normalization of wallet subject identifiers before handler delegation
+
+## Health endpoint contract
+
+CPM exposes `GET /healthz` as its service health endpoint. `GET /health` is not registered in CPM runtime.
 
 ## Outbound CPM events 
 

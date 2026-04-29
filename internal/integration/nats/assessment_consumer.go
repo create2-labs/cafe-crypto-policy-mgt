@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 
 	"github.com/create2-labs/cafe-contracts/cafenatsv01"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/policy"
@@ -64,6 +65,7 @@ func (c *AssessmentRequestConsumer) HandleMessage(ctx context.Context, subject s
 	if err := event.Validate(); err != nil {
 		return err
 	}
+	normalizeWalletSubjects(&event)
 
 	claim, err := c.idempotency.Claim(ctx, event.EventID)
 	if err != nil {
@@ -84,6 +86,46 @@ func (c *AssessmentRequestConsumer) HandleMessage(ctx context.Context, subject s
 		return err
 	}
 	return c.idempotency.MarkProcessed(ctx, event.EventID)
+}
+
+func normalizeWalletSubjects(event *cafenatsv01.PolicyAssessmentRequested) {
+	if event == nil {
+		return
+	}
+	event.Subject.ID = normalizeWalletSubjectID(event.Subject.ID)
+	event.Payload.Observation.Subject.ID = normalizeWalletSubjectID(event.Payload.Observation.Subject.ID)
+}
+
+func normalizeWalletSubjectID(subjectID string) string {
+	const walletPrefix = "wallet:"
+
+	value := strings.TrimSpace(subjectID)
+	if !strings.HasPrefix(strings.ToLower(value), walletPrefix) {
+		return value
+	}
+	address := value[len(walletPrefix):]
+	normalizedAddress, ok := normalizeHexAddress(address)
+	if !ok {
+		return value
+	}
+	return walletPrefix + normalizedAddress
+}
+
+func normalizeHexAddress(address string) (string, bool) {
+	raw := strings.TrimSpace(address)
+	if strings.HasPrefix(raw, "0X") {
+		raw = "0x" + raw[2:]
+	}
+	raw = strings.TrimPrefix(raw, "0x")
+	if len(raw) != 40 {
+		return "", false
+	}
+	for _, r := range raw {
+		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')) {
+			return "", false
+		}
+	}
+	return "0x" + strings.ToLower(raw), true
 }
 
 func mapSelectionRequest(in cafenatsv01.PolicySelectionRequestWire) policy.PolicySelectionRequest {

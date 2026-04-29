@@ -39,6 +39,12 @@ func TestAssessmentRequestConsumer_FirstDeliveryAndDuplicate(t *testing.T) {
 	if got := handler.last.SelectionRequest.TargetPosture; got != vocabulary.PQPostureHybrid {
 		t.Fatalf("mapped target posture = %q, want %q", got, vocabulary.PQPostureHybrid)
 	}
+	if got := handler.last.Command.Subject.ID; got != "wallet:0x742d35cc6634c0532925a3b844bc454e4438f44e" {
+		t.Fatalf("command subject.id = %q, want canonical lowercase wallet subject id", got)
+	}
+	if got := handler.last.Observation.Subject.ID; got != "wallet:0x742d35cc6634c0532925a3b844bc454e4438f44e" {
+		t.Fatalf("observation subject.id = %q, want canonical lowercase wallet subject id", got)
+	}
 }
 
 func TestAssessmentRequestConsumer_ReplayAfterReload(t *testing.T) {
