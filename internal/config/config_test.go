@@ -18,14 +18,14 @@ func TestLoadFromEnvDefaults(t *testing.T) {
 	if cfg.LogLevel != defaultLogLevel {
 		t.Fatalf("expected default log level %q, got %q", defaultLogLevel, cfg.LogLevel)
 	}
-	if cfg.PolicyCatalogPath != "" {
-		t.Fatalf("expected empty default policy catalog path, got %q", cfg.PolicyCatalogPath)
+	if cfg.PolicyCatalogPath != defaultPolicyCatalogPath {
+		t.Fatalf("expected default policy catalog path %q, got %q", defaultPolicyCatalogPath, cfg.PolicyCatalogPath)
 	}
-	if len(cfg.PolicyTemplatePaths) != 0 {
-		t.Fatalf("expected empty default policy template paths, got %#v", cfg.PolicyTemplatePaths)
+	if len(cfg.PolicyTemplatePaths) != 1 || cfg.PolicyTemplatePaths[0] != defaultPolicyTemplatePaths {
+		t.Fatalf("expected default policy template paths [%q], got %#v", defaultPolicyTemplatePaths, cfg.PolicyTemplatePaths)
 	}
-	if len(cfg.PolicyInstancePaths) != 0 {
-		t.Fatalf("expected empty default policy instance paths, got %#v", cfg.PolicyInstancePaths)
+	if len(cfg.PolicyInstancePaths) != 1 || cfg.PolicyInstancePaths[0] != defaultPolicyInstancePaths {
+		t.Fatalf("expected default policy instance paths [%q], got %#v", defaultPolicyInstancePaths, cfg.PolicyInstancePaths)
 	}
 }
 
