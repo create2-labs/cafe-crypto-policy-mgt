@@ -117,7 +117,7 @@ Tests in `internal/integration/nats/assessment_consumer_test.go` cover:
 - retry after transient handler failure
 - non-triggering behavior for `cafe.discovery.wallet.observed`
 
-## Outbound CPM events (PR16)
+## Outbound CPM events 
 
 `internal/integration/nats/outbound_producer.go` publishes shared `cafenatsv01` contracts:
 
@@ -137,15 +137,15 @@ Producer behavior is replay-safe and deterministic:
 - Discovery README: [Data structure (CPM export contract)](https://github.com/create2-labs/cafe-discovery/blob/main/README.md#data-structure-cpm-export-contract)
 - CAFE developer guide: [Discovery to CPM](https://github.com/create2-labs/cafe-documentation/blob/main/03-cafe-developer-guide.md#discovery-to-cpm-normalized-wallet-observation)
 
-## Read APIs (PR17)
+## Read APIs
 
 CPM now exposes read-only APIs backed by local policy files loaded at startup. These endpoints are for inspection and exploration only.
 
 Environment variables:
 
-- `CPM_POLICY_CATALOG_PATH` (default: `internal/domain/policy/testdata/policy_graph_catalog_valid.json`)
-- `CPM_POLICY_TEMPLATE_PATHS` (comma-separated, default: `internal/domain/policy/testdata/crypto_policy_template_valid.json`)
-- `CPM_POLICY_INSTANCE_PATHS` (comma-separated, default: `internal/domain/policy/testdata/crypto_policy_instance_valid.json`)
+- `CPM_POLICY_CATALOG_PATH` (default: `/app/policy/policy_graph_catalog_valid.json`)
+- `CPM_POLICY_TEMPLATE_PATHS` (comma-separated, default: `/app/policy/crypto_policy_template_valid.json`)
+- `CPM_POLICY_INSTANCE_PATHS` (comma-separated, default: `/app/policy/crypto_policy_instance_valid.json`)
 
 Endpoints:
 

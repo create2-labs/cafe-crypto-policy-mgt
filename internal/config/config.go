@@ -6,6 +6,9 @@ const (
 	defaultHTTPAddr = ":8080"
 	defaultLogLevel = "info"
 	defaultService  = "cafe-cpm"
+	defaultPolicyCatalogPath   = "/app/policy/policy_graph_catalog_valid.json"
+	defaultPolicyTemplatePaths = "/app/policy/crypto_policy_template_valid.json"
+	defaultPolicyInstancePaths = "/app/policy/crypto_policy_instance_valid.json"
 )
 
 type Config struct {
@@ -22,9 +25,9 @@ func LoadFromEnv() Config {
 		ServiceName:         getEnv("CPM_SERVICE_NAME", defaultService),
 		HTTPAddr:            getEnv("CPM_HTTP_ADDR", defaultHTTPAddr),
 		LogLevel:            getEnv("CPM_LOG_LEVEL", defaultLogLevel),
-		PolicyCatalogPath:   getEnv("CPM_POLICY_CATALOG_PATH", ""),
-		PolicyTemplatePaths: parseCommaList(getEnv("CPM_POLICY_TEMPLATE_PATHS", "")),
-		PolicyInstancePaths: parseCommaList(getEnv("CPM_POLICY_INSTANCE_PATHS", "")),
+		PolicyCatalogPath:   getEnv("CPM_POLICY_CATALOG_PATH", defaultPolicyCatalogPath),
+		PolicyTemplatePaths: parseCommaList(getEnv("CPM_POLICY_TEMPLATE_PATHS", defaultPolicyTemplatePaths)),
+		PolicyInstancePaths: parseCommaList(getEnv("CPM_POLICY_INSTANCE_PATHS", defaultPolicyInstancePaths)),
 	}
 }
 
