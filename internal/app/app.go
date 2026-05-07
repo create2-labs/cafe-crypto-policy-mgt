@@ -24,6 +24,9 @@ func Run(cfg config.Config) error {
 		SessionValidationURL:          cfg.SessionValidationURL,
 		SessionValidationTimeoutSec:   cfg.SessionValidationTimeoutSec,
 		SessionValidationServiceToken: cfg.SessionValidationServiceToken,
+		ScanAuthorizationURL:          cfg.ScanAuthorizationURL,
+		ScanAuthorizationTimeoutSec:   cfg.ScanAuthorizationTimeoutSec,
+		ScanAuthorizationServiceToken: cfg.ScanAuthorizationServiceToken,
 		ClockSkewSec:                  cfg.AuthClockSkewSec,
 	})
 	if err != nil {

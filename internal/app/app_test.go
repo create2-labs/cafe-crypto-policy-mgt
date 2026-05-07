@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -465,6 +466,98 @@ func TestHandlerPropagatesRequestIDToDiscoveryValidation(t *testing.T) {
 	got, _ := rid.Load().(string)
 	if got != "rid-123" {
 		t.Fatalf("expected request id propagation to discovery, got %q", got)
+	}
+}
+
+func TestHandlerFailsClosedWhenScanIDPresentButAuthzNotConfigured(t *testing.T) {
+	store, err := api.LoadReadStore(api.ReadStoreOptions{
+		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
+		TemplatePaths: []string{
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_valid.json"),
+		},
+		InstancePaths: []string{
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_valid.json"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("LoadReadStore: %v", err)
+	}
+	introspect := newDiscoveryValidationServer(t, discoveryValidationTestConfig{status: http.StatusOK})
+	defer introspect.Close()
+	h, err := handler("cafe-cpm", store, authConfig{
+		Required:                    true,
+		SessionValidationURL:        introspect.URL,
+		SessionValidationTimeoutSec: 3,
+		ClockSkewSec:                30,
+	})
+	if err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+	token, err := makeDiscoveryHybridToken(map[string]any{
+		"user_id": "user-1",
+		"email":   "user@example.com",
+		"exp":     time.Now().Add(1 * time.Hour).Unix(),
+	})
+	if err != nil {
+		t.Fatalf("make token: %v", err)
+	}
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/policies/decisions/explore",
+		strings.NewReader(`{"scanId":"scan-123","observation":{"chain_ids":[1],"account_kind":"eoa","current_algorithm":"secp256k1_ecrecover","current_pq_posture":"classical_only","public_key_exposed":true,"is_multichain":false,"observed_at":"2026-01-01T00:00:00Z"},"selection_request":{"target_posture":"hybrid","target_chain_ids":[1],"require_multichain":false,"allow_new_wallet":false,"address_continuity_required":true,"key_rotation_required":true,"recovery_required":true,"minimum_maturity":1,"approval_mode":"manual"}}`),
+	)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	h.ServeHTTP(res, req)
+	if res.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected status %d, got %d body=%s", http.StatusServiceUnavailable, res.Code, res.Body.String())
+	}
+}
+
+func TestHandlerContinuesWhenAuthzNotConfiguredAndNoScanID(t *testing.T) {
+	store, err := api.LoadReadStore(api.ReadStoreOptions{
+		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
+		TemplatePaths: []string{
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_valid.json"),
+		},
+		InstancePaths: []string{
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_valid.json"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("LoadReadStore: %v", err)
+	}
+	introspect := newDiscoveryValidationServer(t, discoveryValidationTestConfig{status: http.StatusOK})
+	defer introspect.Close()
+	h, err := handler("cafe-cpm", store, authConfig{
+		Required:                    true,
+		SessionValidationURL:        introspect.URL,
+		SessionValidationTimeoutSec: 3,
+		ClockSkewSec:                30,
+	})
+	if err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+	token, err := makeDiscoveryHybridToken(map[string]any{
+		"user_id": "user-1",
+		"email":   "user@example.com",
+		"exp":     time.Now().Add(1 * time.Hour).Unix(),
+	})
+	if err != nil {
+		t.Fatalf("make token: %v", err)
+	}
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/policies/decisions/explore",
+		strings.NewReader(`{"observation":{"chain_ids":[1],"account_kind":"eoa","current_algorithm":"secp256k1_ecrecover","current_pq_posture":"classical_only","public_key_exposed":true,"is_multichain":false,"observed_at":"2026-01-01T00:00:00Z"},"selection_request":{"target_posture":"hybrid","target_chain_ids":[1],"require_multichain":false,"allow_new_wallet":false,"address_continuity_required":true,"key_rotation_required":true,"recovery_required":true,"minimum_maturity":1,"approval_mode":"manual"}}`),
+	)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	h.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d body=%s", http.StatusOK, res.Code, res.Body.String())
 	}
 }
 

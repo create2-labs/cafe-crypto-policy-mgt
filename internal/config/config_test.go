@@ -33,6 +33,15 @@ func TestLoadFromEnvDefaults(t *testing.T) {
 	if cfg.SessionValidationServiceToken != "" {
 		t.Fatalf("expected empty session validation service token default, got %q", cfg.SessionValidationServiceToken)
 	}
+	if cfg.ScanAuthorizationURL != "" {
+		t.Fatalf("expected empty scan authorization URL default, got %q", cfg.ScanAuthorizationURL)
+	}
+	if cfg.ScanAuthorizationTimeoutSec != defaultScanAuthorizationTimeoutSec {
+		t.Fatalf("expected default scan authorization timeout %d, got %d", defaultScanAuthorizationTimeoutSec, cfg.ScanAuthorizationTimeoutSec)
+	}
+	if cfg.ScanAuthorizationServiceToken != "" {
+		t.Fatalf("expected empty scan authorization service token default, got %q", cfg.ScanAuthorizationServiceToken)
+	}
 	if cfg.PolicyCatalogPath != defaultPolicyCatalogPath {
 		t.Fatalf("expected default policy catalog path %q, got %q", defaultPolicyCatalogPath, cfg.PolicyCatalogPath)
 	}
@@ -52,6 +61,9 @@ func TestLoadFromEnvOverrides(t *testing.T) {
 	t.Setenv("CAFE_SESSION_JWT_VALIDATION_URL", "http://discovery:8080/internal/auth/session/validate")
 	t.Setenv("CAFE_SESSION_JWT_VALIDATION_TIMEOUT_SEC", "7")
 	t.Setenv("CAFE_SESSION_JWT_VALIDATION_SERVICE_TOKEN", "service-token")
+	t.Setenv("CAFE_SCAN_AUTHORIZATION_URL", "http://discovery:8080/internal/authz/scans")
+	t.Setenv("CAFE_SCAN_AUTHORIZATION_TIMEOUT_SEC", "9")
+	t.Setenv("CAFE_SCAN_AUTHORIZATION_SERVICE_TOKEN", "scan-authz-service-token")
 	t.Setenv("CPM_AUTH_CLOCK_SKEW_SEC", "45")
 	t.Setenv("CPM_POLICY_CATALOG_PATH", "catalog.json")
 	t.Setenv("CPM_POLICY_TEMPLATE_PATHS", "tpl-a.json, tpl-b.json")
@@ -79,6 +91,15 @@ func TestLoadFromEnvOverrides(t *testing.T) {
 	}
 	if cfg.SessionValidationServiceToken != "service-token" {
 		t.Fatalf("expected session validation service token override, got %q", cfg.SessionValidationServiceToken)
+	}
+	if cfg.ScanAuthorizationURL != "http://discovery:8080/internal/authz/scans" {
+		t.Fatalf("expected scan authorization URL override, got %q", cfg.ScanAuthorizationURL)
+	}
+	if cfg.ScanAuthorizationTimeoutSec != 9 {
+		t.Fatalf("expected scan authorization timeout override, got %d", cfg.ScanAuthorizationTimeoutSec)
+	}
+	if cfg.ScanAuthorizationServiceToken != "scan-authz-service-token" {
+		t.Fatalf("expected scan authorization service token override, got %q", cfg.ScanAuthorizationServiceToken)
 	}
 	if cfg.AuthClockSkewSec != 45 {
 		t.Fatalf("expected auth clock skew override, got %d", cfg.AuthClockSkewSec)
