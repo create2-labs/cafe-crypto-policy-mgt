@@ -183,6 +183,41 @@ AUTH-00 freezes the cross-repo contract required for CPM authenticated rollout:
 
 See [`AUTH_CONTRACT.md`](./AUTH_CONTRACT.md) and typed models in `internal/authz/contract.go`.
 
+## AUTH-01 runtime authentication wiring
+
+CPM now applies authentication middleware to classified business routes.
+
+Environment variables:
+
+- `CPM_AUTH_REQUIRED` (default: `true`)
+- `CAFE_SESSION_JWT_VALIDATION_URL` (required when auth is enabled)
+- `CAFE_SESSION_JWT_VALIDATION_TIMEOUT_SEC` (default: `3`)
+- `CAFE_SESSION_JWT_VALIDATION_SERVICE_TOKEN` (optional placeholder for service-to-service auth)
+- `CPM_AUTH_CLOCK_SKEW_SEC` (default: `30`)
+
+Important:
+- CPM validates **Discovery-issued session JWTs**.
+- CPM does not define a separate JWT model/secret.
+- CPM does not issue or validate a CPM-specific JWT. It accepts the same Bearer session token issued by Discovery and delegates authoritative cryptographic validation to Discovery.
+- The current Discovery session token is a PQC hybrid JWS JSON envelope encoded as base64url, carrying EdDSA and ML-DSA-65 signatures.
+- Current Discovery session-token semantics do not rely on issuer/audience validation, so CPM AUTH-01 does not enforce `iss`/`aud`.
+- Identity is derived from Discovery-validated claims, primarily `user_id` and optionally `email`.
+- CPM may perform local structural and expiry fast-fail checks, but it only injects request principal after Discovery validation succeeds.
+- If the Discovery validation endpoint returns only pass/fail (without claims), CPM falls back to claims parsed from the already validated token payload.
+- `CAFE_SESSION_JWT_VALIDATION_URL` must point to an internal-only Discovery endpoint.
+- Optional config: `CAFE_SESSION_JWT_VALIDATION_SERVICE_TOKEN` for service-to-service protection (temporary placeholder; to be replaced by first-class service identity in later auth hardening).
+
+Public route:
+
+- `GET /healthz`
+
+Authenticated business routes:
+
+- `GET /api/v1/policies/catalog`
+- `GET /api/v1/policies/templates`
+- `GET /api/v1/policies/instances`
+- `POST /api/v1/policies/decisions/explore`
+
 ## Run locally
 
 ```bash

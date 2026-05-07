@@ -18,6 +18,21 @@ func TestLoadFromEnvDefaults(t *testing.T) {
 	if cfg.LogLevel != defaultLogLevel {
 		t.Fatalf("expected default log level %q, got %q", defaultLogLevel, cfg.LogLevel)
 	}
+	if cfg.AuthRequired != defaultAuthRequired {
+		t.Fatalf("expected default auth required %v, got %v", defaultAuthRequired, cfg.AuthRequired)
+	}
+	if cfg.AuthClockSkewSec != defaultAuthClockSkewSec {
+		t.Fatalf("expected default auth clock skew %d, got %d", defaultAuthClockSkewSec, cfg.AuthClockSkewSec)
+	}
+	if cfg.SessionValidationURL != "" {
+		t.Fatalf("expected empty session validation URL default, got %q", cfg.SessionValidationURL)
+	}
+	if cfg.SessionValidationTimeoutSec != defaultSessionValidationTimeoutSec {
+		t.Fatalf("expected default session validation timeout %d, got %d", defaultSessionValidationTimeoutSec, cfg.SessionValidationTimeoutSec)
+	}
+	if cfg.SessionValidationServiceToken != "" {
+		t.Fatalf("expected empty session validation service token default, got %q", cfg.SessionValidationServiceToken)
+	}
 	if cfg.PolicyCatalogPath != defaultPolicyCatalogPath {
 		t.Fatalf("expected default policy catalog path %q, got %q", defaultPolicyCatalogPath, cfg.PolicyCatalogPath)
 	}
@@ -33,6 +48,11 @@ func TestLoadFromEnvOverrides(t *testing.T) {
 	t.Setenv("CPM_SERVICE_NAME", "custom-cpm")
 	t.Setenv("CPM_HTTP_ADDR", ":9090")
 	t.Setenv("CPM_LOG_LEVEL", "debug")
+	t.Setenv("CPM_AUTH_REQUIRED", "false")
+	t.Setenv("CAFE_SESSION_JWT_VALIDATION_URL", "http://discovery:8080/internal/auth/session/validate")
+	t.Setenv("CAFE_SESSION_JWT_VALIDATION_TIMEOUT_SEC", "7")
+	t.Setenv("CAFE_SESSION_JWT_VALIDATION_SERVICE_TOKEN", "service-token")
+	t.Setenv("CPM_AUTH_CLOCK_SKEW_SEC", "45")
 	t.Setenv("CPM_POLICY_CATALOG_PATH", "catalog.json")
 	t.Setenv("CPM_POLICY_TEMPLATE_PATHS", "tpl-a.json, tpl-b.json")
 	t.Setenv("CPM_POLICY_INSTANCE_PATHS", "inst-a.json,inst-b.json")
@@ -47,6 +67,21 @@ func TestLoadFromEnvOverrides(t *testing.T) {
 	}
 	if cfg.LogLevel != "debug" {
 		t.Fatalf("expected log level override, got %q", cfg.LogLevel)
+	}
+	if cfg.AuthRequired {
+		t.Fatalf("expected auth required override false, got %v", cfg.AuthRequired)
+	}
+	if cfg.SessionValidationURL != "http://discovery:8080/internal/auth/session/validate" {
+		t.Fatalf("expected session validation URL override, got %q", cfg.SessionValidationURL)
+	}
+	if cfg.SessionValidationTimeoutSec != 7 {
+		t.Fatalf("expected session validation timeout override, got %d", cfg.SessionValidationTimeoutSec)
+	}
+	if cfg.SessionValidationServiceToken != "service-token" {
+		t.Fatalf("expected session validation service token override, got %q", cfg.SessionValidationServiceToken)
+	}
+	if cfg.AuthClockSkewSec != 45 {
+		t.Fatalf("expected auth clock skew override, got %d", cfg.AuthClockSkewSec)
 	}
 	if cfg.PolicyCatalogPath != "catalog.json" {
 		t.Fatalf("expected policy catalog path override, got %q", cfg.PolicyCatalogPath)
