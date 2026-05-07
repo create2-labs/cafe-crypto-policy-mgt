@@ -6,6 +6,7 @@ import (
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/api"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/config"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/persistence"
 )
 
 // Run starts a minimal HTTP server used as bootstrap for CPM.
@@ -44,6 +45,7 @@ func Run(cfg config.Config) error {
 
 func handler(serviceName string, store *api.ReadStore, authCfg authConfig) (http.Handler, error) {
 	mux := http.NewServeMux()
+	ownerStore := persistence.NewOwnerScopedStore()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(serviceName + " ok"))
@@ -51,6 +53,7 @@ func handler(serviceName string, store *api.ReadStore, authCfg authConfig) (http
 	if err := api.RegisterReadRoutes(mux, store); err != nil {
 		return nil, fmt.Errorf("register read routes: %w", err)
 	}
+	registerOwnerScopedRoutes(mux, ownerStore)
 	protected, err := withAuthentication(mux, authCfg)
 	if err != nil {
 		return nil, fmt.Errorf("wire auth middleware: %w", err)
