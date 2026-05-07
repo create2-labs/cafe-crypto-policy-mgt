@@ -171,6 +171,18 @@ and returns `PolicyDecision` output that keeps the distinction between:
 - `compatible_but_not_deployable`
 - `compatible_and_deployable`
 
+## Auth/Authz contract (AUTH-00)
+
+AUTH-00 freezes the cross-repo contract required for CPM authenticated rollout:
+
+- JWT expectations;
+- principal model;
+- error payload schema for 401/403;
+- scan authorization request/response outcomes;
+- route classification policy.
+
+See [`AUTH_CONTRACT.md`](./AUTH_CONTRACT.md) and typed models in `internal/authz/contract.go`.
+
 ## Run locally
 
 ```bash
