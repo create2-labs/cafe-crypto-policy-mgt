@@ -19,7 +19,13 @@ func Run(cfg config.Config) error {
 		return fmt.Errorf("load read store: %w", err)
 	}
 
-	h, err := handler(cfg.ServiceName, store)
+	h, err := handler(cfg.ServiceName, store, authConfig{
+		Required:                      cfg.AuthRequired,
+		SessionValidationURL:          cfg.SessionValidationURL,
+		SessionValidationTimeoutSec:   cfg.SessionValidationTimeoutSec,
+		SessionValidationServiceToken: cfg.SessionValidationServiceToken,
+		ClockSkewSec:                  cfg.AuthClockSkewSec,
+	})
 	if err != nil {
 		return err
 	}
@@ -33,7 +39,7 @@ func Run(cfg config.Config) error {
 	return server.ListenAndServe()
 }
 
-func handler(serviceName string, store *api.ReadStore) (http.Handler, error) {
+func handler(serviceName string, store *api.ReadStore, authCfg authConfig) (http.Handler, error) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -42,5 +48,9 @@ func handler(serviceName string, store *api.ReadStore) (http.Handler, error) {
 	if err := api.RegisterReadRoutes(mux, store); err != nil {
 		return nil, fmt.Errorf("register read routes: %w", err)
 	}
-	return mux, nil
+	protected, err := withAuthentication(mux, authCfg)
+	if err != nil {
+		return nil, fmt.Errorf("wire auth middleware: %w", err)
+	}
+	return protected, nil
 }
