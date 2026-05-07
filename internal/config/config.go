@@ -12,6 +12,7 @@ const (
 	defaultAuthRequired                = true
 	defaultAuthClockSkewSec            = 30
 	defaultSessionValidationTimeoutSec = 3
+	defaultScanAuthorizationTimeoutSec = 3
 	defaultPolicyCatalogPath           = "/app/policy/policy_graph_catalog_valid.json"
 	defaultPolicyTemplatePaths         = "/app/policy/crypto_policy_template_valid.json"
 	defaultPolicyInstancePaths         = "/app/policy/crypto_policy_instance_valid.json"
@@ -25,6 +26,9 @@ type Config struct {
 	SessionValidationURL          string
 	SessionValidationTimeoutSec   int
 	SessionValidationServiceToken string
+	ScanAuthorizationURL          string
+	ScanAuthorizationTimeoutSec   int
+	ScanAuthorizationServiceToken string
 	AuthClockSkewSec              int
 	PolicyCatalogPath             string
 	PolicyTemplatePaths           []string
@@ -40,6 +44,9 @@ func LoadFromEnv() Config {
 		SessionValidationURL:          getEnv("CAFE_SESSION_JWT_VALIDATION_URL", ""),
 		SessionValidationTimeoutSec:   getEnvInt("CAFE_SESSION_JWT_VALIDATION_TIMEOUT_SEC", defaultSessionValidationTimeoutSec),
 		SessionValidationServiceToken: getEnv("CAFE_SESSION_JWT_VALIDATION_SERVICE_TOKEN", ""),
+		ScanAuthorizationURL:          getEnv("CAFE_SCAN_AUTHORIZATION_URL", ""),
+		ScanAuthorizationTimeoutSec:   getEnvInt("CAFE_SCAN_AUTHORIZATION_TIMEOUT_SEC", defaultScanAuthorizationTimeoutSec),
+		ScanAuthorizationServiceToken: getEnv("CAFE_SCAN_AUTHORIZATION_SERVICE_TOKEN", ""),
 		AuthClockSkewSec:              getEnvInt("CPM_AUTH_CLOCK_SKEW_SEC", defaultAuthClockSkewSec),
 		PolicyCatalogPath:             getEnv("CPM_POLICY_CATALOG_PATH", defaultPolicyCatalogPath),
 		PolicyTemplatePaths:           parseCommaList(getEnv("CPM_POLICY_TEMPLATE_PATHS", defaultPolicyTemplatePaths)),

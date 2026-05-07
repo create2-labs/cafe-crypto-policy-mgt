@@ -1,12 +1,14 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -18,6 +20,9 @@ type authConfig struct {
 	SessionValidationURL          string
 	SessionValidationTimeoutSec   int
 	SessionValidationServiceToken string
+	ScanAuthorizationURL          string
+	ScanAuthorizationTimeoutSec   int
+	ScanAuthorizationServiceToken string
 	ClockSkewSec                  int
 }
 
@@ -71,6 +76,17 @@ func withAuthentication(next http.Handler, cfg authConfig) (http.Handler, error)
 		if authErr.Code != "" {
 			respondAuthError(w, status, authErr)
 			return
+		}
+		routeScanIDs, scanErr, scanStatus := extractScanIDsForAuthorization(r)
+		if scanErr.Code != "" {
+			respondAuthError(w, scanStatus, scanErr)
+			return
+		}
+		for _, routeScanID := range routeScanIDs {
+			if scanAuthErr, scanAuthStatus := authorizeScanAccess(r.Context(), principal, routeScanID, cfg, r.Header.Get("X-Request-Id")); scanAuthErr.Code != "" {
+				respondAuthError(w, scanAuthStatus, scanAuthErr)
+				return
+			}
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalContextKey{}, principal)))
 	}), nil
@@ -260,6 +276,10 @@ type discoveryValidationResponse struct {
 	Claims       map[string]any `json:"claims,omitempty"`
 }
 
+type scanAuthorizationResponse struct {
+	Allowed bool `json:"allowed"`
+}
+
 func validateTokenWithDiscovery(
 	ctx context.Context,
 	token string,
@@ -331,4 +351,176 @@ func respondAuthError(w http.ResponseWriter, status int, payload authz.APIError)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
+}
+
+func extractScanIDsForAuthorization(r *http.Request) ([]string, authz.APIError, int) {
+	if r == nil || r.Body == nil {
+		return nil, authz.APIError{}, http.StatusOK
+	}
+	if r.Method != http.MethodPost && r.Method != http.MethodPut && r.Method != http.MethodPatch {
+		return nil, authz.APIError{}, http.StatusOK
+	}
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return nil, authz.APIError{
+			Code:    "AUTHZ_SCAN_PAYLOAD_READ_FAILED",
+			Message: "Could not read request payload for scan authorization.",
+		}, http.StatusBadRequest
+	}
+	r.Body = io.NopCloser(bytes.NewBuffer(body))
+	if len(body) == 0 {
+		return nil, authz.APIError{}, http.StatusOK
+	}
+	payload := map[string]any{}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, authz.APIError{}, http.StatusOK
+	}
+	scanIDs, malformed := collectScanIDs(payload)
+	if malformed {
+		return nil, authz.APIError{
+			Code:    "AUTHZ_SCAN_ID_MALFORMED",
+			Message: "scanId is malformed.",
+		}, http.StatusBadRequest
+	}
+	if len(scanIDs) == 0 {
+		return nil, authz.APIError{}, http.StatusOK
+	}
+	base := scanIDs[0]
+	for _, scanID := range scanIDs[1:] {
+		if scanID != base {
+			return nil, authz.APIError{
+				Code:    "AUTHZ_SCAN_ID_CONFLICT",
+				Message: "Request carries conflicting scanId values.",
+			}, http.StatusBadRequest
+		}
+	}
+	return []string{base}, authz.APIError{}, http.StatusOK
+}
+
+func collectScanIDs(payload map[string]any) ([]string, bool) {
+	out := make([]string, 0, 2)
+	add := func(raw any) bool {
+		if raw == nil {
+			return true
+		}
+		value, ok := raw.(string)
+		if !ok {
+			return false
+		}
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return false
+		}
+		out = append(out, value)
+		return true
+	}
+	if !add(payload["scanId"]) {
+		return nil, true
+	}
+	if !add(payload["scan_id"]) {
+		return nil, true
+	}
+	if draft, ok := payload["draft"].(map[string]any); ok {
+		if !add(draft["scanId"]) {
+			return nil, true
+		}
+		if !add(draft["scan_id"]) {
+			return nil, true
+		}
+	}
+	return out, false
+}
+
+func authorizeScanAccess(
+	ctx context.Context,
+	principal authz.Principal,
+	scanID string,
+	cfg authConfig,
+	requestID string,
+) (authz.APIError, int) {
+	if strings.TrimSpace(scanID) == "" {
+		return authz.APIError{
+			Code:    "AUTHZ_SCAN_ID_MALFORMED",
+			Message: "scanId is malformed.",
+		}, http.StatusBadRequest
+	}
+	if strings.TrimSpace(cfg.ScanAuthorizationURL) == "" {
+		return authz.APIError{
+			Code:    "AUTHZ_UNAVAILABLE",
+			Message: "Scan authorization service unavailable.",
+			Details: map[string]any{"error": "scan authorization URL not configured"},
+		}, http.StatusServiceUnavailable
+	}
+	timeoutSec := cfg.ScanAuthorizationTimeoutSec
+	if timeoutSec <= 0 {
+		timeoutSec = 3
+	}
+	endpoint := strings.TrimSuffix(cfg.ScanAuthorizationURL, "/") + "/" + url.PathEscape(scanID) + "/can-read"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, http.NoBody)
+	if err != nil {
+		return authz.APIError{
+			Code:    "AUTHZ_UNAVAILABLE",
+			Message: "Scan authorization service unavailable.",
+			Details: map[string]any{"error": err.Error()},
+		}, http.StatusServiceUnavailable
+	}
+	req.Header.Set("X-User-Id", principal.UserID)
+	if principal.TenantID != "" {
+		req.Header.Set("X-Tenant-Id", principal.TenantID)
+	}
+	if requestID != "" {
+		req.Header.Set("X-Request-Id", requestID)
+	}
+	if cfg.ScanAuthorizationServiceToken != "" {
+		req.Header.Set("Authorization", "Bearer "+cfg.ScanAuthorizationServiceToken)
+	}
+	client := &http.Client{Timeout: time.Duration(timeoutSec) * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return authz.APIError{
+			Code:    "AUTHZ_UNAVAILABLE",
+			Message: "Scan authorization service unavailable.",
+			Details: map[string]any{"error": err.Error()},
+		}, http.StatusServiceUnavailable
+	}
+	defer func() { _ = resp.Body.Close() }()
+	switch resp.StatusCode {
+	case http.StatusOK:
+		var parsed scanAuthorizationResponse
+		if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+			return authz.APIError{
+				Code:    "AUTHZ_UNAVAILABLE",
+				Message: "Scan authorization service unavailable.",
+				Details: map[string]any{"error": "invalid authorization response"},
+			}, http.StatusServiceUnavailable
+		}
+		if !parsed.Allowed {
+			return authz.APIError{
+				Code:    "AUTHZ_SCAN_FORBIDDEN",
+				Message: "Scan access denied.",
+			}, http.StatusForbidden
+		}
+		return authz.APIError{}, http.StatusOK
+	case http.StatusForbidden, http.StatusNotFound:
+		return authz.APIError{
+			Code:    "AUTHZ_SCAN_FORBIDDEN",
+			Message: "Scan access denied.",
+		}, http.StatusForbidden
+	case http.StatusUnauthorized:
+		return authz.APIError{
+			Code:    "AUTHZ_UNAVAILABLE",
+			Message: "Scan authorization service unavailable.",
+		}, http.StatusServiceUnavailable
+	default:
+		if resp.StatusCode >= 500 {
+			return authz.APIError{
+				Code:    "AUTHZ_UNAVAILABLE",
+				Message: "Scan authorization service unavailable.",
+			}, http.StatusServiceUnavailable
+		}
+		return authz.APIError{
+			Code:    "AUTHZ_UNAVAILABLE",
+			Message: "Scan authorization service unavailable.",
+		}, http.StatusServiceUnavailable
+	}
 }
