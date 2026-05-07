@@ -222,6 +222,21 @@ Authenticated business routes:
 - `GET /api/v1/policies/instances`
 - `POST /api/v1/policies/decisions/explore`
 
+## AUTH-03 owner-scoped persistence foundation
+
+CPM now includes an owner-scoped persistence primitive in `internal/persistence/owner_scoped_store.go` for draft/policy records.
+
+Rules enforced by this layer:
+- owner is always derived from authenticated principal context (`user_id`, optional `tenant_id`);
+- cross-user read/update is rejected;
+- write operations require a valid principal;
+- no API should accept owner identity from client payload as authoritative.
+
+Legacy anonymous records strategy (AUTH-03):
+- current rollout treats legacy anonymous draft/policy data as inaccessible to authenticated owner-scoped reads;
+- no backfill migration is performed in this PR;
+- local/dev anonymous datasets can be dropped or regenerated during rollout.
+
 ## Run locally
 
 ```bash

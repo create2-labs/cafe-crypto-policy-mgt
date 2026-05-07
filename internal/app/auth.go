@@ -38,6 +38,10 @@ var routeInventory = []routeSpec{
 	{Method: http.MethodGet, Path: "/api/v1/policies/templates", Class: authz.RouteClassAuthenticated},
 	{Method: http.MethodGet, Path: "/api/v1/policies/instances", Class: authz.RouteClassAuthenticated},
 	{Method: http.MethodPost, Path: "/api/v1/policies/decisions/explore", Class: authz.RouteClassAuthenticated},
+	{Method: http.MethodPost, Path: "/api/v1/cpm/drafts", Class: authz.RouteClassAuthenticated},
+	{Method: http.MethodGet, Path: "/api/v1/cpm/drafts", Class: authz.RouteClassAuthenticated},
+	{Method: http.MethodPost, Path: "/api/v1/cpm/policies", Class: authz.RouteClassAuthenticated},
+	{Method: http.MethodGet, Path: "/api/v1/cpm/policies", Class: authz.RouteClassAuthenticated},
 }
 
 type principalContextKey struct{}
