@@ -46,6 +46,11 @@ func Run(cfg config.Config) error {
 func handler(serviceName string, store *api.ReadStore, authCfg authConfig) (http.Handler, error) {
 	mux := http.NewServeMux()
 	ownerStore := persistence.NewOwnerScopedStore()
+	obs := authCfg.Observability
+	if obs == nil {
+		obs = newAuthObservability()
+	}
+	authCfg.Observability = obs
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(serviceName + " ok"))
@@ -53,7 +58,7 @@ func handler(serviceName string, store *api.ReadStore, authCfg authConfig) (http
 	if err := api.RegisterReadRoutes(mux, store); err != nil {
 		return nil, fmt.Errorf("register read routes: %w", err)
 	}
-	registerOwnerScopedRoutes(mux, ownerStore)
+	registerOwnerScopedRoutes(mux, ownerStore, obs)
 	protected, err := withAuthentication(mux, authCfg)
 	if err != nil {
 		return nil, fmt.Errorf("wire auth middleware: %w", err)

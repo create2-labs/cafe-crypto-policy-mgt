@@ -98,25 +98,25 @@ func TestAuthorizeScanAccessMappings(t *testing.T) {
 		ScanAuthorizationTimeoutSec: 1,
 	}
 	principal.TenantID = "tenant-a"
-	if errPayload, status := authorizeScanAccess(t.Context(), principal, "allow", cfg, "rid"); errPayload.Code != "" || status != http.StatusOK {
+	if errPayload, status, _ := authorizeScanAccess(t.Context(), principal, "allow", cfg, "rid"); errPayload.Code != "" || status != http.StatusOK {
 		t.Fatalf("expected allow, got code=%q status=%d", errPayload.Code, status)
 	}
 	if gotUserID.Load() != "u1" || gotTenantID.Load() != "tenant-a" {
 		t.Fatalf("expected principal-derived headers, got user=%v tenant=%v", gotUserID.Load(), gotTenantID.Load())
 	}
-	if errPayload, status := authorizeScanAccess(t.Context(), principal, "deny", cfg, "rid"); status != http.StatusForbidden || errPayload.Code == "" {
+	if errPayload, status, _ := authorizeScanAccess(t.Context(), principal, "deny", cfg, "rid"); status != http.StatusForbidden || errPayload.Code == "" {
 		t.Fatalf("expected forbidden mapping, got code=%q status=%d", errPayload.Code, status)
 	}
-	if errPayload, status := authorizeScanAccess(t.Context(), principal, "notfound", cfg, "rid"); status != http.StatusForbidden || errPayload.Code == "" {
+	if errPayload, status, _ := authorizeScanAccess(t.Context(), principal, "notfound", cfg, "rid"); status != http.StatusForbidden || errPayload.Code == "" {
 		t.Fatalf("expected notfound->forbidden mapping, got code=%q status=%d", errPayload.Code, status)
 	}
-	if errPayload, status := authorizeScanAccess(t.Context(), principal, "bad200", cfg, "rid"); status != http.StatusForbidden || errPayload.Code == "" {
+	if errPayload, status, _ := authorizeScanAccess(t.Context(), principal, "bad200", cfg, "rid"); status != http.StatusForbidden || errPayload.Code == "" {
 		t.Fatalf("expected explicit allowed=false to map forbidden, got code=%q status=%d", errPayload.Code, status)
 	}
-	if errPayload, status := authorizeScanAccess(t.Context(), principal, "unavailable", cfg, "rid"); status != http.StatusServiceUnavailable || errPayload.Code == "" {
+	if errPayload, status, _ := authorizeScanAccess(t.Context(), principal, "unavailable", cfg, "rid"); status != http.StatusServiceUnavailable || errPayload.Code == "" {
 		t.Fatalf("expected unavailable mapping, got code=%q status=%d", errPayload.Code, status)
 	}
-	if errPayload, status := authorizeScanAccess(t.Context(), principal, "timeout", cfg, "rid"); status != http.StatusServiceUnavailable || errPayload.Code == "" {
+	if errPayload, status, _ := authorizeScanAccess(t.Context(), principal, "timeout", cfg, "rid"); status != http.StatusServiceUnavailable || errPayload.Code == "" {
 		t.Fatalf("expected timeout mapping, got code=%q status=%d", errPayload.Code, status)
 	}
 }

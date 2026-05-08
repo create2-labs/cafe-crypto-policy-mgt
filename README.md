@@ -237,6 +237,49 @@ Legacy anonymous records strategy (AUTH-03):
 - no backfill migration is performed in this PR;
 - local/dev anonymous datasets can be dropped or regenerated during rollout.
 
+## AUTH-04 auth error contract and observability
+
+CPM now returns stable JSON payloads for authn/authz failures:
+
+```json
+{
+  "code": "AUTHZ_SCAN_FORBIDDEN",
+  "message": "scan access denied",
+  "details": {},
+  "request_id": "req_..."
+}
+```
+
+Contract guarantees:
+- `code`, `message`, `details`, and `request_id` are always present in auth-related error payloads.
+- `X-Request-Id` is propagated when provided and generated otherwise.
+- The same request id is echoed in both response header and JSON payload.
+
+AUTH-04 stable codes and mappings:
+- `AUTH_UNAUTHENTICATED` -> `401`
+- `AUTH_VALIDATION_UNAVAILABLE` -> `503`
+- `AUTHZ_SCAN_ID_MALFORMED` -> `400`
+- `AUTHZ_SCAN_ID_CONFLICT` -> `400`
+- `AUTHZ_SCAN_FORBIDDEN` -> `403`
+- `AUTHZ_SCAN_UNAVAILABLE` -> `503`
+- `AUTHZ_OWNER_FORBIDDEN` -> `403`
+- `AUTHZ_PRINCIPAL_REQUIRED` -> `401`
+
+Observability:
+- structured auth decision logs include request id, method, route class, category, outcome, and safe reason code.
+- logs may include authenticated `user_id` and `tenant_id` only after principal resolution.
+- logs must not include raw bearer tokens, authorization headers, full claims, emails, secrets, or request bodies.
+
+Metrics:
+- decision counter name: `cpm_auth_decisions_total`.
+- label set: `category` (`authn`, `scan_authz`, `owner_authz`), `outcome` (`allowed`, `denied`, `unavailable`, `malformed`), `code` (stable auth code or `OK`), `route` (low-cardinality route class).
+- no high-cardinality labels (no user id, scan id, raw path, token, or request id).
+
+Audit hook:
+- AUTH-04 adds a small internal audit sink interface with default no-op implementation.
+- events are emitted for scan authorization denied and owner access denied decisions.
+- no external audit storage is implemented in this phase.
+
 ## Run locally
 
 ```bash

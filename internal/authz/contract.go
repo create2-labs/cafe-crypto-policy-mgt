@@ -35,10 +35,10 @@ func (p Principal) Validate() error {
 }
 
 type APIError struct {
-	Code      string `json:"code"`
-	Message   string `json:"message"`
-	Details   any    `json:"details,omitempty"`
-	RequestID string `json:"request_id,omitempty"`
+	Code      string         `json:"code"`
+	Message   string         `json:"message"`
+	Details   map[string]any `json:"details"`
+	RequestID string         `json:"request_id,omitempty"`
 }
 
 func (e APIError) Validate() error {

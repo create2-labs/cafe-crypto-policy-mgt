@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/authz"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/persistence"
 )
 
@@ -17,11 +18,16 @@ type ownerScopedUpsertRequest struct {
 	TenantID    string         `json:"tenant_id,omitempty"`
 }
 
-func registerOwnerScopedRoutes(mux *http.ServeMux, store *persistence.OwnerScopedStore) {
+func registerOwnerScopedRoutes(mux *http.ServeMux, store *persistence.OwnerScopedStore, obs *authObservability) {
+	if obs == nil {
+		obs = newAuthObservability()
+	}
 	mux.HandleFunc("POST /api/v1/cpm/drafts", func(w http.ResponseWriter, r *http.Request) {
+		requestID := obs.ensureRequestID(w, r)
 		principal, ok := principalFromContext(r.Context())
 		if !ok {
-			writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "missing principal"})
+			obs.recordDecision(r, requestID, authCategoryOwner, "denied", authCodePrincipalRequired, "principal_missing", "", "")
+			obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, "authentication required", map[string]any{"reason": "principal_missing"})
 			return
 		}
 		req, err := decodeOwnerScopedUpsertRequest(r)
@@ -31,15 +37,17 @@ func registerOwnerScopedRoutes(mux *http.ServeMux, store *persistence.OwnerScope
 		}
 		record, saveErr := store.SaveDraft(principal, req.ID, req.ScanID, req.Payload)
 		if saveErr != nil {
-			mapPersistenceError(w, saveErr)
+			mapPersistenceError(w, r, obs, principal, saveErr)
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"item": record})
 	})
 	mux.HandleFunc("GET /api/v1/cpm/drafts", func(w http.ResponseWriter, r *http.Request) {
+		requestID := obs.ensureRequestID(w, r)
 		principal, ok := principalFromContext(r.Context())
 		if !ok {
-			writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "missing principal"})
+			obs.recordDecision(r, requestID, authCategoryOwner, "denied", authCodePrincipalRequired, "principal_missing", "", "")
+			obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, "authentication required", map[string]any{"reason": "principal_missing"})
 			return
 		}
 		id := strings.TrimSpace(r.URL.Query().Get("id"))
@@ -49,15 +57,17 @@ func registerOwnerScopedRoutes(mux *http.ServeMux, store *persistence.OwnerScope
 		}
 		record, err := store.GetDraft(principal, id)
 		if err != nil {
-			mapPersistenceError(w, err)
+			mapPersistenceError(w, r, obs, principal, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"item": record})
 	})
 	mux.HandleFunc("POST /api/v1/cpm/policies", func(w http.ResponseWriter, r *http.Request) {
+		requestID := obs.ensureRequestID(w, r)
 		principal, ok := principalFromContext(r.Context())
 		if !ok {
-			writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "missing principal"})
+			obs.recordDecision(r, requestID, authCategoryOwner, "denied", authCodePrincipalRequired, "principal_missing", "", "")
+			obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, "authentication required", map[string]any{"reason": "principal_missing"})
 			return
 		}
 		req, err := decodeOwnerScopedUpsertRequest(r)
@@ -67,15 +77,17 @@ func registerOwnerScopedRoutes(mux *http.ServeMux, store *persistence.OwnerScope
 		}
 		record, saveErr := store.SavePolicy(principal, req.ID, req.ScanID, req.Payload)
 		if saveErr != nil {
-			mapPersistenceError(w, saveErr)
+			mapPersistenceError(w, r, obs, principal, saveErr)
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"item": record})
 	})
 	mux.HandleFunc("GET /api/v1/cpm/policies", func(w http.ResponseWriter, r *http.Request) {
+		requestID := obs.ensureRequestID(w, r)
 		principal, ok := principalFromContext(r.Context())
 		if !ok {
-			writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "missing principal"})
+			obs.recordDecision(r, requestID, authCategoryOwner, "denied", authCodePrincipalRequired, "principal_missing", "", "")
+			obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, "authentication required", map[string]any{"reason": "principal_missing"})
 			return
 		}
 		id := strings.TrimSpace(r.URL.Query().Get("id"))
@@ -85,7 +97,7 @@ func registerOwnerScopedRoutes(mux *http.ServeMux, store *persistence.OwnerScope
 		}
 		record, err := store.GetPolicy(principal, id)
 		if err != nil {
-			mapPersistenceError(w, err)
+			mapPersistenceError(w, r, obs, principal, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"item": record})
@@ -106,14 +118,27 @@ func decodeOwnerScopedUpsertRequest(r *http.Request) (ownerScopedUpsertRequest, 
 	return req, nil
 }
 
-func mapPersistenceError(w http.ResponseWriter, err error) {
+func mapPersistenceError(w http.ResponseWriter, r *http.Request, obs *authObservability, principal authz.Principal, err error) {
+	requestID := obs.ensureRequestID(w, r)
 	switch {
 	case errors.Is(err, persistence.ErrForbidden):
-		writeJSON(w, http.StatusForbidden, map[string]any{"error": "forbidden"})
+		obs.recordDecision(r, requestID, authCategoryOwner, "denied", authCodeOwnerForbidden, "owner_forbidden", principal.UserID, principal.TenantID)
+		obs.audit.RecordAuthEvent(authAuditEvent{
+			Category:  authCategoryOwner,
+			Outcome:   "denied",
+			Code:      authCodeOwnerForbidden,
+			RequestID: requestID,
+			Route:     classifyRoute(r.Method, r.URL.Path),
+			Method:    r.Method,
+			UserID:    principal.UserID,
+			TenantID:  principal.TenantID,
+		})
+		obs.writeAuthError(w, r, http.StatusForbidden, authCodeOwnerForbidden, "owner access denied", map[string]any{"reason": "owner_forbidden"})
 	case errors.Is(err, persistence.ErrDraftNotFound), errors.Is(err, persistence.ErrPolicyNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "not found"})
 	case errors.Is(err, persistence.ErrPrincipalRequired):
-		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "missing principal"})
+		obs.recordDecision(r, requestID, authCategoryOwner, "denied", authCodePrincipalRequired, "principal_missing", "", "")
+		obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, "authentication required", map[string]any{"reason": "principal_missing"})
 	default:
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal server error"})
 	}
