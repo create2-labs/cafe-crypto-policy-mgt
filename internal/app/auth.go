@@ -24,6 +24,7 @@ type authConfig struct {
 	ScanAuthorizationTimeoutSec   int
 	ScanAuthorizationServiceToken string
 	ClockSkewSec                  int
+	Observability                 *authObservability
 }
 
 type routeSpec struct {
@@ -64,34 +65,61 @@ func withAuthentication(next http.Handler, cfg authConfig) (http.Handler, error)
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		obs := cfg.Observability
+		if obs == nil {
+			obs = newAuthObservability()
+		}
+		requestID := obs.ensureRequestID(w, r)
 		class := classifyRoute(r.Method, r.URL.Path)
 		if class == authz.RouteClassPublicHealth {
 			next.ServeHTTP(w, r)
 			return
 		}
 		if class == authz.RouteClassDeprecatedDisabled {
-			respondAuthError(w, http.StatusNotFound, authz.APIError{
-				Code:    "AUTH_ROUTE_NOT_ENABLED",
-				Message: "Route is not enabled.",
-			})
+			obs.writeAuthError(w, r, http.StatusNotFound, "AUTH_ROUTE_NOT_ENABLED", "route is not enabled", map[string]any{})
 			return
 		}
-		principal, authErr, status := authenticateBearerToken(r, cfg)
+		principal, authErr, status, reason := authenticateBearerToken(r, cfg, requestID)
 		if authErr.Code != "" {
-			respondAuthError(w, status, authErr)
+			outcome := "denied"
+			if status == http.StatusServiceUnavailable {
+				outcome = "unavailable"
+			}
+			obs.recordDecision(r, requestID, authCategoryAuthn, outcome, authErr.Code, reason, "", "")
+			obs.writeAuthError(w, r, status, authErr.Code, authErr.Message, authErr.Details)
 			return
 		}
 		routeScanIDs, scanErr, scanStatus := extractScanIDsForAuthorization(r)
 		if scanErr.Code != "" {
-			respondAuthError(w, scanStatus, scanErr)
+			obs.recordDecision(r, requestID, authCategoryScanAuth, "malformed", scanErr.Code, "scan_id_malformed", principal.UserID, principal.TenantID)
+			obs.writeAuthError(w, r, scanStatus, scanErr.Code, scanErr.Message, scanErr.Details)
 			return
 		}
 		for _, routeScanID := range routeScanIDs {
-			if scanAuthErr, scanAuthStatus := authorizeScanAccess(r.Context(), principal, routeScanID, cfg, r.Header.Get("X-Request-Id")); scanAuthErr.Code != "" {
-				respondAuthError(w, scanAuthStatus, scanAuthErr)
+			if scanAuthErr, scanAuthStatus, scanReason := authorizeScanAccess(r.Context(), principal, routeScanID, cfg, requestID); scanAuthErr.Code != "" {
+				outcome := "denied"
+				if scanAuthStatus == http.StatusServiceUnavailable {
+					outcome = "unavailable"
+				}
+				obs.recordDecision(r, requestID, authCategoryScanAuth, outcome, scanAuthErr.Code, scanReason, principal.UserID, principal.TenantID)
+				if scanAuthErr.Code == authCodeScanForbidden {
+					obs.audit.RecordAuthEvent(authAuditEvent{
+						Category:  authCategoryScanAuth,
+						Outcome:   "denied",
+						Code:      authCodeScanForbidden,
+						RequestID: requestID,
+						Route:     class,
+						Method:    r.Method,
+						UserID:    principal.UserID,
+						TenantID:  principal.TenantID,
+					})
+				}
+				obs.writeAuthError(w, r, scanAuthStatus, scanAuthErr.Code, scanAuthErr.Message, scanAuthErr.Details)
 				return
 			}
+			obs.recordDecision(r, requestID, authCategoryScanAuth, "allowed", authCodeOK, "scan_access_allowed", principal.UserID, principal.TenantID)
 		}
+		obs.recordDecision(r, requestID, authCategoryAuthn, "allowed", authCodeOK, "session_validated", principal.UserID, principal.TenantID)
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalContextKey{}, principal)))
 	}), nil
 }
@@ -123,43 +151,45 @@ func classifyRoute(method string, path string) string {
 	return authz.RouteClassDeprecatedDisabled
 }
 
-func authenticateBearerToken(r *http.Request, cfg authConfig) (authz.Principal, authz.APIError, int) {
+func authenticateBearerToken(r *http.Request, cfg authConfig, requestID string) (authz.Principal, authz.APIError, int, string) {
 	header := strings.TrimSpace(r.Header.Get("Authorization"))
 	if !strings.HasPrefix(strings.ToLower(header), "bearer ") {
 		return authz.Principal{}, authz.APIError{
-			Code:    "AUTH_MISSING_BEARER",
-			Message: "Missing or invalid Authorization bearer token.",
-		}, http.StatusUnauthorized
+			Code:    authCodeUnauthenticated,
+			Message: "authentication required",
+			Details: map[string]any{"reason": "missing_or_malformed_authorization_header"},
+		}, http.StatusUnauthorized, "missing_or_malformed_authorization_header"
 	}
 	rawToken := strings.TrimSpace(header[len("Bearer "):])
 	if rawToken == "" {
 		return authz.Principal{}, authz.APIError{
-			Code:    "AUTH_EMPTY_TOKEN",
-			Message: "Bearer token is empty.",
-		}, http.StatusUnauthorized
+			Code:    authCodeUnauthenticated,
+			Message: "authentication required",
+			Details: map[string]any{"reason": "empty_bearer_token"},
+		}, http.StatusUnauthorized, "empty_bearer_token"
 	}
 	claims, err := parseAndValidateDiscoveryToken(rawToken, cfg.ClockSkewSec)
 	if err != nil {
 		return authz.Principal{}, authz.APIError{
-			Code:    "AUTH_INVALID_TOKEN",
-			Message: "Bearer token validation failed.",
-			Details: map[string]any{"error": errorString(err)},
-		}, http.StatusUnauthorized
+			Code:    authCodeUnauthenticated,
+			Message: "authentication required",
+			Details: map[string]any{"reason": "malformed_or_expired_session_token"},
+		}, http.StatusUnauthorized, "malformed_or_expired_session_token"
 	}
-	validation, err := validateTokenWithDiscovery(r.Context(), rawToken, cfg, r.Header.Get("X-Request-Id"))
+	validation, err := validateTokenWithDiscovery(r.Context(), rawToken, cfg, requestID)
 	if err != nil {
 		return authz.Principal{}, authz.APIError{
-			Code:    "AUTH_VALIDATION_UNAVAILABLE",
-			Message: "Session validation service unavailable.",
-			Details: map[string]any{"error": errorString(err)},
-		}, http.StatusServiceUnavailable
+			Code:    authCodeValidationUnavailable,
+			Message: "authentication validation unavailable",
+			Details: map[string]any{"reason": "session_validation_unavailable"},
+		}, http.StatusServiceUnavailable, "session_validation_unavailable"
 	}
 	if !validation.Accepted {
 		return authz.Principal{}, authz.APIError{
-			Code:    "AUTH_INVALID_TOKEN",
-			Message: "Bearer token validation failed.",
-			Details: map[string]any{"error": validation.ErrorMessage},
-		}, http.StatusUnauthorized
+			Code:    authCodeUnauthenticated,
+			Message: "authentication required",
+			Details: map[string]any{"reason": "session_validation_rejected"},
+		}, http.StatusUnauthorized, "session_validation_rejected"
 	}
 	if validation.Claims != nil {
 		claims = validation.Claims
@@ -169,9 +199,10 @@ func authenticateBearerToken(r *http.Request, cfg authConfig) (authz.Principal, 
 	tenantID, _ := claims["tenant_id"].(string)
 	if strings.TrimSpace(userID) == "" {
 		return authz.Principal{}, authz.APIError{
-			Code:    "AUTH_INVALID_CLAIMS",
-			Message: "Token is missing required claims.",
-		}, http.StatusUnauthorized
+			Code:    authCodeUnauthenticated,
+			Message: "authentication required",
+			Details: map[string]any{"reason": "missing_user_id_claim"},
+		}, http.StatusUnauthorized, "missing_user_id_claim"
 	}
 	principal := authz.Principal{
 		UserID:   userID,
@@ -181,12 +212,12 @@ func authenticateBearerToken(r *http.Request, cfg authConfig) (authz.Principal, 
 	}
 	if err := principal.Validate(); err != nil {
 		return authz.Principal{}, authz.APIError{
-			Code:    "AUTH_INVALID_PRINCIPAL",
-			Message: "Derived principal is invalid.",
-			Details: map[string]any{"error": err.Error()},
-		}, http.StatusUnauthorized
+			Code:    authCodeUnauthenticated,
+			Message: "authentication required",
+			Details: map[string]any{"reason": "invalid_principal"},
+		}, http.StatusUnauthorized, "invalid_principal"
 	}
-	return principal, authz.APIError{}, http.StatusOK
+	return principal, authz.APIError{}, http.StatusOK, "session_validated"
 }
 
 func parseAndValidateDiscoveryToken(rawToken string, clockSkewSec int) (map[string]any, error) {
@@ -344,14 +375,7 @@ func validateTokenWithDiscovery(
 	return parsed, nil
 }
 
-func errorString(err error) string {
-	if err == nil {
-		return ""
-	}
-	return err.Error()
-}
-
-func respondAuthError(w http.ResponseWriter, status int, payload authz.APIError) {
+func respondAuthError(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
@@ -382,8 +406,9 @@ func extractScanIDsForAuthorization(r *http.Request) ([]string, authz.APIError, 
 	scanIDs, malformed := collectScanIDs(payload)
 	if malformed {
 		return nil, authz.APIError{
-			Code:    "AUTHZ_SCAN_ID_MALFORMED",
-			Message: "scanId is malformed.",
+			Code:    authCodeScanIDMalformed,
+			Message: "scanId is malformed",
+			Details: map[string]any{"reason": "scan_id_malformed"},
 		}, http.StatusBadRequest
 	}
 	if len(scanIDs) == 0 {
@@ -393,8 +418,9 @@ func extractScanIDsForAuthorization(r *http.Request) ([]string, authz.APIError, 
 	for _, scanID := range scanIDs[1:] {
 		if scanID != base {
 			return nil, authz.APIError{
-				Code:    "AUTHZ_SCAN_ID_CONFLICT",
-				Message: "Request carries conflicting scanId values.",
+				Code:    authCodeScanIDConflict,
+				Message: "scanId values conflict",
+				Details: map[string]any{"reason": "scan_id_conflict"},
 			}, http.StatusBadRequest
 		}
 	}
@@ -441,19 +467,20 @@ func authorizeScanAccess(
 	scanID string,
 	cfg authConfig,
 	requestID string,
-) (authz.APIError, int) {
+) (authz.APIError, int, string) {
 	if strings.TrimSpace(scanID) == "" {
 		return authz.APIError{
-			Code:    "AUTHZ_SCAN_ID_MALFORMED",
-			Message: "scanId is malformed.",
-		}, http.StatusBadRequest
+			Code:    authCodeScanIDMalformed,
+			Message: "scanId is malformed",
+			Details: map[string]any{"reason": "scan_id_malformed"},
+		}, http.StatusBadRequest, "scan_id_malformed"
 	}
 	if strings.TrimSpace(cfg.ScanAuthorizationURL) == "" {
 		return authz.APIError{
-			Code:    "AUTHZ_UNAVAILABLE",
-			Message: "Scan authorization service unavailable.",
-			Details: map[string]any{"error": "scan authorization URL not configured"},
-		}, http.StatusServiceUnavailable
+			Code:    authCodeScanUnavailable,
+			Message: "scan authorization unavailable",
+			Details: map[string]any{"reason": "scan_authorization_url_not_configured"},
+		}, http.StatusServiceUnavailable, "scan_authorization_url_not_configured"
 	}
 	timeoutSec := cfg.ScanAuthorizationTimeoutSec
 	if timeoutSec <= 0 {
@@ -463,10 +490,10 @@ func authorizeScanAccess(
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, http.NoBody)
 	if err != nil {
 		return authz.APIError{
-			Code:    "AUTHZ_UNAVAILABLE",
-			Message: "Scan authorization service unavailable.",
-			Details: map[string]any{"error": err.Error()},
-		}, http.StatusServiceUnavailable
+			Code:    authCodeScanUnavailable,
+			Message: "scan authorization unavailable",
+			Details: map[string]any{"reason": "scan_authorization_request_build_failed"},
+		}, http.StatusServiceUnavailable, "scan_authorization_request_build_failed"
 	}
 	req.Header.Set("X-User-Id", principal.UserID)
 	if principal.TenantID != "" {
@@ -482,10 +509,10 @@ func authorizeScanAccess(
 	resp, err := client.Do(req)
 	if err != nil {
 		return authz.APIError{
-			Code:    "AUTHZ_UNAVAILABLE",
-			Message: "Scan authorization service unavailable.",
-			Details: map[string]any{"error": err.Error()},
-		}, http.StatusServiceUnavailable
+			Code:    authCodeScanUnavailable,
+			Message: "scan authorization unavailable",
+			Details: map[string]any{"reason": "scan_authorization_request_failed"},
+		}, http.StatusServiceUnavailable, "scan_authorization_request_failed"
 	}
 	defer func() { _ = resp.Body.Close() }()
 	switch resp.StatusCode {
@@ -493,38 +520,43 @@ func authorizeScanAccess(
 		var parsed scanAuthorizationResponse
 		if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
 			return authz.APIError{
-				Code:    "AUTHZ_UNAVAILABLE",
-				Message: "Scan authorization service unavailable.",
-				Details: map[string]any{"error": "invalid authorization response"},
-			}, http.StatusServiceUnavailable
+				Code:    authCodeScanUnavailable,
+				Message: "scan authorization unavailable",
+				Details: map[string]any{"reason": "scan_authorization_invalid_response"},
+			}, http.StatusServiceUnavailable, "scan_authorization_invalid_response"
 		}
 		if !parsed.Allowed {
 			return authz.APIError{
-				Code:    "AUTHZ_SCAN_FORBIDDEN",
-				Message: "Scan access denied.",
-			}, http.StatusForbidden
+				Code:    authCodeScanForbidden,
+				Message: "scan access denied",
+				Details: map[string]any{"reason": "scan_authorization_denied"},
+			}, http.StatusForbidden, "scan_authorization_denied"
 		}
-		return authz.APIError{}, http.StatusOK
+		return authz.APIError{}, http.StatusOK, "scan_access_allowed"
 	case http.StatusForbidden, http.StatusNotFound:
 		return authz.APIError{
-			Code:    "AUTHZ_SCAN_FORBIDDEN",
-			Message: "Scan access denied.",
-		}, http.StatusForbidden
+			Code:    authCodeScanForbidden,
+			Message: "scan access denied",
+			Details: map[string]any{"reason": "scan_authorization_denied"},
+		}, http.StatusForbidden, "scan_authorization_denied"
 	case http.StatusUnauthorized:
 		return authz.APIError{
-			Code:    "AUTHZ_UNAVAILABLE",
-			Message: "Scan authorization service unavailable.",
-		}, http.StatusServiceUnavailable
+			Code:    authCodeScanUnavailable,
+			Message: "scan authorization unavailable",
+			Details: map[string]any{"reason": "scan_authorization_upstream_unauthorized"},
+		}, http.StatusServiceUnavailable, "scan_authorization_upstream_unauthorized"
 	default:
 		if resp.StatusCode >= 500 {
 			return authz.APIError{
-				Code:    "AUTHZ_UNAVAILABLE",
-				Message: "Scan authorization service unavailable.",
-			}, http.StatusServiceUnavailable
+				Code:    authCodeScanUnavailable,
+				Message: "scan authorization unavailable",
+				Details: map[string]any{"reason": "scan_authorization_upstream_5xx"},
+			}, http.StatusServiceUnavailable, "scan_authorization_upstream_5xx"
 		}
 		return authz.APIError{
-			Code:    "AUTHZ_UNAVAILABLE",
-			Message: "Scan authorization service unavailable.",
-		}, http.StatusServiceUnavailable
+			Code:    authCodeScanUnavailable,
+			Message: "scan authorization unavailable",
+			Details: map[string]any{"reason": "scan_authorization_unexpected_status"},
+		}, http.StatusServiceUnavailable, "scan_authorization_unexpected_status"
 	}
 }
