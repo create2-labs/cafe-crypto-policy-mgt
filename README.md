@@ -209,7 +209,7 @@ Important:
 - If the Discovery validation endpoint returns only pass/fail (without claims), CPM falls back to claims parsed from the already validated token payload.
 - `CAFE_SESSION_JWT_VALIDATION_URL` must point to an internal-only Discovery endpoint.
 - Optional config: `CAFE_SESSION_JWT_VALIDATION_SERVICE_TOKEN` for service-to-service protection (temporary placeholder; to be replaced by first-class service identity in later auth hardening).
-- AUTH-02 adds fail-closed scan authorization for requests carrying a `scanId` by delegating to Discovery scan visibility checks.
+- AUTH-02 adds fail-closed scan authorization for requests carrying a `scan_id` field in the JSON body by delegating to Discovery scan visibility checks.
 
 Public route:
 

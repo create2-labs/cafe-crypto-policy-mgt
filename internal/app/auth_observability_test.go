@@ -73,7 +73,7 @@ func TestAuthErrorPayloadContract(t *testing.T) {
 			name:       "scan id malformed",
 			method:     http.MethodPost,
 			target:     "/api/v1/policies/decisions/explore",
-			body:       `{"scanId":42}`,
+			body:       `{"scan_id":42}`,
 			authHeader: "Bearer " + mustTokenEnvelope(t, "user-1"),
 			cfg: authConfig{
 				Required:             true,
@@ -111,7 +111,7 @@ func TestAuthErrorPayloadContract(t *testing.T) {
 			SessionValidationURL: introspect.URL,
 			ScanAuthorizationURL: scanForbidden.URL,
 		})
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/policies/decisions/explore", strings.NewReader(`{"scanId":"scan-deny"}`))
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/policies/decisions/explore", strings.NewReader(`{"scan_id":"scan-deny"}`))
 		req.Header.Set("Authorization", "Bearer "+mustTokenEnvelope(t, "user-1"))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
@@ -236,11 +236,11 @@ func TestAuthMetricsCounters(t *testing.T) {
 	missingTokenReq := httptest.NewRequest(http.MethodGet, "/api/v1/policies/catalog", nil)
 	h.ServeHTTP(httptest.NewRecorder(), missingTokenReq)
 
-	denyReq := httptest.NewRequest(http.MethodPost, "/api/v1/policies/decisions/explore", strings.NewReader(`{"scanId":"deny"}`))
+	denyReq := httptest.NewRequest(http.MethodPost, "/api/v1/policies/decisions/explore", strings.NewReader(`{"scan_id":"deny"}`))
 	denyReq.Header.Set("Authorization", "Bearer "+mustTokenEnvelope(t, "user-1"))
 	h.ServeHTTP(httptest.NewRecorder(), denyReq)
 
-	unavailableReq := httptest.NewRequest(http.MethodPost, "/api/v1/policies/decisions/explore", strings.NewReader(`{"scanId":"slow"}`))
+	unavailableReq := httptest.NewRequest(http.MethodPost, "/api/v1/policies/decisions/explore", strings.NewReader(`{"scan_id":"slow"}`))
 	unavailableReq.Header.Set("Authorization", "Bearer "+mustTokenEnvelope(t, "user-1"))
 	h.ServeHTTP(httptest.NewRecorder(), unavailableReq)
 
