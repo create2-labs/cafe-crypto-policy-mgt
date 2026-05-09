@@ -439,7 +439,9 @@ func collectScanIDs(payload map[string]any) ([]string, bool) {
 		}
 		value = strings.TrimSpace(value)
 		if value == "" {
-			return false
+			// Explicit "" must match "no scan binding" (same as a missing key), e.g. owner
+			// draft POSTs that include scan_id for shape compatibility.
+			return true
 		}
 		out = append(out, value)
 		return true
