@@ -407,7 +407,7 @@ func extractScanIDsForAuthorization(r *http.Request) ([]string, authz.APIError, 
 	if malformed {
 		return nil, authz.APIError{
 			Code:    authCodeScanIDMalformed,
-			Message: "scanId is malformed",
+			Message: "scan_id is malformed",
 			Details: map[string]any{"reason": "scan_id_malformed"},
 		}, http.StatusBadRequest
 	}
@@ -419,7 +419,7 @@ func extractScanIDsForAuthorization(r *http.Request) ([]string, authz.APIError, 
 		if scanID != base {
 			return nil, authz.APIError{
 				Code:    authCodeScanIDConflict,
-				Message: "scanId values conflict",
+				Message: "scan_id values conflict",
 				Details: map[string]any{"reason": "scan_id_conflict"},
 			}, http.StatusBadRequest
 		}
@@ -444,16 +444,11 @@ func collectScanIDs(payload map[string]any) ([]string, bool) {
 		out = append(out, value)
 		return true
 	}
-	if !add(payload["scanId"]) {
-		return nil, true
-	}
+	// Canonical JSON field for scan binding: `scan_id` (top-level and under `draft`).
 	if !add(payload["scan_id"]) {
 		return nil, true
 	}
 	if draft, ok := payload["draft"].(map[string]any); ok {
-		if !add(draft["scanId"]) {
-			return nil, true
-		}
 		if !add(draft["scan_id"]) {
 			return nil, true
 		}
@@ -471,7 +466,7 @@ func authorizeScanAccess(
 	if strings.TrimSpace(scanID) == "" {
 		return authz.APIError{
 			Code:    authCodeScanIDMalformed,
-			Message: "scanId is malformed",
+			Message: "scan_id is malformed",
 			Details: map[string]any{"reason": "scan_id_malformed"},
 		}, http.StatusBadRequest, "scan_id_malformed"
 	}

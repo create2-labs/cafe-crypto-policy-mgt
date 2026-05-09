@@ -13,7 +13,7 @@ import (
 )
 
 func TestExtractScanIDsForAuthorization(t *testing.T) {
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/policies/decisions/explore", strings.NewReader(`{"scanId":"scan-123"}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/policies/decisions/explore", strings.NewReader(`{"scan_id":"scan-123"}`))
 	scanIDs, authErr, status := extractScanIDsForAuthorization(req)
 	if authErr.Code != "" || status != http.StatusOK {
 		t.Fatalf("expected no error, got code=%q status=%d", authErr.Code, status)
@@ -36,11 +36,10 @@ func TestExtractScanIDsForAuthorizationVariants(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "top-level scan_id", body: `{"scan_id":"scan-1"}`, want: []string{"scan-1"}},
-		{name: "draft scanId", body: `{"draft":{"scanId":"scan-2"}}`, want: []string{"scan-2"}},
-		{name: "draft scan_id", body: `{"draft":{"scan_id":"scan-3"}}`, want: []string{"scan-3"}},
+		{name: "draft scan_id only", body: `{"draft":{"scan_id":"scan-2"}}`, want: []string{"scan-2"}},
 		{name: "no scan id", body: `{"draft":{"name":"x"}}`, want: nil},
-		{name: "mismatch ids", body: `{"scanId":"scan-a","draft":{"scan_id":"scan-b"}}`, wantErr: true},
-		{name: "malformed scan id type", body: `{"scanId":42}`, wantErr: true},
+		{name: "mismatch top vs draft scan_id", body: `{"scan_id":"scan-a","draft":{"scan_id":"scan-b"}}`, wantErr: true},
+		{name: "malformed scan_id type", body: `{"scan_id":42}`, wantErr: true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -158,7 +157,7 @@ func TestWithAuthenticationAllowsRequestWhenScanAuthzAllowed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("make token: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/policies/decisions/explore", strings.NewReader(`{"scanId":"scan-123"}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/policies/decisions/explore", strings.NewReader(`{"scan_id":"scan-123"}`))
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("X-User-Id", "fake-client-header")
 	res := httptest.NewRecorder()

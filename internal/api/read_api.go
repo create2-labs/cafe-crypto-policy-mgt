@@ -128,6 +128,8 @@ func RegisterReadRoutes(mux *http.ServeMux, store *ReadStore) error {
 }
 
 type decisionExploreRequest struct {
+	// Optional scan binding for AUTH-02 (scan authorization). Ignored by Evaluate; wire name is `scan_id` only.
+	ScanID           string                        `json:"scan_id,omitempty"`
 	Observation      walletobserved.Payload        `json:"observation"`
 	SelectionRequest policy.PolicySelectionRequest `json:"selection_request"`
 }
