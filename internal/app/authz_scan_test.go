@@ -38,6 +38,7 @@ func TestExtractScanIDsForAuthorizationVariants(t *testing.T) {
 		{name: "top-level scan_id", body: `{"scan_id":"scan-1"}`, want: []string{"scan-1"}},
 		{name: "draft scan_id only", body: `{"draft":{"scan_id":"scan-2"}}`, want: []string{"scan-2"}},
 		{name: "no scan id", body: `{"draft":{"name":"x"}}`, want: nil},
+		{name: "empty string scan_id ignored", body: `{"scan_id":"","id":"draft-1","payload":{}}`, want: nil},
 		{name: "mismatch top vs draft scan_id", body: `{"scan_id":"scan-a","draft":{"scan_id":"scan-b"}}`, wantErr: true},
 		{name: "malformed scan_id type", body: `{"scan_id":42}`, wantErr: true},
 	}
