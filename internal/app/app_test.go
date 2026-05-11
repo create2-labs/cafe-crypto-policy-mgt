@@ -504,7 +504,7 @@ func TestHandlerFailsClosedWhenScanIDPresentButAuthzNotConfigured(t *testing.T) 
 	req := httptest.NewRequest(
 		http.MethodPost,
 		"/api/v1/policies/decisions/explore",
-		strings.NewReader(`{"scan_id":"scan-123","observation":{"chain_ids":[1],"account_kind":"eoa","current_algorithm":"secp256k1_ecrecover","current_pq_posture":"classical_only","public_key_exposed":true,"is_multichain":false,"observed_at":"2026-01-01T00:00:00Z"},"selection_request":{"target_posture":"hybrid","target_chain_ids":[1],"require_multichain":false,"allow_new_wallet":false,"address_continuity_required":true,"key_rotation_required":true,"recovery_required":true,"minimum_maturity":1,"approval_mode":"manual"}}`),
+		strings.NewReader(`{"scan_id":"scan-123","policy_context":{"scan_id":"scan-123","wallet_type":"EOA","chain_ids":[1],"current_pq_posture":"classical_only","scanned_at":"2026-01-01T00:00:00Z"},"selection_request":{"target_posture":"hybrid","target_chain_ids":[1],"require_multichain":false,"allow_new_wallet":false,"address_continuity_required":true,"key_rotation_required":true,"recovery_required":true,"minimum_maturity":1,"approval_mode":"manual"}}`),
 	)
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
@@ -550,7 +550,7 @@ func TestHandlerContinuesWhenAuthzNotConfiguredAndNoScanID(t *testing.T) {
 	req := httptest.NewRequest(
 		http.MethodPost,
 		"/api/v1/policies/decisions/explore",
-		strings.NewReader(`{"observation":{"chain_ids":[1],"account_kind":"eoa","current_algorithm":"secp256k1_ecrecover","current_pq_posture":"classical_only","public_key_exposed":true,"is_multichain":false,"observed_at":"2026-01-01T00:00:00Z"},"selection_request":{"target_posture":"hybrid","target_chain_ids":[1],"require_multichain":false,"allow_new_wallet":false,"address_continuity_required":true,"key_rotation_required":true,"recovery_required":true,"minimum_maturity":1,"approval_mode":"manual"}}`),
+		strings.NewReader(`{"policy_context":{"wallet_type":"EOA","chain_ids":[1],"current_pq_posture":"classical_only","scanned_at":"2026-01-01T00:00:00Z"},"selection_request":{"target_posture":"hybrid","target_chain_ids":[1],"require_multichain":false,"allow_new_wallet":false,"address_continuity_required":true,"key_rotation_required":true,"recovery_required":true,"minimum_maturity":1,"approval_mode":"manual"}}`),
 	)
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")

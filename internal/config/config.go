@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	defaultHTTPAddr                    = ":8080"
+	defaultHTTPAddr                    = ":8082"
 	defaultLogLevel                    = "info"
 	defaultService                     = "cafe-cpm"
 	defaultAuthRequired                = true
