@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/policy"
-	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/walletobserved"
 )
 
 var (
@@ -103,6 +102,12 @@ func RegisterReadRoutes(mux *http.ServeMux, store *ReadStore) error {
 			return
 		}
 
+		observation, err := observationFromDecisionExplore(&req)
+		if err != nil {
+			respondJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			return
+		}
+
 		candidates := make([]policy.PolicyDecisionCandidate, 0, len(store.instances))
 		for _, inst := range store.instances {
 			candidates = append(candidates, policy.PolicyDecisionCandidate{
@@ -112,7 +117,7 @@ func RegisterReadRoutes(mux *http.ServeMux, store *ReadStore) error {
 		}
 
 		decision, err := (policy.PolicyDecisionEvaluator{}).Evaluate(
-			req.Observation,
+			observation,
 			&req.SelectionRequest,
 			candidates,
 			store.catalog,
@@ -129,8 +134,9 @@ func RegisterReadRoutes(mux *http.ServeMux, store *ReadStore) error {
 
 type decisionExploreRequest struct {
 	// Optional scan binding for AUTH-02 (scan authorization). Ignored by Evaluate; wire name is `scan_id` only.
-	ScanID           string                        `json:"scan_id,omitempty"`
-	Observation      walletobserved.Payload        `json:"observation"`
+	ScanID string `json:"scan_id,omitempty"`
+	// PolicyContext is required; evaluator input is derived from it (no top-level observation).
+	PolicyContext    *walletPolicyContextWire       `json:"policy_context"`
 	SelectionRequest policy.PolicySelectionRequest `json:"selection_request"`
 }
 

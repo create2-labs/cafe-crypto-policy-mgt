@@ -4,7 +4,7 @@
 
 ## Role and boundaries
 
-- Discovery observes wallets, persists scan artifacts, and  maps observations to the shared wire contract from `cafe-contracts`.
+- Discovery observes wallets, persists scan artifacts, and maps observations to the shared wire contract from `cafe-contracts`.
 - CPM validates policy documents, selects compatible routes, assesses observations, and emits policy outcomes. 
 - Remediation consumes policy outcomes and plans or executes migration work.
 
@@ -20,7 +20,8 @@ CPM does not depend on Discovery’s database or internal domain structs. Inboun
 | `internal/domain/vocabulary` | Exported strings for account kind, algorithms, PQ posture, subject type |
 | `internal/domain/policy` | Policy domain contracts (`PolicySelectionRequest`, `PolicyGraphCatalog`, `CryptoPolicyTemplate`, `CryptoPolicyInstance`, `CryptoPolicyValidationResult`, `CryptoPolicyAssessmentResult`, `PolicyCompatibilityResult` + `PolicyCompatibilityEvaluator`, and PR13 `PolicyDecision` models/evaluator) |
 | `internal/api` | PR17 read-only HTTP APIs for policy inspection and decision exploration |
-| `internal/persistence` | Placeholder for future persistence adapters |
+| `internal/persistence` | Owner-scoped in-memory persistence (`OwnerScopedStore`) for drafts and persisted policy records exposed under `/api/v1/cpm/*` |
+| `scripts/` | Operational helpers (e.g. `wallet-scan-and-cpm-policy.sh` for Discovery + CPM over HTTPS) |
 | `internal/integration/nats` | NATS integration for inbound explicit assessment requests + outbound CPM event publication |
 
 ## Discovery → CPM contract (`cafe.discovery.wallet.observed` v0.1)
@@ -162,8 +163,9 @@ Endpoints:
 
 `POST /api/v1/policies/decisions/explore` accepts:
 
-- `observation` (`walletobserved.Payload`)
+- `policy_context` (wallet scan context: `scan_id`, `wallet_address`, `wallet_type`, `chain_ids`, `current_algorithm`, `current_pq_posture`, `scanned_at`, `status` — converted server-side into the evaluator’s normalized payload)
 - `selection_request` (`PolicySelectionRequest`)
+- optional top-level `scan_id` (`string`): when present and non-empty, AUTH-02 delegates to Discovery (`can-read`); if `policy_context.scan_id` is also set, it must match. Evaluation uses the mapped observation derived from `policy_context` plus `selection_request`
 
 and returns `PolicyDecision` output that keeps the distinction between:
 
@@ -221,6 +223,13 @@ Authenticated business routes:
 - `GET /api/v1/policies/templates`
 - `GET /api/v1/policies/instances`
 - `POST /api/v1/policies/decisions/explore`
+
+Additional authenticated routes (owner-scoped draft / policy payloads):
+
+- `POST /api/v1/cpm/drafts` — upsert `{ "id", "scan_id?", "payload" }` (`owner_user_id` / `tenant_id` rejected from client)
+- `GET /api/v1/cpm/drafts?id=...`
+- `POST /api/v1/cpm/policies` — upsert `{ "id", "scan_id?", "payload" }`
+- `GET /api/v1/cpm/policies?id=...`
 
 ## AUTH-03 owner-scoped persistence foundation
 
@@ -280,9 +289,21 @@ Audit hook:
 - events are emitted for scan authorization denied and owner access denied decisions.
 - no external audit storage is implemented in this phase.
 
+## Scripted Discovery → CPM flow (HTTPS-friendly)
+
+[`scripts/wallet-scan-and-cpm-policy.sh`](./scripts/wallet-scan-and-cpm-policy.sh) signs in to **cafe-discovery**, queues `POST /discovery/scan`, polls `GET /discovery/cbom/{address}`, maps CBOM fields into **`policy_context`** for **`POST /api/v1/policies/decisions/explore`**, then optionally persists a minimal record via **`POST /api/v1/cpm/policies`**. In-line help: `./scripts/wallet-scan-and-cpm-policy.sh --help`.
+
+- Defaults for local dev: **`http://localhost:8080`** (**`DISCOVERY_BASE`**) and **`http://localhost:8082`** (**`CPM_BASE`**) when unset in the script. **`go run ./cmd/cafe-cpm`** listens on **`:8082`** by default (`CPM_HTTP_ADDR`, overridable).
+- Use **`https://`** in `DISCOVERY_BASE` / `CPM_BASE` behind TLS gateways as needed.
+- For self-signed or unknown CAs locally, set **`CURL_INSECURE=1`** (curl `-k`).
+- Discovery’s immediate **`POST /discovery/scan` response does not include the internal NATS scan UUID**; the script correlates by wallet address → CBOM. See [cafe-discovery README](https://github.com/create2-labs/cafe-discovery/blob/main/README.md#post-discoveryscan).
+
+Cross-repo narrative: [`cafe-documentation/03-cafe-developer-guide.md`](https://github.com/create2-labs/cafe-documentation/blob/main/03-cafe-developer-guide.md).
+
 ## Run locally
 
 ```bash
 go test ./...
+# Default bind: :8082 (override with CPM_HTTP_ADDR)
 go run ./cmd/cafe-cpm
 ```

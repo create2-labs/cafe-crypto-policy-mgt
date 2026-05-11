@@ -455,6 +455,11 @@ func collectScanIDs(payload map[string]any) ([]string, bool) {
 			return nil, true
 		}
 	}
+	if pc, ok := payload["policy_context"].(map[string]any); ok {
+		if !add(pc["scan_id"]) {
+			return nil, true
+		}
+	}
 	return out, false
 }
 
