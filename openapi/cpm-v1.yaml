@@ -1,0 +1,569 @@
+openapi: 3.0.3
+info:
+  title: CAFE Crypto Policy Management (CPM) API
+  version: "1.0.0"
+  license:
+    name: Proprietary
+    url: https://example.com/license
+  description: |
+    Target HTTP contract for persisted policies, drafts, catalogue reads, and decision exploration
+    per **WORKPLAN_API.md** §0.2, §2.3–2.4, §4.3–4.4, §5.1–5.2, §8.
+
+    **Public URL prefix:** `/api/cpm/v1`. Do **not** publish paths like `/api/cpm/v1/cpm/...` (no duplicated `cpm` segment).
+
+    **Rollout / ingress-only paths (§0.3)** are described under tag `rollout` for coordination during migration;
+    they are **not** a long-term product contract (WORKPLAN_API.md §0.2 vs §0.3).
+
+    **Discovery scans (correlation):** `cafe-discovery/openapi/discovery-v1.yaml` (PR1a); shared key **`scan_id`**.
+
+servers:
+  - url: https://{host}/api/cpm/v1
+    description: Canonical product base (§0.2).
+    variables:
+      host:
+        default: api.example.com
+
+tags:
+  - name: policies
+    description: Persisted policy instances and related operations (§0.2).
+  - name: drafts
+    description: Policy drafts (§0.2).
+  - name: catalog
+    description: Static catalogue reads (graph, templates, reference instances).
+  - name: decisions
+    description: Non-persisted decision exploration (`explore`).
+  - name: rollout
+    description: Temporary ingress paths (§0.3) — remove after migration.
+
+security:
+  - bearerAuth: []
+
+paths:
+  /policies/catalog:
+    get:
+      tags: [catalog]
+      summary: Get policy catalog (static)
+      operationId: getPoliciesCatalog
+      responses:
+        "200":
+          description: Catalogue payload (format as implemented; typically JSON or YAML-backed).
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /policies/templates:
+    get:
+      tags: [catalog]
+      summary: List policy templates (static)
+      operationId: getPoliciesTemplates
+      responses:
+        "200":
+          description: Policy templates payload (static catalogue read).
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /policies/instances:
+    get:
+      tags: [catalog]
+      summary: List reference / example instances from catalogue (static)
+      operationId: getPoliciesInstancesCatalog
+      responses:
+        "200":
+          description: Reference / example instances payload (static catalogue read).
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /policies/decisions/explore:
+    post:
+      tags: [decisions]
+      summary: Explore applicable policies for a context (non-persistent)
+      description: |
+        **Does not** persist a final policy instance (WORKPLAN_API.md §5.1, §8.6). Wire shape aligns with
+        implementation (`policy_context`, `selection_request`); tighten in PR8 as needed.
+      operationId: postPoliciesDecisionsExplore
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DecisionExploreRequest"
+      responses:
+        "200":
+          description: Evaluation result wrapper.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DecisionExploreResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /policies:
+    get:
+      tags: [policies]
+      summary: Get persisted policy instance(s)
+      description: |
+        **Exactly one** of **`id`** (single instance) or **`scan_id`** (list owner-scoped) must be used.
+        **Both `id` and `scan_id` → 400** (WORKPLAN_API.md §5.2, §8.2).
+      operationId: getPolicies
+      parameters:
+        - name: id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Return a single persisted instance by id.
+        - name: scan_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: List instances referencing this scan (owner-scoped).
+      responses:
+        "200":
+          description: Single `PolicyRecord` or `PolicyListByScanIdResponse` depending on query mode.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/PolicyRecord"
+                  - $ref: "#/components/schemas/PolicyListByScanIdResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Unknown id (single-instance mode only).
+    post:
+      tags: [policies]
+      summary: Persist a policy instance
+      description: |
+        **`scan_id` is mandatory** for instances created from Discovery-bound flows (WORKPLAN_API.md §5.2).
+        May be absent only for catalogue fixtures, manual drafts not yet bound, or explicit non-product tests
+        — distinguish in validation and tests.
+      operationId: postPolicies
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PolicyRecordWrite"
+      responses:
+        "200":
+          description: Created or updated instance as per implementation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyRecord"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    delete:
+      tags: [policies]
+      summary: Delete persisted policy instance by id
+      description: |
+        **204** if deleted; **404** if unknown / out of scope / already deleted (idempotent). **Never**
+        deletes the Discovery scan row (WORKPLAN_API.md §5.2, §8.5). **No 409** on this route in this plan.
+      operationId: deletePolicies
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Instance removed.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /drafts:
+    get:
+      tags: [drafts]
+      summary: List drafts (owner)
+      operationId: getDrafts
+      responses:
+        "200":
+          description: Owner-scoped list of drafts.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PolicyDraft"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [drafts]
+      summary: Create or update a draft
+      operationId: postDrafts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PolicyDraftWrite"
+      responses:
+        "200":
+          description: Draft created or updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyDraft"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /v1/policies/catalog:
+    get:
+      tags: [rollout, catalog]
+      deprecated: true
+      summary: "§0.3 rollout — GET catalogue (legacy prefix)"
+      operationId: rolloutGetCatalog
+      servers:
+        - url: https://{host}/api
+          variables:
+            host:
+              default: api.example.com
+      responses:
+        "200":
+          description: Same semantics as `/api/cpm/v1/policies/catalog`; path mirrors §0.3.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /v1/policies/templates:
+    get:
+      tags: [rollout, catalog]
+      deprecated: true
+      summary: "§0.3 rollout — GET templates (legacy prefix)"
+      operationId: rolloutGetTemplates
+      servers:
+        - url: https://{host}/api
+          variables:
+            host:
+              default: api.example.com
+      responses:
+        "200":
+          description: Rollout §0.3 templates payload (same semantics as canonical GET templates).
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /v1/policies/instances:
+    get:
+      tags: [rollout, catalog]
+      deprecated: true
+      summary: "§0.3 rollout — GET instances catalogue (legacy prefix)"
+      operationId: rolloutGetInstances
+      servers:
+        - url: https://{host}/api
+          variables:
+            host:
+              default: api.example.com
+      responses:
+        "200":
+          description: Rollout §0.3 instances catalogue payload.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /v1/policies/decisions/explore:
+    post:
+      tags: [rollout, decisions]
+      deprecated: true
+      summary: "§0.3 rollout — POST explore (legacy prefix)"
+      operationId: rolloutPostExplore
+      servers:
+        - url: https://{host}/api
+          variables:
+            host:
+              default: api.example.com
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DecisionExploreRequest"
+      responses:
+        "200":
+          description: Rollout §0.3 explore response (same semantics as canonical explore).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DecisionExploreResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /v1/cpm/policies:
+    get:
+      tags: [rollout, policies]
+      deprecated: true
+      summary: "§0.3 rollout — GET/DELETE policies under /api/v1/cpm/policies"
+      description: Legacy query `id` for GET/DELETE per WORKPLAN_API.md §0.3.
+      operationId: rolloutGetCpmPolicies
+      servers:
+        - url: https://{host}/api
+          variables:
+            host:
+              default: api.example.com
+      parameters:
+        - name: id
+          in: query
+          schema: { type: string }
+        - name: scan_id
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Single instance or list by scan_id (legacy rollout path).
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/PolicyRecord"
+                  - $ref: "#/components/schemas/PolicyListByScanIdResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [rollout, policies]
+      deprecated: true
+      summary: "§0.3 rollout — POST persisted policy (legacy /api/v1/cpm/policies)"
+      operationId: rolloutPostCpmPolicies
+      servers:
+        - url: https://{host}/api
+          variables:
+            host:
+              default: api.example.com
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PolicyRecordWrite"
+      responses:
+        "200":
+          description: Policy instance returned after POST (legacy rollout path).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyRecord"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    delete:
+      tags: [rollout, policies]
+      deprecated: true
+      summary: "§0.3 rollout — DELETE policy by id (legacy /api/v1/cpm/policies)"
+      operationId: rolloutDeleteCpmPolicies
+      servers:
+        - url: https://{host}/api
+          variables:
+            host:
+              default: api.example.com
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/cpm/drafts:
+    get:
+      tags: [rollout, drafts]
+      deprecated: true
+      summary: "§0.3 rollout — list drafts (legacy /api/v1/cpm/drafts)"
+      operationId: rolloutGetCpmDrafts
+      servers:
+        - url: https://{host}/api
+          variables:
+            host:
+              default: api.example.com
+      responses:
+        "200":
+          description: Owner-scoped drafts list (legacy rollout path).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PolicyDraft"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [rollout, drafts]
+      deprecated: true
+      summary: "§0.3 rollout — create or update draft (legacy /api/v1/cpm/drafts)"
+      operationId: rolloutPostCpmDrafts
+      servers:
+        - url: https://{host}/api
+          variables:
+            host:
+              default: api.example.com
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PolicyDraftWrite"
+      responses:
+        "200":
+          description: Draft created or updated (legacy rollout path).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyDraft"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid JWT.
+    BadRequest:
+      description: Invalid input (including `id` + `scan_id` together on GET `/policies`).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Unknown resource or idempotent delete miss.
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+
+    PolicyRecord:
+      type: object
+      required: [id, payload]
+      description: Persisted instance (WORKPLAN_API.md §4.4, §8.3 `PolicyRecord`).
+      properties:
+        id:
+          type: string
+        scan_id:
+          type: string
+          format: uuid
+          description: Required for Discovery→CPM flows; optional only for catalogue/fixture/manual-exception cases (§5.2).
+        payload:
+          type: object
+          additionalProperties: true
+
+    PolicyRecordWrite:
+      type: object
+      required: [id, payload]
+      properties:
+        id:
+          type: string
+        scan_id:
+          type: string
+          format: uuid
+        payload:
+          type: object
+          additionalProperties: true
+
+    PolicyListByScanIdResponse:
+      type: object
+      required: [items, total, limit, offset]
+      description: Owner-scoped list for `GET …/policies?scan_id=` (WORKPLAN_API.md §5.2, §8.3).
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PolicyRecord"
+        total:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 1
+        offset:
+          type: integer
+          minimum: 0
+
+    PolicyDraft:
+      type: object
+      additionalProperties: true
+
+    PolicyDraftWrite:
+      type: object
+      additionalProperties: true
+
+    DecisionExploreRequest:
+      type: object
+      required: [policy_context, selection_request]
+      properties:
+        scan_id:
+          type: string
+          description: Optional scan binding for AUTH-02 (implementation detail).
+        policy_context:
+          type: object
+          additionalProperties: true
+        selection_request:
+          type: object
+          additionalProperties: true
+
+    DecisionExploreResponse:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: object
+          additionalProperties: true

@@ -165,7 +165,7 @@ Endpoints:
 
 - `policy_context` (wallet scan context: `scan_id`, `wallet_address`, `wallet_type`, `chain_ids`, `current_algorithm`, `current_pq_posture`, `scanned_at`, `status` — converted server-side into the evaluator’s normalized payload)
 - `selection_request` (`PolicySelectionRequest`)
-- optional top-level `scan_id` (`string`): when present and non-empty, AUTH-02 delegates to Discovery (`can-read`); if `policy_context.scan_id` is also set, it must match. Evaluation uses the mapped observation derived from `policy_context` plus `selection_request`
+- optional top-level `scan_id` (`string`): when present and non-empty, AUTH-02 delegates to Discovery (`can-read`); if `policy_context.scan_id` is also set, it must match. Evaluation uses the mapped observation derived from `policy_context` plus `selection_request`. Discovery’s `scan_id` is the id of **one persisted scan result row** (a new scan run creates a new row with a new id; stable for that row’s lifetime — see `WORKPLAN_API.md` §2.2 and Discovery `wallet_policy_context` docs).
 
 and returns `PolicyDecision` output that keeps the distinction between:
 
