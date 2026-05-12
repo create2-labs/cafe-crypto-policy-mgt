@@ -30,17 +30,17 @@
 | **1a** | `api-contract/api-coherency-openapi` | `cafe-discovery` | [#49](https://github.com/create2-labs/cafe-discovery/pull/49) | — | Dérive spec vs `WORKPLAN_API.md` ; maintenir `discovery-v1.yaml` aligné. | OpenAPI **§0.1** : **`openapi/discovery-v1.yaml`** ; pas de handler ; option validation CI. |
 | **1b** | `api-contract/api-coherency-openapi` | `cafe-crypto-policy-mgt` | [#26](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/26) | — | Idem côté CPM ; maintenir `cpm-v1.yaml` aligné. | OpenAPI **§0.2** : **`openapi/cpm-v1.yaml`** ; pas de handler ; option validation CI. |
 | **2** | `discovery/api-v1-route-skeleton` | `cafe-discovery` | — | **1a** | Clients / edge : n’utiliser que **`/api/discovery/v1/wallets`** (plus de **`/api/wallets`**). | Monter **`/discovery/v1`** ; ordre **`wallets/scans` avant `wallets/:wallet_id`** ; squelettes ; **CAFE wallets uniquement sous v1**. |
-| **3** | `discovery/post-scan-contract-response` | `cafe-discovery` | — | **2** | Clients **`processing`** → **`requested`** ; release / **10** / **11a**/**11b**. | **`POST /discovery/v1/scan`** : réponse contrat + **`requested`** + **`location`**. |
-| **4** | `discovery/scan-history-lifecycle` | `cafe-discovery` | — | **2**, **3** | Perf listes (N+1) ; mettre à jour OpenAPI si écart en revue. | Listes + détail wallet/TLS : **`items`**, pagination, tri, filtres, règles **`result`**. |
+| **3** | `discovery/post-scan-contract-response` | `cafe-discovery` | — | **2** | Remplacer le stub **501** sur **`POST /discovery/v1/scan`** ; clients **`processing`** → **`requested`** (**10**). | **`POST /discovery/v1/scan`** : réponse contrat + **`requested`** + **`location`**. |
+| **4** | `discovery/scan-history-lifecycle` | `cafe-discovery` | — | **2**, **3** | Remplacer les **501** sur listes / détail scans v1 ; perf listes (N+1) ; OpenAPI si écart. | Listes + détail wallet/TLS : **`items`**, pagination, tri, filtres, règles **`result`**. |
 | **5** | `cpm/internal-policy-reference-by-scan` | `cafe-crypto-policy-mgt` | — | **4** | Charge à chaque DELETE scan ; timeouts, circuit, **SLO** documentés. | **CPM seul** : endpoint **interne** (token service) — « cet owner a-t-il des policies persistées qui référencent ce **`scan_id`** ? » — verdict **`referenced`** (+ **`count`** optionnel logs) ; **pas** d’IDs de policies dans la réponse. |
 | **6** | `discovery/delete-semantics-cpm-reference-check` | `cafe-discovery` | — | **4**, **5** (et **7** si 409 **`wallet_id`** via CPM) | Latence DELETE ; **503** attendu si CPM indispo ; runbook exploit. | **Discovery** orchestre le DELETE scan / wallet mais **consomme seulement** le verdict CPM ; **503 fail-closed** si la vérif CPM est indisponible. |
 | **7** | `cpm/policies-scan-reference-contract` | `cafe-crypto-policy-mgt` | — | **1b**, **4**, **5** | Liste **`scan_id`** en O(n) en mémoire ; plan DB ; même lookup que **PR5**. | **`/api/cpm/v1/policies`**, **`GET ?scan_id=`** (même lookup owner-scoped que **PR5**), **`DELETE ?id=`**, validations, alias rollout optionnels. |
 | **8** | `cpm/decisions-explore-contract-check` | `cafe-crypto-policy-mgt` | — | **1b**, **7** | Validation trop stricte → démos ; garder voie « fixtures » (**PR7**). | **`POST …/policies/decisions/explore`** : non persistant ; DTOs alignés scan v1. |
-| **9** | `deploy/api-v1-edge-alignment` | `cafe-deploy` | — | **2**, **7** | Coupure si edge avant images ; coordonner avec **10**. | NGINX / env : **`/api/discovery/v1`**, **`/api/cpm/v1`** ; chemins §0.3 **temporaires** documentés. |
-| **10** | `frontend/api-coherency-migration` | `cafe-frontend` | — | **9** (ou stack locale équivalente) | Bundles / **SW** staging ; procédure de purge. | Clients vers nouveaux chemins et enveloppes. |
+| **9** | `deploy/api-v1-edge-alignment` | `cafe-deploy` | — | **2**, **7** | Coupure si edge avant images ; **ne pas** réintroduire de **`/api/wallets`** (hors **`/api/discovery/v1/wallets`**). | NGINX / env : **`/api/discovery/v1`**, **`/api/cpm/v1`** ; chemins §0.3 **temporaires** documentés. |
+| **10** | `frontend/api-coherency-migration` | `cafe-frontend` | — | **9** (ou stack locale équivalente) | Bundles / **SW** staging ; procédure de purge ; **CRUD wallets** : base **`/api/discovery/v1/wallets`** (plus d’ancien **`/wallets`**). | Clients vers nouveaux chemins et enveloppes. |
 | **11a** | `cleanup/remove-obsolete-discovery-routes` | `cafe-discovery` | — | **10** | Intégrateurs sur anciennes URLs ; com **release** ; merger avant **11b** si possible. | Retrait handlers / tests Discovery obsolètes (`GET /discovery/scans`, `GET /discovery/tls/scans`, `wallet-policy-contexts`, ancien `POST /discovery/scan`, etc.). |
 | **11b** | `cleanup/remove-cpm-rollout-and-client-leftovers` | `cafe-crypto-policy-mgt`, `cafe-frontend`, `cafe-crypto-policy-mgt/scripts`, `cafe-deploy` | — | **10**, **11a** (recommandé : Discovery ne sert plus les anciennes routes avant de retirer l’edge) | Diff « fourre-tout » ; rester strictement rollout + reliquats ; tag specs si besoin. | Alias **§0.3** CPM / nginx, double enregistrement mux, scripts, références frontend résiduelles. |
-| **12** | `docs/api-coherency-runbook-qa` | `cafe-documentation` (+ README optionnels) | — | **11a**, **11b** | Doc obsolète si merge tard ; merger vite après cleanup. | Runbooks, exemples curl, checklist QA §8. |
+| **12** | `docs/api-coherency-runbook-qa` | `cafe-documentation` (+ README optionnels) | — | **11a**, **11b** | Doc obsolète si merge tard ; exemples curl **uniquement** chemins v1 (wallets inclus). | Runbooks, exemples curl, checklist QA §8. |
 
 **Colonne PR Git :** lien vers la pull request du dépôt concerné lorsqu’elle existe ; **—** = pas encore créée / à renseigner.
 
@@ -142,7 +142,7 @@
 - **Scope:** `internal/handler/discovery.go` (`UnifiedScan` / helpers de queue) ; réutiliser l’UUID déjà créé pour NATS.
 - **Out of scope:** DTOs liste/détail (**PR4**), retrait de l’ancien `POST /discovery/scan` (**PR11a**).
 - **Dependencies:** **PR2** (route v1 montée).
-- **Implementation notes:** Persistance **`requested`** avant publish NATS si ce n’est pas déjà garanti — possible toucher `internal/service` / workers au minimum.
+- **Implementation notes:** Implémenter **uniquement** sous **`/discovery/v1/scan`** (plus de chemin parallèle hors v1). Persistance **`requested`** avant publish NATS si ce n’est pas déjà garanti — possible toucher `internal/service` / workers au minimum.
 - **Tests:** Handler : exclusion mutuelle, forme JSON, **`scan_id`** présent et stable à l’acceptation ; comportement 503 scanner absent inchangé si applicable.
 - **Validation commands:** `cd cafe-discovery && go test ./...`
 - **Proposed commit title:** `Discovery v1: POST scan returns scan_id, family, and location`
@@ -162,7 +162,7 @@
 - **Scope:** `DiscoveryHandler`, `TLSHandler`, `userScanCache` / dépôts ; remplacer **`results`** par **`items`** ; tri par défaut **`created_at` desc, `scan_id` desc** ; **`GET …/wallets/scans?chain_id=` sans `address` → 400** ; liste TLS : ne pas supporter **`address` / `chain_id`** (400 si query interdite fournie, interprétation stricte).
 - **Out of scope:** DELETE et **409** (**PR6**) ; suppression des anciennes listes (**PR11a**).
 - **Dependencies:** **PR2**, **PR3** (URLs de détail et stabilité **`scan_id`**).
-- **Implementation notes:** **`GET …/wallets/scans/{scan_id}`** et **`GET …/tls/scans/{scan_id}`** ; aligner le service `wallet_policy_context` si encore utilisé en interne.
+- **Implementation notes:** Toutes les routes cibles sont sous **`/discovery/v1/...`** (listes scans wallet/TLS déjà préfixées **`…/wallets/scans`**, **`…/tls/scans`** — **pas** de **`/wallets`** racine). **`GET …/wallets/scans/{scan_id}`** et **`GET …/tls/scans/{scan_id}`** ; aligner le service `wallet_policy_context` si encore utilisé en interne.
 - **Tests:** Table-driven : enveloppe pagination, ordre de tri, **400** sur queries invalides, plusieurs lignes d’historique pour une même adresse.
 - **Validation commands:** `cd cafe-discovery && go test ./...`
 - **Proposed commit title:** `Discovery v1: wallet and TLS scan lists and detail DTOs`
@@ -339,7 +339,7 @@ Both endpoints must rely on the same internal owner-scoped policy lookup logic t
 - **Scope:** `templates/nginx/nginx.conf.template`, templates env (health/blackbox) si les chemins changent.
 - **Out of scope:** Suppression définitive des alias rollout (**PR11b**) ; code applicatif.
 - **Dependencies:** **PR2** et **PR7** (routes existantes avant bascule clients).
-- **Implementation notes:** **Résoudre l’incohérence** frontend **`/api/cpm/...`** vs mux direct **`/api/v1/cpm/...`** : une seule histoire pour navigateur et scripts après cette PR.
+- **Implementation notes:** **Résoudre l’incohérence** frontend **`/api/cpm/...`** vs mux direct **`/api/v1/cpm/...`** : une seule histoire pour navigateur et scripts après cette PR. **Ne pas** exposer d’alias edge **`/api/wallets`** (ou équivalent court) vers Discovery : les wallets CAFE passent par **`/api/discovery/v1/wallets`** après strip **`/api`**.
 - **Tests:** `nginx -t` en CI ou check manuel documenté ; extraits curl dans la PR body.
 - **Validation commands:** `docker compose ... config` si applicable ; `nginx -t` sur conf générée.
 - **Proposed commit title:** `Deploy: edge routes for /api/discovery/v1 and /api/cpm/v1`
@@ -355,8 +355,8 @@ Both endpoints must rely on the same internal owner-scoped policy lookup logic t
 
 - **Branch:** `frontend/api-coherency-migration`
 - **Repository:** `cafe-frontend`
-- **Objective:** Basculer les appels Discovery vers **`/discovery/v1/...`** (via base **`/api`**), adopter **`items`**, traiter la réponse **`POST /scan`** (**`location`**, **`scan_id`**), CPM vers **`/api/cpm/v1/...`** aligné avec **9**.
-- **Scope:** `src/services/scanService.js`, `tlsService.js`, `cpm/apiCpmDataSource.ts`, composables / tests associés ; `.env.example` si besoin.
+- **Objective:** Basculer les appels Discovery vers **`/discovery/v1/...`** (via base **`/api`**), adopter **`items`**, traiter la réponse **`POST /scan`** (**`location`**, **`scan_id`**), CPM vers **`/api/cpm/v1/...`** aligné avec **9**. **CRUD wallets** : tout appeler sous **`/api/discovery/v1/wallets`** (plus d’URL **`/wallets`** ou **`/api/.../wallets`** hors ce préfixe).
+- **Scope:** `src/services/scanService.js`, `tlsService.js`, services / composables **wallets** (création, liste, suppression, etc.), `cpm/apiCpmDataSource.ts`, composables / tests associés ; `.env.example` si besoin.
 - **Out of scope:** Suppression backend des anciennes routes (**11a**) ; nettoyage rollout / scripts (**11b**).
 - **Dependencies:** **PR9** (ou overrides locaux coordonnés).
 - **Tests:** Mise à jour Vitest/Jest pour builders d’URL et parsers ; `apiCpmDataSource.spec.ts`.
@@ -413,6 +413,7 @@ Both endpoints must rely on the same internal owner-scoped policy lookup logic t
 - **Branch:** `docs/api-coherency-runbook-qa`
 - **Repository:** `cafe-documentation` (principal) ; README optionnels dans `cafe-discovery` / `cafe-crypto-policy-mgt`.
 - **Objective:** Remplacer les exemples curl du guide développeur ; checklist QA type **§8** ; scripts alignés avec **11a** / **11b**.
+- **Scope:** Runbooks et guides d’intégration ; **tous** les exemples curl côté Discovery (y compris **wallets**) sous **`/api/discovery/v1/...`** — **aucune** doc « primaire » qui cible **`/wallets`** ou **`/api/wallets`** hors ce préfixe.
 - **Out of scope:** Copy marketing.
 - **Dependencies:** **11a** et **11b** terminées (ou merge équivalent : cleanup complet sans fenêtre doc cassée).
 - **Tests:** N/A (markdown) ; lien HTTP optionnel en CI si déjà présent.
