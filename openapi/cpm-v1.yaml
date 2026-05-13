@@ -519,6 +519,12 @@ components:
         scan_id:
           type: string
           format: uuid
+        binding:
+          type: string
+          enum: [discovery, fixture, catalog, none]
+          description: |
+            **`discovery`** (default when omitted): `scan_id` is mandatory (UUID) for Discovery→CPM persisted instances.
+            **`fixture`**, **`catalog`**, **`none`**: optional `scan_id` for non-product tests and catalogue-aligned payloads (WORKPLAN_API.md §5.2).
         payload:
           type: object
           additionalProperties: true

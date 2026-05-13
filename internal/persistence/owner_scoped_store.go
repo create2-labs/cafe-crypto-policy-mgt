@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"errors"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -122,29 +123,67 @@ func (s *OwnerScopedStore) SavePolicy(principal authz.Principal, id string, scan
 	return record, nil
 }
 
-// CountPersistedPoliciesForScan returns how many persisted policy instances belong to
-// principal and reference the given scan_id (trimmed exact match on PolicyRecord.ScanID).
-// Drafts are not counted — only persisted policies in the owner-scoped policy map.
-func (s *OwnerScopedStore) CountPersistedPoliciesForScan(principal authz.Principal, scanID string) (int, error) {
+// ListPersistedPoliciesForScan returns persisted policy instances for principal that
+// reference scanID (trimmed exact match on PolicyRecord.ScanID). Order is stable by id.
+// Drafts are excluded — only entries in the owner-scoped policy map.
+func (s *OwnerScopedStore) ListPersistedPoliciesForScan(principal authz.Principal, scanID string) ([]PolicyRecord, error) {
 	if err := principal.Validate(); err != nil {
-		return 0, ErrPrincipalRequired
+		return nil, ErrPrincipalRequired
 	}
 	needle := strings.TrimSpace(scanID)
 	if needle == "" {
-		return 0, errors.New("scan_id is required")
+		return nil, errors.New("scan_id is required")
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	n := 0
-	for _, rec := range s.policies {
+	var ids []string
+	for id, rec := range s.policies {
 		if !sameOwner(rec.OwnerUserID, rec.TenantID, principal.UserID, principal.TenantID) {
 			continue
 		}
-		if strings.TrimSpace(rec.ScanID) == needle {
-			n++
+		if strings.EqualFold(strings.TrimSpace(rec.ScanID), needle) {
+			ids = append(ids, id)
 		}
 	}
-	return n, nil
+	sort.Strings(ids)
+	out := make([]PolicyRecord, 0, len(ids))
+	for _, id := range ids {
+		rec := s.policies[id]
+		rec.Payload = cloneMap(rec.Payload)
+		out = append(out, rec)
+	}
+	return out, nil
+}
+
+// CountPersistedPoliciesForScan returns how many persisted policy instances belong to
+// principal and reference the given scan_id (trimmed exact match on PolicyRecord.ScanID).
+// Drafts are not counted — only persisted policies in the owner-scoped policy map.
+// Semantics match len(ListPersistedPoliciesForScan(...)) for the same principal and scan_id.
+func (s *OwnerScopedStore) CountPersistedPoliciesForScan(principal authz.Principal, scanID string) (int, error) {
+	list, err := s.ListPersistedPoliciesForScan(principal, scanID)
+	if err != nil {
+		return 0, err
+	}
+	return len(list), nil
+}
+
+// DeletePolicy removes a persisted policy instance by id for principal. ErrPolicyNotFound if
+// missing; ErrForbidden if owned by another principal (callers may map to 404).
+func (s *OwnerScopedStore) DeletePolicy(principal authz.Principal, id string) error {
+	if err := principal.Validate(); err != nil {
+		return ErrPrincipalRequired
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	record, ok := s.policies[id]
+	if !ok {
+		return ErrPolicyNotFound
+	}
+	if !sameOwner(record.OwnerUserID, record.TenantID, principal.UserID, principal.TenantID) {
+		return ErrForbidden
+	}
+	delete(s.policies, id)
+	return nil
 }
 
 func (s *OwnerScopedStore) GetPolicy(principal authz.Principal, id string) (PolicyRecord, error) {
