@@ -85,17 +85,23 @@ func RegisterReadRoutes(mux *http.ServeMux, store *ReadStore) error {
 	if store == nil {
 		return ErrStoreNil
 	}
+	for _, prefix := range []string{"/api/v1/policies", "/api/cpm/v1/policies"} {
+		registerReadRoutesForPrefix(mux, store, prefix)
+	}
+	return nil
+}
 
-	mux.HandleFunc("GET /api/v1/policies/catalog", func(w http.ResponseWriter, _ *http.Request) {
+func registerReadRoutesForPrefix(mux *http.ServeMux, store *ReadStore, prefix string) {
+	mux.HandleFunc("GET "+prefix+"/catalog", func(w http.ResponseWriter, _ *http.Request) {
 		respondJSON(w, http.StatusOK, map[string]any{"catalog": store.catalog})
 	})
-	mux.HandleFunc("GET /api/v1/policies/templates", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("GET "+prefix+"/templates", func(w http.ResponseWriter, _ *http.Request) {
 		respondJSON(w, http.StatusOK, map[string]any{"items": store.templates})
 	})
-	mux.HandleFunc("GET /api/v1/policies/instances", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("GET "+prefix+"/instances", func(w http.ResponseWriter, _ *http.Request) {
 		respondJSON(w, http.StatusOK, map[string]any{"items": store.instances})
 	})
-	mux.HandleFunc("POST /api/v1/policies/decisions/explore", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST "+prefix+"/decisions/explore", func(w http.ResponseWriter, r *http.Request) {
 		var req decisionExploreRequest
 		if err := decodeJSON(r, &req); err != nil {
 			respondJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
@@ -129,7 +135,6 @@ func RegisterReadRoutes(mux *http.ServeMux, store *ReadStore) error {
 
 		respondJSON(w, http.StatusOK, map[string]any{"decision": decision})
 	})
-	return nil
 }
 
 type decisionExploreRequest struct {

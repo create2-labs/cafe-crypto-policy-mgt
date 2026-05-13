@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/api"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/authz"
@@ -145,5 +146,85 @@ func TestPolicyReferenceInternalReferencedAndCount(t *testing.T) {
 	}
 	if out2.Referenced || out2.Count != 0 {
 		t.Fatalf("expected referenced=false count=0 for scan without policies, got referenced=%v count=%d", out2.Referenced, out2.Count)
+	}
+}
+
+func TestPublicGETPoliciesByScanIDAgreesWithInternalReferenceCheck(t *testing.T) {
+	owner := persistence.NewOwnerScopedStore()
+	read := policyRefTestReadStore(t)
+	scanID := "550e8400-e29b-41d4-a716-446655440000"
+	principal := authz.Principal{UserID: "u1", Subject: "u1", TenantID: "tenant-a"}
+	if _, err := owner.SavePolicy(principal, "pol-1", scanID, map[string]any{"x": 1}); err != nil {
+		t.Fatalf("SavePolicy: %v", err)
+	}
+	if _, err := owner.SavePolicy(principal, "pol-2", scanID, map[string]any{"x": 2}); err != nil {
+		t.Fatalf("SavePolicy: %v", err)
+	}
+
+	introspect := newDiscoveryValidationServer(t, discoveryValidationTestConfig{status: http.StatusOK})
+	t.Cleanup(introspect.Close)
+	scanAuth := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"allowed":true}`))
+	}))
+	t.Cleanup(scanAuth.Close)
+	const svcToken = "svc-ref-agree"
+	h, err := handlerWithOwnerStore("cafe-cpm", read, owner, authConfig{
+		Required:                            true,
+		SessionValidationURL:                introspect.URL,
+		SessionValidationTimeoutSec:         3,
+		ClockSkewSec:                        30,
+		ScanAuthorizationURL:              scanAuth.URL,
+		ScanAuthorizationTimeoutSec:         2,
+		PolicyReferenceInternalServiceToken: svcToken,
+	})
+	if err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+	token, err := makeDiscoveryHybridToken(map[string]any{
+		"user_id":   "u1",
+		"tenant_id": "tenant-a",
+		"email":     "u1@example.com",
+		"exp":       time.Now().Add(time.Hour).Unix(),
+	})
+	if err != nil {
+		t.Fatalf("token: %v", err)
+	}
+	getReq := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies?scan_id="+scanID, nil)
+	getReq.Header.Set("Authorization", "Bearer "+token)
+	getRes := httptest.NewRecorder()
+	h.ServeHTTP(getRes, getReq)
+	if getRes.Code != http.StatusOK {
+		t.Fatalf("GET policies by scan_id: want 200, got %d body=%s", getRes.Code, getRes.Body.String())
+	}
+	var listBody struct {
+		Items []map[string]any `json:"items"`
+		Total int              `json:"total"`
+	}
+	if err := json.Unmarshal(getRes.Body.Bytes(), &listBody); err != nil {
+		t.Fatalf("decode list: %v", err)
+	}
+	if listBody.Total != 2 || len(listBody.Items) != 2 {
+		t.Fatalf("want 2 policies in list, got total=%d len(items)=%d", listBody.Total, len(listBody.Items))
+	}
+
+	internalBody := `{"scan_id":"550e8400-e29b-41d4-a716-446655440000","user_id":"u1","tenant_id":"tenant-a"}`
+	inReq := httptest.NewRequest(http.MethodPost, "/internal/policies/references/scan", strings.NewReader(internalBody))
+	inReq.Header.Set("Content-Type", "application/json")
+	inReq.Header.Set("Authorization", "Bearer "+svcToken)
+	inRes := httptest.NewRecorder()
+	h.ServeHTTP(inRes, inReq)
+	if inRes.Code != http.StatusOK {
+		t.Fatalf("internal: want 200, got %d body=%s", inRes.Code, inRes.Body.String())
+	}
+	var inOut struct {
+		Referenced bool `json:"referenced"`
+		Count      int  `json:"count"`
+	}
+	if err := json.Unmarshal(inRes.Body.Bytes(), &inOut); err != nil {
+		t.Fatalf("decode internal: %v", err)
+	}
+	if !inOut.Referenced || inOut.Count != len(listBody.Items) {
+		t.Fatalf("internal count=%d referenced=%v vs public len=%d", inOut.Count, inOut.Referenced, len(listBody.Items))
 	}
 }

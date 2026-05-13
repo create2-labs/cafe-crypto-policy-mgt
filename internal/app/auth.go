@@ -41,10 +41,20 @@ var routeInventory = []routeSpec{
 	{Method: http.MethodGet, Path: "/api/v1/policies/templates", Class: authz.RouteClassAuthenticated},
 	{Method: http.MethodGet, Path: "/api/v1/policies/instances", Class: authz.RouteClassAuthenticated},
 	{Method: http.MethodPost, Path: "/api/v1/policies/decisions/explore", Class: authz.RouteClassAuthenticated},
+	{Method: http.MethodGet, Path: "/api/cpm/v1/policies/catalog", Class: authz.RouteClassAuthenticated},
+	{Method: http.MethodGet, Path: "/api/cpm/v1/policies/templates", Class: authz.RouteClassAuthenticated},
+	{Method: http.MethodGet, Path: "/api/cpm/v1/policies/instances", Class: authz.RouteClassAuthenticated},
+	{Method: http.MethodPost, Path: "/api/cpm/v1/policies/decisions/explore", Class: authz.RouteClassAuthenticated},
 	{Method: http.MethodPost, Path: "/api/v1/cpm/drafts", Class: authz.RouteClassAuthenticated},
 	{Method: http.MethodGet, Path: "/api/v1/cpm/drafts", Class: authz.RouteClassAuthenticated},
 	{Method: http.MethodPost, Path: "/api/v1/cpm/policies", Class: authz.RouteClassAuthenticated},
 	{Method: http.MethodGet, Path: "/api/v1/cpm/policies", Class: authz.RouteClassAuthenticated},
+	{Method: http.MethodDelete, Path: "/api/v1/cpm/policies", Class: authz.RouteClassAuthenticated},
+	{Method: http.MethodPost, Path: "/api/cpm/v1/drafts", Class: authz.RouteClassAuthenticated},
+	{Method: http.MethodGet, Path: "/api/cpm/v1/drafts", Class: authz.RouteClassAuthenticated},
+	{Method: http.MethodPost, Path: "/api/cpm/v1/policies", Class: authz.RouteClassAuthenticated},
+	{Method: http.MethodGet, Path: "/api/cpm/v1/policies", Class: authz.RouteClassAuthenticated},
+	{Method: http.MethodDelete, Path: "/api/cpm/v1/policies", Class: authz.RouteClassAuthenticated},
 	{Method: http.MethodPost, Path: "/internal/policies/references/scan", Class: authz.RouteClassInternalService},
 }
 
@@ -400,7 +410,13 @@ func respondAuthError(w http.ResponseWriter, status int, payload any) {
 }
 
 func extractScanIDsForAuthorization(r *http.Request) ([]string, authz.APIError, int) {
-	if r == nil || r.Body == nil {
+	if r == nil {
+		return nil, authz.APIError{}, http.StatusOK
+	}
+	if r.Method == http.MethodGet && isOwnerPoliciesGETPath(r.URL.Path) {
+		return scanIDsFromOwnerPoliciesGETQuery(r)
+	}
+	if r.Body == nil {
 		return nil, authz.APIError{}, http.StatusOK
 	}
 	if r.Method != http.MethodPost && r.Method != http.MethodPut && r.Method != http.MethodPatch {
@@ -443,6 +459,31 @@ func extractScanIDsForAuthorization(r *http.Request) ([]string, authz.APIError, 
 		}
 	}
 	return []string{base}, authz.APIError{}, http.StatusOK
+}
+
+func scanIDsFromOwnerPoliciesGETQuery(r *http.Request) ([]string, authz.APIError, int) {
+	q := r.URL.Query()
+	id := strings.TrimSpace(q.Get("id"))
+	scanID := strings.TrimSpace(q.Get("scan_id"))
+	if id != "" && scanID != "" {
+		return nil, authz.APIError{
+			Code:    authCodeScanIDConflict,
+			Message: "id and scan_id are mutually exclusive",
+			Details: map[string]any{"reason": "mutually_exclusive_query_params"},
+		}, http.StatusBadRequest
+	}
+	if scanID == "" {
+		return nil, authz.APIError{}, http.StatusOK
+	}
+	norm, err := NormalizeDiscoveryScanID(scanID)
+	if err != nil {
+		return nil, authz.APIError{
+			Code:    authCodeScanIDMalformed,
+			Message: "scan_id is malformed",
+			Details: map[string]any{"reason": "scan_id_malformed"},
+		}, http.StatusBadRequest
+	}
+	return []string{norm}, authz.APIError{}, http.StatusOK
 }
 
 func collectScanIDs(payload map[string]any) ([]string, bool) {

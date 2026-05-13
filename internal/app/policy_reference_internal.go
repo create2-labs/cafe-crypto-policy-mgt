@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/authz"
@@ -21,9 +20,6 @@ type policyScanReferenceRequest struct {
 // registerPolicyReferenceInternalRoute registers POST /internal/policies/references/scan
 // (WORKPLAN_API_PR.md PR5). Caller must gate the mux with service-token auth for this path
 // when CPM_AUTH_REQUIRED is true.
-// scanUUIDPattern matches canonical lowercase UUID strings (Discovery scan_id).
-var scanUUIDPattern = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
-
 func registerPolicyReferenceInternalRoute(mux *http.ServeMux, store *persistence.OwnerScopedStore) {
 	mux.HandleFunc("POST /internal/policies/references/scan", func(w http.ResponseWriter, r *http.Request) {
 		const maxBody = 1 << 16
@@ -41,12 +37,11 @@ func registerPolicyReferenceInternalRoute(mux *http.ServeMux, store *persistence
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
 			return
 		}
-		scanID := strings.TrimSpace(req.ScanID)
-		if !scanUUIDPattern.MatchString(scanID) {
+		scanID, err := NormalizeDiscoveryScanID(req.ScanID)
+		if err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "scan_id must be a valid UUID"})
 			return
 		}
-		scanID = strings.ToLower(scanID)
 		userID := strings.TrimSpace(req.UserID)
 		if userID == "" {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "user_id is required"})
@@ -61,7 +56,7 @@ func registerPolicyReferenceInternalRoute(mux *http.ServeMux, store *persistence
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid principal"})
 			return
 		}
-		count, err := store.CountPersistedPoliciesForScan(principal, scanID)
+		list, err := store.ListPersistedPoliciesForScan(principal, scanID)
 		if err != nil {
 			if errors.Is(err, persistence.ErrPrincipalRequired) {
 				writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
@@ -70,6 +65,7 @@ func registerPolicyReferenceInternalRoute(mux *http.ServeMux, store *persistence
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal server error"})
 			return
 		}
+		count := len(list)
 		writeJSON(w, http.StatusOK, map[string]any{
 			"referenced": count > 0,
 			"count":      count,

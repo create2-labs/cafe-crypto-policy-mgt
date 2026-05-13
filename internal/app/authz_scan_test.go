@@ -68,6 +68,24 @@ func TestExtractScanIDsForAuthorizationVariants(t *testing.T) {
 	}
 }
 
+func TestExtractScanIDsForAuthorizationGETPolicies(t *testing.T) {
+	scan := "550e8400-e29b-41d4-a716-446655440000"
+	req := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies?scan_id="+scan, nil)
+	ids, authErr, status := extractScanIDsForAuthorization(req)
+	if authErr.Code != "" || status != http.StatusOK {
+		t.Fatalf("expected ok, got code=%q status=%d", authErr.Code, status)
+	}
+	if len(ids) != 1 || ids[0] != strings.ToLower(scan) {
+		t.Fatalf("expected normalized scan id, got %#v", ids)
+	}
+
+	reqBoth := httptest.NewRequest(http.MethodGet, "/api/v1/cpm/policies?id=a&scan_id="+scan, nil)
+	_, ae2, st2 := extractScanIDsForAuthorization(reqBoth)
+	if ae2.Code == "" || st2 != http.StatusBadRequest {
+		t.Fatalf("expected 400 conflict, got code=%q status=%d", ae2.Code, st2)
+	}
+}
+
 func TestAuthorizeScanAccessMappings(t *testing.T) {
 	principal := authz.Principal{UserID: "u1", Subject: "u1"}
 	var gotUserID atomic.Value
