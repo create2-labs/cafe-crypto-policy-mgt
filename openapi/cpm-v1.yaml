@@ -16,6 +16,10 @@ info:
 
     **Discovery scans (correlation):** `cafe-discovery/openapi/discovery-v1.yaml` (PR1a); shared key **`scan_id`**.
 
+    **Internal (service mesh / Docker, not public ingress):** `POST /internal/policies/references/scan` — gated by env
+    **`CAFE_POLICY_REFERENCE_INTERNAL_SERVICE_TOKEN`** (Bearer). Request JSON **`{ "scan_id", "user_id", "tenant_id" }`**;
+    response **`{ "referenced": boolean, "count": number }`**. Authoritative check for Discovery scan delete (WORKPLAN_API_PR **PR5**/**PR6**);
+    the owner-scoped lookup must remain shared with **`GET …/policies?scan_id=`** (**PR7**).
 servers:
   - url: https://{host}/api/cpm/v1
     description: Canonical product base (§0.2).

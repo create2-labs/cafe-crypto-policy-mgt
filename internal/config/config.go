@@ -29,28 +29,31 @@ type Config struct {
 	ScanAuthorizationURL          string
 	ScanAuthorizationTimeoutSec   int
 	ScanAuthorizationServiceToken string
-	AuthClockSkewSec              int
-	PolicyCatalogPath             string
-	PolicyTemplatePaths           []string
-	PolicyInstancePaths           []string
+	// PolicyReferenceInternalServiceToken gates POST /internal/policies/references/scan (Discovery PR6).
+	PolicyReferenceInternalServiceToken string
+	AuthClockSkewSec                    int
+	PolicyCatalogPath                   string
+	PolicyTemplatePaths                 []string
+	PolicyInstancePaths                 []string
 }
 
 func LoadFromEnv() Config {
 	return Config{
-		ServiceName:                   getEnv("CPM_SERVICE_NAME", defaultService),
-		HTTPAddr:                      getEnv("CPM_HTTP_ADDR", defaultHTTPAddr),
-		LogLevel:                      getEnv("CPM_LOG_LEVEL", defaultLogLevel),
-		AuthRequired:                  getEnvBool("CPM_AUTH_REQUIRED", defaultAuthRequired),
-		SessionValidationURL:          getEnv("CAFE_SESSION_JWT_VALIDATION_URL", ""),
-		SessionValidationTimeoutSec:   getEnvInt("CAFE_SESSION_JWT_VALIDATION_TIMEOUT_SEC", defaultSessionValidationTimeoutSec),
-		SessionValidationServiceToken: getEnv("CAFE_SESSION_JWT_VALIDATION_SERVICE_TOKEN", ""),
-		ScanAuthorizationURL:          getEnv("CAFE_SCAN_AUTHORIZATION_URL", ""),
-		ScanAuthorizationTimeoutSec:   getEnvInt("CAFE_SCAN_AUTHORIZATION_TIMEOUT_SEC", defaultScanAuthorizationTimeoutSec),
-		ScanAuthorizationServiceToken: getEnv("CAFE_SCAN_AUTHORIZATION_SERVICE_TOKEN", ""),
-		AuthClockSkewSec:              getEnvInt("CPM_AUTH_CLOCK_SKEW_SEC", defaultAuthClockSkewSec),
-		PolicyCatalogPath:             getEnv("CPM_POLICY_CATALOG_PATH", defaultPolicyCatalogPath),
-		PolicyTemplatePaths:           parseCommaList(getEnv("CPM_POLICY_TEMPLATE_PATHS", defaultPolicyTemplatePaths)),
-		PolicyInstancePaths:           parseCommaList(getEnv("CPM_POLICY_INSTANCE_PATHS", defaultPolicyInstancePaths)),
+		ServiceName:                         getEnv("CPM_SERVICE_NAME", defaultService),
+		HTTPAddr:                            getEnv("CPM_HTTP_ADDR", defaultHTTPAddr),
+		LogLevel:                            getEnv("CPM_LOG_LEVEL", defaultLogLevel),
+		AuthRequired:                        getEnvBool("CPM_AUTH_REQUIRED", defaultAuthRequired),
+		SessionValidationURL:                getEnv("CAFE_SESSION_JWT_VALIDATION_URL", ""),
+		SessionValidationTimeoutSec:         getEnvInt("CAFE_SESSION_JWT_VALIDATION_TIMEOUT_SEC", defaultSessionValidationTimeoutSec),
+		SessionValidationServiceToken:       getEnv("CAFE_SESSION_JWT_VALIDATION_SERVICE_TOKEN", ""),
+		ScanAuthorizationURL:                getEnv("CAFE_SCAN_AUTHORIZATION_URL", ""),
+		ScanAuthorizationTimeoutSec:         getEnvInt("CAFE_SCAN_AUTHORIZATION_TIMEOUT_SEC", defaultScanAuthorizationTimeoutSec),
+		ScanAuthorizationServiceToken:       getEnv("CAFE_SCAN_AUTHORIZATION_SERVICE_TOKEN", ""),
+		PolicyReferenceInternalServiceToken: getEnv("CAFE_POLICY_REFERENCE_INTERNAL_SERVICE_TOKEN", ""),
+		AuthClockSkewSec:                    getEnvInt("CPM_AUTH_CLOCK_SKEW_SEC", defaultAuthClockSkewSec),
+		PolicyCatalogPath:                   getEnv("CPM_POLICY_CATALOG_PATH", defaultPolicyCatalogPath),
+		PolicyTemplatePaths:                 parseCommaList(getEnv("CPM_POLICY_TEMPLATE_PATHS", defaultPolicyTemplatePaths)),
+		PolicyInstancePaths:                 parseCommaList(getEnv("CPM_POLICY_INSTANCE_PATHS", defaultPolicyInstancePaths)),
 	}
 }
 

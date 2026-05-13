@@ -198,6 +198,7 @@ Environment variables:
 - `CAFE_SCAN_AUTHORIZATION_URL` (required for scan-bound operations)
 - `CAFE_SCAN_AUTHORIZATION_TIMEOUT_SEC` (default: `3`)
 - `CAFE_SCAN_AUTHORIZATION_SERVICE_TOKEN` (optional placeholder for service-to-service auth)
+- `CAFE_POLICY_REFERENCE_INTERNAL_SERVICE_TOKEN` (required when `CPM_AUTH_REQUIRED=true` for `POST /internal/policies/references/scan`; shared secret for Discovery → CPM scan-reference check — WORKPLAN PR5)
 - `CPM_AUTH_CLOCK_SKEW_SEC` (default: `30`)
 
 Important:

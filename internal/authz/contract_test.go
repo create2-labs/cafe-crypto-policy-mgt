@@ -58,6 +58,9 @@ func TestRouteClassValidation(t *testing.T) {
 	if !IsValidRouteClass(RouteClassPublicHealth) {
 		t.Fatal("expected public health route class to be valid")
 	}
+	if !IsValidRouteClass(RouteClassInternalService) {
+		t.Fatal("expected internal service route class to be valid")
+	}
 	if IsValidRouteClass("unknown") {
 		t.Fatal("did not expect unknown route class to be valid")
 	}

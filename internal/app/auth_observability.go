@@ -21,6 +21,8 @@ const (
 	authCodeScanUnavailable       = "AUTHZ_SCAN_UNAVAILABLE"
 	authCodeOwnerForbidden        = "AUTHZ_OWNER_FORBIDDEN"
 	authCodePrincipalRequired     = "AUTHZ_PRINCIPAL_REQUIRED"
+	authCodeInternalMisconfigured = "AUTH_INTERNAL_MISCONFIGURED"
+	authCodeInternalForbidden     = "AUTH_INTERNAL_FORBIDDEN"
 	authCodeOK                    = "OK"
 )
 

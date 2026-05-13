@@ -15,6 +15,9 @@ const (
 	RouteClassPublicHealth       = "public_health"
 	RouteClassAuthenticated      = "authenticated_business"
 	RouteClassDeprecatedDisabled = "deprecated_disabled"
+	// RouteClassInternalService is gated by a static service token (not user JWT).
+	// Used for service-to-service endpoints such as Discovery → CPM policy reference checks.
+	RouteClassInternalService = "internal_service_token"
 )
 
 type Principal struct {
@@ -91,7 +94,7 @@ func (r ScanAccessCheckResponse) Validate() error {
 
 func IsValidRouteClass(value string) bool {
 	switch value {
-	case RouteClassPublicHealth, RouteClassAuthenticated, RouteClassDeprecatedDisabled:
+	case RouteClassPublicHealth, RouteClassAuthenticated, RouteClassDeprecatedDisabled, RouteClassInternalService:
 		return true
 	default:
 		return false
