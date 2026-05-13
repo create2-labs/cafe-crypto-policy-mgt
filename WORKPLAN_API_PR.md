@@ -335,19 +335,20 @@ Both endpoints must rely on the same internal owner-scoped policy lookup logic t
 
 - **Branch:** `deploy/api-v1-edge-alignment`
 - **Repository:** `cafe-deploy` (principal) ; commentaires d’env compose si nécessaire pour URLs internes PR5/6.
-- **Objective:** Exposer **`/api/discovery/v1`** et **`/api/cpm/v1`** avec **`proxy_pass`** cohérent ; documenter les alias **§0.3** comme **temporaires** ; conserver le blocage **`/api/internal/`** à l’edge.
+- **Objective:** Exposer **`/api/discovery/v1`** et **`/api/cpm/v1`** avec **`proxy_pass`** cohérent ; documenter les alias **§0.3** comme **temporaires** ; **garantir** que **`/api/internal/...`** reste **bloqué** à l’edge (NGINX **`location ^~ /api/internal/`** → **403**), y compris après toute refonte des blocs **`location /api/...`** — ne jamais router ce préfixe vers Discovery ni CPM.
 - **Scope:** `templates/nginx/nginx.conf.template`, templates env (health/blackbox) si les chemins changent.
 - **Out of scope:** Suppression définitive des alias rollout (**PR11b**) ; code applicatif.
 - **Dependencies:** **PR2** et **PR7** (routes existantes avant bascule clients).
 - **Implementation notes:** **Résoudre l’incohérence** frontend **`/api/cpm/...`** vs mux direct **`/api/v1/cpm/...`** : une seule histoire pour navigateur et scripts après cette PR. **Ne pas** exposer d’alias edge **`/api/wallets`** (ou équivalent court) vers Discovery : les wallets CAFE passent par **`/api/discovery/v1/wallets`** après strip **`/api`**.
-- **Tests:** `nginx -t` en CI ou check manuel documenté ; extraits curl dans la PR body.
+- **Sécurité interne CPM (PR5 / PR6) — staging & prod :** avec **`CPM_AUTH_REQUIRED=true`** (cible opérationnelle), **`CAFE_POLICY_REFERENCE_INTERNAL_SERVICE_TOKEN`** doit être **défini et non vide** sur **cafe-cpm**, et **identique** au secret utilisé par **Discovery** pour appeler **`POST /internal/policies/references/scan`** (client **PR6**). Sinon : token absent → **503** sur l’endpoint interne (fail-closed pour l’appelant, mais **déploiement incomplet**). **`CPM_AUTH_REQUIRED=false`** désactive **tout** le middleware d’auth CPM : l’endpoint interne **n’exige plus** de Bearer service — **inacceptable** pour un environnement réel exposant le réseau de services ; réserver **`false`** au dev local contrôlé. Vérifier les **`env/*.env.template`** et **`compose/25-cpm.yml`** (et, au **PR6**, variables Discovery) pour forcer la paire **`CPM_AUTH_REQUIRED=true` + token interne** hors dev.
+- **Tests:** `nginx -t` en CI ou check manuel documenté ; extraits curl dans la PR body ; **vérification obligatoire** : depuis l’extérieur (TLS terminé à l’edge comme en prod), **`GET` ou `POST https://<host>/api/internal/<suffixe>`** (ex. chemin factice ou **`…/auth/session/validate`**) doit répondre **403** avec le corps JSON edge actuel (**`internal API is not exposed at the edge`**), **sans** joindre l’upstream Discovery. Répéter après tout changement d’ordre des `location` ou de la map **`$backend_api_uri`** pour éviter qu’un strip **`/api`** ne réexpose **`/internal/...`**.
 - **Validation commands:** `docker compose ... config` si applicable ; `nginx -t` sur conf générée.
 - **Proposed commit title:** `Deploy: edge routes for /api/discovery/v1 and /api/cpm/v1`
 - **Proposed commit message:** `Update NGINX routing for WORKPLAN_API public bases; document temporary rollout paths and Discovery→CPM internal URL envs.`
 - **Proposed PR title:** `Deploy: NGINX alignment for Discovery and CPM v1 APIs`
-- **Proposed PR body:** Cartographie edge → upstream ; note de migration staging/prod.
+- **Proposed PR body:** Cartographie edge → upstream ; note de migration staging/prod ; **preuve explicite** que **`/api/internal/*`** reste **403** à l’edge (curl + extrait de conf **`location ^~ /api/internal/`**).
 - **Risks:** Coupure si chemins basculés avant images — ordonner avec **10**.
-- **Completion criteria:** Stack locale : curls vers v1 OK.
+- **Completion criteria:** Stack locale : curls vers v1 OK ; **checklist edge** : **`/api/internal/...` → 403** documentée (commande curl ou test smoke) et non-régression sur les chemins **`/api/discovery/v1`** / **`/api/cpm/`**.
 
 ---
 

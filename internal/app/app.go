@@ -21,14 +21,15 @@ func Run(cfg config.Config) error {
 	}
 
 	h, err := handler(cfg.ServiceName, store, authConfig{
-		Required:                      cfg.AuthRequired,
-		SessionValidationURL:          cfg.SessionValidationURL,
-		SessionValidationTimeoutSec:   cfg.SessionValidationTimeoutSec,
-		SessionValidationServiceToken: cfg.SessionValidationServiceToken,
-		ScanAuthorizationURL:          cfg.ScanAuthorizationURL,
-		ScanAuthorizationTimeoutSec:   cfg.ScanAuthorizationTimeoutSec,
-		ScanAuthorizationServiceToken: cfg.ScanAuthorizationServiceToken,
-		ClockSkewSec:                  cfg.AuthClockSkewSec,
+		Required:                            cfg.AuthRequired,
+		SessionValidationURL:                cfg.SessionValidationURL,
+		SessionValidationTimeoutSec:         cfg.SessionValidationTimeoutSec,
+		SessionValidationServiceToken:       cfg.SessionValidationServiceToken,
+		ScanAuthorizationURL:                cfg.ScanAuthorizationURL,
+		ScanAuthorizationTimeoutSec:         cfg.ScanAuthorizationTimeoutSec,
+		ScanAuthorizationServiceToken:       cfg.ScanAuthorizationServiceToken,
+		PolicyReferenceInternalServiceToken: cfg.PolicyReferenceInternalServiceToken,
+		ClockSkewSec:                        cfg.AuthClockSkewSec,
 	})
 	if err != nil {
 		return err
@@ -44,8 +45,11 @@ func Run(cfg config.Config) error {
 }
 
 func handler(serviceName string, store *api.ReadStore, authCfg authConfig) (http.Handler, error) {
+	return handlerWithOwnerStore(serviceName, store, persistence.NewOwnerScopedStore(), authCfg)
+}
+
+func handlerWithOwnerStore(serviceName string, store *api.ReadStore, ownerStore *persistence.OwnerScopedStore, authCfg authConfig) (http.Handler, error) {
 	mux := http.NewServeMux()
-	ownerStore := persistence.NewOwnerScopedStore()
 	obs := authCfg.Observability
 	if obs == nil {
 		obs = newAuthObservability()
@@ -59,6 +63,7 @@ func handler(serviceName string, store *api.ReadStore, authCfg authConfig) (http
 		return nil, fmt.Errorf("register read routes: %w", err)
 	}
 	registerOwnerScopedRoutes(mux, ownerStore, obs)
+	registerPolicyReferenceInternalRoute(mux, ownerStore)
 	protected, err := withAuthentication(mux, authCfg)
 	if err != nil {
 		return nil, fmt.Errorf("wire auth middleware: %w", err)

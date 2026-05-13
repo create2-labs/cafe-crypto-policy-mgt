@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"errors"
+	"strings"
 	"sync"
 	"time"
 
@@ -119,6 +120,31 @@ func (s *OwnerScopedStore) SavePolicy(principal authz.Principal, id string, scan
 	}
 	s.policies[id] = record
 	return record, nil
+}
+
+// CountPersistedPoliciesForScan returns how many persisted policy instances belong to
+// principal and reference the given scan_id (trimmed exact match on PolicyRecord.ScanID).
+// Drafts are not counted — only persisted policies in the owner-scoped policy map.
+func (s *OwnerScopedStore) CountPersistedPoliciesForScan(principal authz.Principal, scanID string) (int, error) {
+	if err := principal.Validate(); err != nil {
+		return 0, ErrPrincipalRequired
+	}
+	needle := strings.TrimSpace(scanID)
+	if needle == "" {
+		return 0, errors.New("scan_id is required")
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	n := 0
+	for _, rec := range s.policies {
+		if !sameOwner(rec.OwnerUserID, rec.TenantID, principal.UserID, principal.TenantID) {
+			continue
+		}
+		if strings.TrimSpace(rec.ScanID) == needle {
+			n++
+		}
+	}
+	return n, nil
 }
 
 func (s *OwnerScopedStore) GetPolicy(principal authz.Principal, id string) (PolicyRecord, error) {

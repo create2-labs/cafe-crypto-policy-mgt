@@ -198,9 +198,11 @@ Environment variables:
 - `CAFE_SCAN_AUTHORIZATION_URL` (required for scan-bound operations)
 - `CAFE_SCAN_AUTHORIZATION_TIMEOUT_SEC` (default: `3`)
 - `CAFE_SCAN_AUTHORIZATION_SERVICE_TOKEN` (optional placeholder for service-to-service auth)
+- `CAFE_POLICY_REFERENCE_INTERNAL_SERVICE_TOKEN` (required when `CPM_AUTH_REQUIRED=true` for `POST /internal/policies/references/scan`; shared secret for Discovery → CPM scan-reference check — WORKPLAN PR5)
 - `CPM_AUTH_CLOCK_SKEW_SEC` (default: `30`)
 
 Important:
+- **`CPM_AUTH_REQUIRED=false`** disables the entire auth middleware: user JWT routes and **`POST /internal/policies/references/scan`** are unauthenticated at CPM — use only in controlled local dev. **Staging/production** should keep **`CPM_AUTH_REQUIRED=true`** and set **`CAFE_POLICY_REFERENCE_INTERNAL_SERVICE_TOKEN`** (see `cafe-deploy` env templates and **WORKPLAN_API_PR** PR9).
 - CPM validates **Discovery-issued session JWTs**.
 - CPM does not define a separate JWT model/secret.
 - CPM does not issue or validate a CPM-specific JWT. It accepts the same Bearer session token issued by Discovery and delegates authoritative cryptographic validation to Discovery.

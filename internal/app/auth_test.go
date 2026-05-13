@@ -27,6 +27,9 @@ func TestClassifyRoute(t *testing.T) {
 	if got := classifyRoute(http.MethodGet, "/does-not-exist"); got != authz.RouteClassDeprecatedDisabled {
 		t.Fatalf("expected unknown route class %q, got %q", authz.RouteClassDeprecatedDisabled, got)
 	}
+	if got := classifyRoute(http.MethodPost, "/internal/policies/references/scan"); got != authz.RouteClassInternalService {
+		t.Fatalf("expected internal service class %q, got %q", authz.RouteClassInternalService, got)
+	}
 }
 
 func TestWithAuthenticationFailsWithoutValidationURLWhenRequired(t *testing.T) {
