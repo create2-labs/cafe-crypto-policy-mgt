@@ -96,8 +96,13 @@ paths:
       tags: [decisions]
       summary: Explore applicable policies for a context (non-persistent)
       description: |
-        **Does not** persist a final policy instance (WORKPLAN_API.md §5.1, §8.6). Wire shape aligns with
-        implementation (`policy_context`, `selection_request`); tighten in PR8 as needed.
+        **Does not** persist a final policy instance (WORKPLAN_API.md §5.1, §8.6). Body carries
+        `policy_context` and `selection_request`. **`policy_context`** accepts either the flat Option A
+        shape (`wallet_address` or **`target_address`**, `wallet_type`, `chain_ids`, …) or a Discovery v1
+        wallet scan **detail** envelope (`scan_id`, `status`, **`result`** with `WalletScanResult` fields
+        as in `cafe-discovery` `openapi/discovery-v1.yaml`). Discovery **`current_pq_posture`** labels
+        `pq_ready` / `not_pq_ready` map to evaluator exports; `wallet_type` **`smart_account`** maps like
+        Option A `AA`.
       operationId: postPoliciesDecisionsExplore
       requestBody:
         required: true
@@ -565,6 +570,10 @@ components:
           description: Optional scan binding for AUTH-02 (implementation detail).
         policy_context:
           type: object
+          description: |
+            Flat Option A context and/or Discovery v1 `WalletScanDetail`-shaped object (`result` for terminal scans).
+            Extra keys are ignored when parsing the nested `result` branch; unknown keys at the top level of the
+            request body remain rejected by the API (strict JSON on the outer envelope).
           additionalProperties: true
         selection_request:
           type: object
