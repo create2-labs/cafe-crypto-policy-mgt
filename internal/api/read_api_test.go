@@ -192,6 +192,189 @@ func TestDecisionExplore_optionA_policy_context(t *testing.T) {
 	}
 }
 
+// TestDecisionExplore_discoveryV1WalletScanDetailEnvelope uses the same shape as GET …/discovery/v1/wallets/scans/{scan_id}
+// once the scan is terminal (openapi WalletScanDetail + WalletScanResult).
+func TestDecisionExplore_discoveryV1WalletScanDetailEnvelope(t *testing.T) {
+	store, err := LoadReadStore(ReadStoreOptions{
+		CatalogPath: fixturePath("policy_graph_catalog_valid.json"),
+		TemplatePaths: []string{
+			fixturePath("crypto_policy_template_valid.json"),
+		},
+		InstancePaths: []string{
+			fixturePath("crypto_policy_instance_valid.json"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("LoadReadStore: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	if err := RegisterReadRoutes(mux, store); err != nil {
+		t.Fatalf("RegisterReadRoutes: %v", err)
+	}
+
+	body := map[string]any{
+		"scan_id": "705c9704-9428-45e0-882d-fae4cb9d2a0b",
+		"policy_context": map[string]any{
+			"scan_id": "705c9704-9428-45e0-882d-fae4cb9d2a0b",
+			"status":  "completed",
+			"result": map[string]any{
+				"target_address":     "0x0802b015613ef6701192811e595e085a9c560caf",
+				"chain_ids":          []int64{1},
+				"wallet_type":        "eoa",
+				"current_pq_posture": "hybrid",
+				"observations":       []any{},
+			},
+		},
+		"selection_request": map[string]any{
+			"target_posture":              string(vocabulary.PQPostureHybrid),
+			"target_chain_ids":            []int64{1},
+			"require_multichain":          false,
+			"allow_new_wallet":            false,
+			"address_continuity_required": true,
+			"key_rotation_required":       true,
+			"recovery_required":           true,
+			"minimum_maturity":            1,
+			"approval_mode":               "manual",
+		},
+	}
+	raw, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	for _, path := range []string{
+		"/api/v1/policies/decisions/explore",
+		"/api/cpm/v1/policies/decisions/explore",
+	} {
+		req := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(raw))
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s status: got %d body=%s", path, rec.Code, rec.Body.String())
+		}
+	}
+}
+
+func TestDecisionExplore_targetAddressFlatPolicyContext(t *testing.T) {
+	store, err := LoadReadStore(ReadStoreOptions{
+		CatalogPath: fixturePath("policy_graph_catalog_valid.json"),
+		TemplatePaths: []string{
+			fixturePath("crypto_policy_template_valid.json"),
+		},
+		InstancePaths: []string{
+			fixturePath("crypto_policy_instance_valid.json"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("LoadReadStore: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	if err := RegisterReadRoutes(mux, store); err != nil {
+		t.Fatalf("RegisterReadRoutes: %v", err)
+	}
+
+	body := map[string]any{
+		"policy_context": map[string]any{
+			"scan_id":            "705c9704-9428-45e0-882d-fae4cb9d2a0b",
+			"target_address":     "0x742d35cc6634c0532925a3b844bc454e4438f44e",
+			"wallet_type":        "smart_account",
+			"chain_ids":          []int64{1},
+			"current_pq_posture": "pq_ready",
+			"scanned_at":         "2026-04-17T09:59:58Z",
+		},
+		"selection_request": map[string]any{
+			"target_posture":              string(vocabulary.PQPostureHybrid),
+			"target_chain_ids":            []int64{1},
+			"require_multichain":          false,
+			"allow_new_wallet":            false,
+			"address_continuity_required": true,
+			"key_rotation_required":       true,
+			"recovery_required":           true,
+			"minimum_maturity":            1,
+			"approval_mode":               "manual",
+		},
+	}
+	raw, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/policies/decisions/explore", bytes.NewReader(raw))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: got %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestDecisionExplore_doesNotMutateReadStoreInstances(t *testing.T) {
+	store, err := LoadReadStore(ReadStoreOptions{
+		CatalogPath: fixturePath("policy_graph_catalog_valid.json"),
+		TemplatePaths: []string{
+			fixturePath("crypto_policy_template_valid.json"),
+		},
+		InstancePaths: []string{
+			fixturePath("crypto_policy_instance_valid.json"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("LoadReadStore: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	if err := RegisterReadRoutes(mux, store); err != nil {
+		t.Fatalf("RegisterReadRoutes: %v", err)
+	}
+
+	n := len(store.instances)
+	if n == 0 {
+		t.Fatal("expected fixture instances")
+	}
+	firstID := store.instances[0].ID
+
+	body := map[string]any{
+		"policy_context": map[string]any{
+			"wallet_address":     "0x742d35cc6634c0532925a3b844bc454e4438f44e",
+			"wallet_type":        "eoa",
+			"chain_ids":          []int{1, 8453},
+			"current_algorithm":  "secp256k1_ecrecover",
+			"current_pq_posture": "classical_only",
+			"scanned_at":         "2026-04-17T09:59:58Z",
+		},
+		"selection_request": map[string]any{
+			"target_posture":              string(vocabulary.PQPostureHybrid),
+			"target_chain_ids":            []int64{1, 8453},
+			"require_multichain":          true,
+			"allow_new_wallet":            false,
+			"address_continuity_required": true,
+			"key_rotation_required":       true,
+			"recovery_required":           true,
+			"minimum_maturity":            1,
+			"approval_mode":               "manual",
+		},
+	}
+	raw, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/policies/decisions/explore", bytes.NewReader(raw))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	if len(store.instances) != n {
+		t.Fatalf("instances slice length changed: got %d want %d", len(store.instances), n)
+	}
+	if store.instances[0].ID != firstID {
+		t.Fatalf("instance id mutated: got %q want %q", store.instances[0].ID, firstID)
+	}
+}
+
 func fixturePath(name string) string {
 	return filepath.Join("..", "domain", "policy", "testdata", name)
 }

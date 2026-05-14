@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -101,14 +102,15 @@ func registerReadRoutesForPrefix(mux *http.ServeMux, store *ReadStore, prefix st
 	mux.HandleFunc("GET "+prefix+"/instances", func(w http.ResponseWriter, _ *http.Request) {
 		respondJSON(w, http.StatusOK, map[string]any{"items": store.instances})
 	})
+	// POST …/decisions/explore evaluates candidates in memory only (no persisted policy instances).
 	mux.HandleFunc("POST "+prefix+"/decisions/explore", func(w http.ResponseWriter, r *http.Request) {
-		var req decisionExploreRequest
-		if err := decodeJSON(r, &req); err != nil {
+		req, err := decodeDecisionExploreRequest(r)
+		if err != nil {
 			respondJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 			return
 		}
 
-		observation, err := observationFromDecisionExplore(&req)
+		observation, err := observationFromDecisionExplore(req)
 		if err != nil {
 			respondJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 			return
@@ -141,26 +143,53 @@ type decisionExploreRequest struct {
 	// Optional scan binding for AUTH-02 (scan authorization). Ignored by Evaluate; wire name is `scan_id` only.
 	ScanID string `json:"scan_id,omitempty"`
 	// PolicyContext is required; evaluator input is derived from it (no top-level observation).
-	PolicyContext    *walletPolicyContextWire       `json:"policy_context"`
+	PolicyContext    *walletPolicyContextWire      `json:"policy_context"`
 	SelectionRequest policy.PolicySelectionRequest `json:"selection_request"`
 }
 
-func decodeJSON(r *http.Request, out any) error {
+type decisionExploreBody struct {
+	ScanID           string          `json:"scan_id,omitempty"`
+	PolicyContext    json.RawMessage `json:"policy_context"`
+	SelectionRequest json.RawMessage `json:"selection_request"`
+}
+
+func decodeDecisionExploreRequest(r *http.Request) (*decisionExploreRequest, error) {
 	if r == nil {
-		return errors.New("request is nil")
+		return nil, errors.New("request is nil")
 	}
 	defer func() {
 		_ = r.Body.Close()
 	}()
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
-	if err := dec.Decode(out); err != nil {
-		return fmt.Errorf("invalid json body: %w", err)
+	var body decisionExploreBody
+	if err := dec.Decode(&body); err != nil {
+		return nil, fmt.Errorf("invalid json body: %w", err)
 	}
 	if dec.More() {
-		return errors.New("invalid json body: multiple values are not allowed")
+		return nil, errors.New("invalid json body: multiple values are not allowed")
 	}
-	return nil
+	if len(bytesTrimSpaceJSON(body.PolicyContext)) == 0 {
+		return nil, errors.New("policy_context is required")
+	}
+	pc, err := parsePolicyContextFlexible(body.PolicyContext)
+	if err != nil {
+		return nil, err
+	}
+	decSel := json.NewDecoder(bytes.NewReader(body.SelectionRequest))
+	decSel.DisallowUnknownFields()
+	var sel policy.PolicySelectionRequest
+	if err := decSel.Decode(&sel); err != nil {
+		return nil, fmt.Errorf("selection_request: %w", err)
+	}
+	if decSel.More() {
+		return nil, errors.New("selection_request: multiple values are not allowed")
+	}
+	return &decisionExploreRequest{
+		ScanID:           body.ScanID,
+		PolicyContext:    pc,
+		SelectionRequest: sel,
+	}, nil
 }
 
 func respondJSON(w http.ResponseWriter, status int, payload any) {

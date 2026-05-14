@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -11,15 +12,74 @@ import (
 
 // walletPolicyContextWire is the Discovery façade shape for POST .../decisions/explore (Option A).
 // It is converted server-side into walletobserved.Payload for the policy evaluator.
+// TargetAddress mirrors Discovery v1 GET …/wallets/scans/{scan_id} → result.target_address (openapi WalletScanResult).
 type walletPolicyContextWire struct {
-	ScanID           string `json:"scan_id,omitempty"`
-	WalletAddress    string `json:"wallet_address,omitempty"`
-	WalletType       string `json:"wallet_type,omitempty"`
-	ChainIDs         []int  `json:"chain_ids,omitempty"`
-	CurrentAlgorithm string `json:"current_algorithm,omitempty"`
-	CurrentPQPosture string `json:"current_pq_posture,omitempty"`
-	ScannedAt        string `json:"scanned_at,omitempty"`
-	Status           string `json:"status,omitempty"`
+	ScanID           string  `json:"scan_id,omitempty"`
+	WalletAddress    string  `json:"wallet_address,omitempty"`
+	TargetAddress    string  `json:"target_address,omitempty"`
+	WalletType       string  `json:"wallet_type,omitempty"`
+	ChainIDs         []int64 `json:"chain_ids,omitempty"`
+	CurrentAlgorithm string  `json:"current_algorithm,omitempty"`
+	CurrentPQPosture string  `json:"current_pq_posture,omitempty"`
+	ScannedAt        string  `json:"scanned_at,omitempty"`
+	Status           string  `json:"status,omitempty"`
+}
+
+// walletScanResultV1Wire matches Discovery v1 WalletScanResult (subset used for explore).
+type walletScanResultV1Wire struct {
+	TargetAddress    string  `json:"target_address,omitempty"`
+	ChainIDs         []int64 `json:"chain_ids,omitempty"`
+	WalletType       string  `json:"wallet_type,omitempty"`
+	CurrentPQPosture string  `json:"current_pq_posture,omitempty"`
+	CurrentAlgorithm string  `json:"current_algorithm,omitempty"`
+	ScannedAt        string  `json:"scanned_at,omitempty"`
+}
+
+// parsePolicyContextFlexible accepts either the legacy flat policy_context or a Discovery v1
+// wallet scan detail envelope (scan_id, status, result) per openapi/discovery-v1.yaml WalletScanDetail.
+func parsePolicyContextFlexible(raw []byte) (*walletPolicyContextWire, error) {
+	if len(bytesTrimSpaceJSON(raw)) == 0 {
+		return nil, fmt.Errorf("policy_context is required")
+	}
+	var top map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &top); err != nil {
+		return nil, fmt.Errorf("policy_context: %w", err)
+	}
+	if sub, ok := top["result"]; ok && len(sub) > 0 && string(sub) != "null" {
+		var res walletScanResultV1Wire
+		if err := json.Unmarshal(sub, &res); err != nil {
+			return nil, fmt.Errorf("policy_context.result: %w", err)
+		}
+		out := &walletPolicyContextWire{
+			WalletAddress:    strings.TrimSpace(res.TargetAddress),
+			TargetAddress:    strings.TrimSpace(res.TargetAddress),
+			WalletType:       res.WalletType,
+			ChainIDs:         append([]int64(nil), res.ChainIDs...),
+			CurrentAlgorithm: res.CurrentAlgorithm,
+			CurrentPQPosture: res.CurrentPQPosture,
+			ScannedAt:        res.ScannedAt,
+		}
+		if sid, ok := top["scan_id"]; ok {
+			var s string
+			_ = json.Unmarshal(sid, &s)
+			out.ScanID = strings.TrimSpace(s)
+		}
+		if st, ok := top["status"]; ok {
+			var s string
+			_ = json.Unmarshal(st, &s)
+			out.Status = strings.TrimSpace(s)
+		}
+		return out, nil
+	}
+	var flat walletPolicyContextWire
+	if err := json.Unmarshal(raw, &flat); err != nil {
+		return nil, fmt.Errorf("policy_context: %w", err)
+	}
+	return &flat, nil
+}
+
+func bytesTrimSpaceJSON(b []byte) []byte {
+	return []byte(strings.TrimSpace(string(b)))
 }
 
 func observationFromWalletPolicyContext(pc *walletPolicyContextWire) (walletobserved.Payload, error) {
@@ -39,12 +99,9 @@ func observationFromWalletPolicyContext(pc *walletPolicyContextWire) (walletobse
 		return walletobserved.Payload{}, fmt.Errorf("policy_context current_algorithm invalid: %q", algo)
 	}
 
-	pq := strings.ToLower(strings.TrimSpace(pc.CurrentPQPosture))
-	if pq == "" {
-		pq = string(v01.PQPostureUnknown)
-	}
-	if !v01.CurrentPQPosture(pq).IsValid() {
-		return walletobserved.Payload{}, fmt.Errorf("policy_context.current_pq_posture invalid: %q", pc.CurrentPQPosture)
+	pq, err := mapWirePQPostureToV01Exported(pc.CurrentPQPosture)
+	if err != nil {
+		return walletobserved.Payload{}, err
 	}
 
 	chains := make([]int64, 0, len(pc.ChainIDs))
@@ -81,21 +138,55 @@ func observationFromWalletPolicyContext(pc *walletPolicyContextWire) (walletobse
 	return payload, nil
 }
 
+func mapWirePQPostureToV01Exported(raw string) (string, error) {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return string(v01.PQPostureUnknown), nil
+	}
+	ls := strings.ToLower(s)
+	if v01.CurrentPQPosture(ls).IsValid() {
+		return ls, nil
+	}
+	// Discovery v1 wallet scan detail labels (WalletScanResult in discovery-v1.yaml).
+	switch ls {
+	case "pq_ready":
+		return string(v01.PQPostureFullPQ), nil
+	case "not_pq_ready":
+		return string(v01.PQPostureClassicalOnly), nil
+	case "hybrid", "unknown":
+		return ls, nil
+	default:
+		return "", fmt.Errorf("policy_context.current_pq_posture invalid: %q", raw)
+	}
+}
+
 func normalizeWireAccountKind(walletType string) string {
-	switch strings.ToUpper(strings.TrimSpace(walletType)) {
+	s := strings.TrimSpace(walletType)
+	switch strings.ToUpper(s) {
 	case "EOA":
 		return string(v01.AccountKindEOA)
 	case "AA":
 		return string(v01.AccountKindERC4337SmartAccount)
 	case "CONTRACT":
 		return string(v01.AccountKindContractAccount)
-	default:
-		lt := strings.ToLower(strings.TrimSpace(walletType))
-		if lt != "" && v01.AccountKind(lt).IsValid() {
-			return lt
-		}
+	case "SMART_ACCOUNT":
+		return string(v01.AccountKindERC4337SmartAccount)
+	}
+	lt := strings.ToLower(s)
+	switch lt {
+	case "eoa":
+		return string(v01.AccountKindEOA)
+	case "aa", "smart_account":
+		return string(v01.AccountKindERC4337SmartAccount)
+	case "contract":
+		return string(v01.AccountKindContractAccount)
+	case "unknown":
 		return string(v01.AccountKindUnknown)
 	}
+	if lt != "" && v01.AccountKind(lt).IsValid() {
+		return lt
+	}
+	return string(v01.AccountKindUnknown)
 }
 
 // observationFromDecisionExplore derives the evaluator payload from Option A wire input only.
