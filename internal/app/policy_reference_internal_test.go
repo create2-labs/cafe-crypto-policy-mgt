@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -47,7 +48,7 @@ func TestPolicyReferenceInternalForbiddenWithoutValidServiceToken(t *testing.T) 
 		t.Fatalf("handler: %v", err)
 	}
 	body := `{"scan_id":"550e8400-e29b-41d4-a716-446655440000","user_id":"u1","tenant_id":"t1"}`
-	req := httptest.NewRequest(http.MethodPost, "/internal/policies/references/scan", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.InternalPolicyReferenceScan, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer wrong-token")
 	res := httptest.NewRecorder()
@@ -73,7 +74,7 @@ func TestPolicyReferenceInternalUnavailableWhenTokenNotConfigured(t *testing.T) 
 		t.Fatalf("handler: %v", err)
 	}
 	body := `{"scan_id":"550e8400-e29b-41d4-a716-446655440000","user_id":"u1","tenant_id":"t1"}`
-	req := httptest.NewRequest(http.MethodPost, "/internal/policies/references/scan", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.InternalPolicyReferenceScan, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer any-token")
 	res := httptest.NewRecorder()
@@ -112,7 +113,7 @@ func TestPolicyReferenceInternalReferencedAndCount(t *testing.T) {
 		t.Fatalf("handler: %v", err)
 	}
 	body := `{"scan_id":"550e8400-e29b-41d4-a716-446655440000","user_id":"u1","tenant_id":"tenant-a"}`
-	req := httptest.NewRequest(http.MethodPost, "/internal/policies/references/scan", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.InternalPolicyReferenceScan, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+svcToken)
 	res := httptest.NewRecorder()
@@ -132,7 +133,7 @@ func TestPolicyReferenceInternalReferencedAndCount(t *testing.T) {
 	}
 
 	bodyNoRef := `{"scan_id":"00000000-0000-0000-0000-000000000099","user_id":"u1","tenant_id":"tenant-a"}`
-	req2 := httptest.NewRequest(http.MethodPost, "/internal/policies/references/scan", strings.NewReader(bodyNoRef))
+	req2 := httptest.NewRequest(http.MethodPost, cpmroutes.InternalPolicyReferenceScan, strings.NewReader(bodyNoRef))
 	req2.Header.Set("Content-Type", "application/json")
 	req2.Header.Set("Authorization", "Bearer "+svcToken)
 	res2 := httptest.NewRecorder()
@@ -174,7 +175,7 @@ func TestPublicGETPoliciesByScanIDAgreesWithInternalReferenceCheck(t *testing.T)
 		SessionValidationURL:                introspect.URL,
 		SessionValidationTimeoutSec:         3,
 		ClockSkewSec:                        30,
-		ScanAuthorizationURL:              scanAuth.URL,
+		ScanAuthorizationURL:                scanAuth.URL,
 		ScanAuthorizationTimeoutSec:         2,
 		PolicyReferenceInternalServiceToken: svcToken,
 	})
@@ -190,7 +191,7 @@ func TestPublicGETPoliciesByScanIDAgreesWithInternalReferenceCheck(t *testing.T)
 	if err != nil {
 		t.Fatalf("token: %v", err)
 	}
-	getReq := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies?scan_id="+scanID, nil)
+	getReq := httptest.NewRequest(http.MethodGet, cpmroutes.Policies+"?scan_id="+scanID, nil)
 	getReq.Header.Set("Authorization", "Bearer "+token)
 	getRes := httptest.NewRecorder()
 	h.ServeHTTP(getRes, getReq)
@@ -209,7 +210,7 @@ func TestPublicGETPoliciesByScanIDAgreesWithInternalReferenceCheck(t *testing.T)
 	}
 
 	internalBody := `{"scan_id":"550e8400-e29b-41d4-a716-446655440000","user_id":"u1","tenant_id":"tenant-a"}`
-	inReq := httptest.NewRequest(http.MethodPost, "/internal/policies/references/scan", strings.NewReader(internalBody))
+	inReq := httptest.NewRequest(http.MethodPost, cpmroutes.InternalPolicyReferenceScan, strings.NewReader(internalBody))
 	inReq.Header.Set("Content-Type", "application/json")
 	inReq.Header.Set("Authorization", "Bearer "+svcToken)
 	inRes := httptest.NewRecorder()

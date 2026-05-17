@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -17,7 +18,7 @@ func TestDraftEndpointsAreOwnerScopedAtAPILevel(t *testing.T) {
 	tokenA := mustToken(t, "user-a")
 	tokenB := mustToken(t, "user-b")
 
-	create := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/drafts", strings.NewReader(`{"id":"draft-1","payload":{"name":"draft-a"}}`))
+	create := httptest.NewRequest(http.MethodPost, cpmroutes.Drafts, strings.NewReader(`{"id":"draft-1","payload":{"name":"draft-a"}}`))
 	create.Header.Set("Authorization", "Bearer "+tokenA)
 	create.Header.Set("Content-Type", "application/json")
 	createRes := httptest.NewRecorder()
@@ -26,7 +27,7 @@ func TestDraftEndpointsAreOwnerScopedAtAPILevel(t *testing.T) {
 		t.Fatalf("expected create status 200, got %d body=%s", createRes.Code, createRes.Body.String())
 	}
 
-	getOwner := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/drafts?id=draft-1", nil)
+	getOwner := httptest.NewRequest(http.MethodGet, cpmroutes.Drafts+"?id=draft-1", nil)
 	getOwner.Header.Set("Authorization", "Bearer "+tokenA)
 	getOwnerRes := httptest.NewRecorder()
 	h.ServeHTTP(getOwnerRes, getOwner)
@@ -34,7 +35,7 @@ func TestDraftEndpointsAreOwnerScopedAtAPILevel(t *testing.T) {
 		t.Fatalf("expected owner read status 200, got %d body=%s", getOwnerRes.Code, getOwnerRes.Body.String())
 	}
 
-	getOther := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/drafts?id=draft-1", nil)
+	getOther := httptest.NewRequest(http.MethodGet, cpmroutes.Drafts+"?id=draft-1", nil)
 	getOther.Header.Set("Authorization", "Bearer "+tokenB)
 	getOtherRes := httptest.NewRecorder()
 	h.ServeHTTP(getOtherRes, getOther)
@@ -42,7 +43,7 @@ func TestDraftEndpointsAreOwnerScopedAtAPILevel(t *testing.T) {
 		t.Fatalf("expected cross-user read status 403, got %d body=%s", getOtherRes.Code, getOtherRes.Body.String())
 	}
 
-	updateOther := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/drafts", strings.NewReader(`{"id":"draft-1","payload":{"name":"hijack"}}`))
+	updateOther := httptest.NewRequest(http.MethodPost, cpmroutes.Drafts, strings.NewReader(`{"id":"draft-1","payload":{"name":"hijack"}}`))
 	updateOther.Header.Set("Authorization", "Bearer "+tokenB)
 	updateOther.Header.Set("Content-Type", "application/json")
 	updateOtherRes := httptest.NewRecorder()
@@ -57,7 +58,7 @@ func TestPolicyEndpointsAreOwnerScopedAtAPILevel(t *testing.T) {
 	tokenA := mustToken(t, "user-a")
 	tokenB := mustToken(t, "user-b")
 
-	create := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/policies", strings.NewReader(`{"id":"policy-1","binding":"fixture","payload":{"mode":"strict"}}`))
+	create := httptest.NewRequest(http.MethodPost, cpmroutes.Policies, strings.NewReader(`{"id":"policy-1","binding":"fixture","payload":{"mode":"strict"}}`))
 	create.Header.Set("Authorization", "Bearer "+tokenA)
 	create.Header.Set("Content-Type", "application/json")
 	createRes := httptest.NewRecorder()
@@ -66,7 +67,7 @@ func TestPolicyEndpointsAreOwnerScopedAtAPILevel(t *testing.T) {
 		t.Fatalf("expected create status 200, got %d body=%s", createRes.Code, createRes.Body.String())
 	}
 
-	getOther := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies?id=policy-1", nil)
+	getOther := httptest.NewRequest(http.MethodGet, cpmroutes.Policies+"?id=policy-1", nil)
 	getOther.Header.Set("Authorization", "Bearer "+tokenB)
 	getOtherRes := httptest.NewRecorder()
 	h.ServeHTTP(getOtherRes, getOther)
@@ -79,7 +80,7 @@ func TestOwnerFieldsFromClientAreRejected(t *testing.T) {
 	h := newAuthedTestHandler(t)
 	token := mustToken(t, "user-a")
 
-	req := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/drafts", strings.NewReader(`{"id":"draft-2","owner_user_id":"evil","tenant_id":"evil","payload":{"x":1}}`))
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.Drafts, strings.NewReader(`{"id":"draft-2","owner_user_id":"evil","tenant_id":"evil","payload":{"x":1}}`))
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 	res := httptest.NewRecorder()
@@ -91,7 +92,7 @@ func TestOwnerFieldsFromClientAreRejected(t *testing.T) {
 
 func TestMissingPrincipalFailsClosedOnOwnerEndpoints(t *testing.T) {
 	h := newAuthedTestHandler(t)
-	req := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/drafts", strings.NewReader(`{"id":"draft-3","payload":{"x":1}}`))
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.Drafts, strings.NewReader(`{"id":"draft-3","payload":{"x":1}}`))
 	req.Header.Set("Content-Type", "application/json")
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
@@ -104,7 +105,7 @@ func TestOwnerPersistedFromPrincipal(t *testing.T) {
 	h := newAuthedTestHandler(t)
 	token := mustToken(t, "user-persist")
 
-	create := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/drafts", strings.NewReader(`{"id":"draft-persist","payload":{"k":"v"}}`))
+	create := httptest.NewRequest(http.MethodPost, cpmroutes.Drafts, strings.NewReader(`{"id":"draft-persist","payload":{"k":"v"}}`))
 	create.Header.Set("Authorization", "Bearer "+token)
 	create.Header.Set("Content-Type", "application/json")
 	createRes := httptest.NewRecorder()
@@ -126,7 +127,7 @@ func TestGETPoliciesMutuallyExclusiveQueryReturns400(t *testing.T) {
 	h := newAuthedTestHandler(t)
 	tok := mustToken(t, "u1")
 	scan := "550e8400-e29b-41d4-a716-446655440000"
-	req := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies?id=policy-x&scan_id="+scan, nil)
+	req := httptest.NewRequest(http.MethodGet, cpmroutes.Policies+"?id=policy-x&scan_id="+scan, nil)
 	req.Header.Set("Authorization", "Bearer "+tok)
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
@@ -139,7 +140,7 @@ func TestPOSTPolicyDiscoveryRequiresScanUUID(t *testing.T) {
 	h := newAuthedTestHandler(t)
 	tok := mustToken(t, "user-discovery")
 	body := `{"id":"p-no-scan","payload":{}}`
-	req := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/policies", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.Policies, strings.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+tok)
 	req.Header.Set("Content-Type", "application/json")
 	res := httptest.NewRecorder()
@@ -153,7 +154,7 @@ func TestDELETEPolicy204And404(t *testing.T) {
 	h := newAuthedTestHandler(t)
 	tokA := mustToken(t, "owner-a")
 	tokB := mustToken(t, "owner-b")
-	create := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/policies", strings.NewReader(`{"id":"to-del","binding":"fixture","payload":{"k":1}}`))
+	create := httptest.NewRequest(http.MethodPost, cpmroutes.Policies, strings.NewReader(`{"id":"to-del","binding":"fixture","payload":{"k":1}}`))
 	create.Header.Set("Authorization", "Bearer "+tokA)
 	create.Header.Set("Content-Type", "application/json")
 	cr := httptest.NewRecorder()
@@ -161,21 +162,21 @@ func TestDELETEPolicy204And404(t *testing.T) {
 	if cr.Code != http.StatusOK {
 		t.Fatalf("create: expected 200, got %d body=%s", cr.Code, cr.Body.String())
 	}
-	del := httptest.NewRequest(http.MethodDelete, "/api/cpm/v1/policies?id=to-del", nil)
+	del := httptest.NewRequest(http.MethodDelete, cpmroutes.Policies+"?id=to-del", nil)
 	del.Header.Set("Authorization", "Bearer "+tokA)
 	dr := httptest.NewRecorder()
 	h.ServeHTTP(dr, del)
 	if dr.Code != http.StatusNoContent {
 		t.Fatalf("delete: expected 204, got %d", dr.Code)
 	}
-	del404 := httptest.NewRequest(http.MethodDelete, "/api/cpm/v1/policies?id=to-del", nil)
+	del404 := httptest.NewRequest(http.MethodDelete, cpmroutes.Policies+"?id=to-del", nil)
 	del404.Header.Set("Authorization", "Bearer "+tokA)
 	d404 := httptest.NewRecorder()
 	h.ServeHTTP(d404, del404)
 	if d404.Code != http.StatusNotFound {
 		t.Fatalf("second delete: expected 404, got %d body=%s", d404.Code, d404.Body.String())
 	}
-	delOther := httptest.NewRequest(http.MethodDelete, "/api/cpm/v1/policies?id=ghost", nil)
+	delOther := httptest.NewRequest(http.MethodDelete, cpmroutes.Policies+"?id=ghost", nil)
 	delOther.Header.Set("Authorization", "Bearer "+tokB)
 	do := httptest.NewRecorder()
 	h.ServeHTTP(do, delOther)
@@ -184,7 +185,7 @@ func TestDELETEPolicy204And404(t *testing.T) {
 	}
 
 	tokC := mustToken(t, "owner-c")
-	createC := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/policies", strings.NewReader(`{"id":"owned-by-c","binding":"fixture","payload":{"x":1}}`))
+	createC := httptest.NewRequest(http.MethodPost, cpmroutes.Policies, strings.NewReader(`{"id":"owned-by-c","binding":"fixture","payload":{"x":1}}`))
 	createC.Header.Set("Authorization", "Bearer "+tokC)
 	createC.Header.Set("Content-Type", "application/json")
 	cc := httptest.NewRecorder()
@@ -192,7 +193,7 @@ func TestDELETEPolicy204And404(t *testing.T) {
 	if cc.Code != http.StatusOK {
 		t.Fatalf("create C: %d %s", cc.Code, cc.Body.String())
 	}
-	delCross := httptest.NewRequest(http.MethodDelete, "/api/cpm/v1/policies?id=owned-by-c", nil)
+	delCross := httptest.NewRequest(http.MethodDelete, cpmroutes.Policies+"?id=owned-by-c", nil)
 	delCross.Header.Set("Authorization", "Bearer "+tokA)
 	dx := httptest.NewRecorder()
 	h.ServeHTTP(dx, delCross)
@@ -251,12 +252,12 @@ func newAuthedTestHandlerWithScanAuth(t *testing.T) http.Handler {
 	}))
 	t.Cleanup(scanAuth.Close)
 	h, err := handler("cafe-cpm", store, authConfig{
-		Required:                      true,
-		SessionValidationURL:          introspect.URL,
-		SessionValidationTimeoutSec:   3,
-		ScanAuthorizationURL:          scanAuth.URL,
+		Required:                    true,
+		SessionValidationURL:        introspect.URL,
+		SessionValidationTimeoutSec: 3,
+		ScanAuthorizationURL:        scanAuth.URL,
 		ScanAuthorizationTimeoutSec: 2,
-		ClockSkewSec:                  30,
+		ClockSkewSec:                30,
 	})
 	if err != nil {
 		t.Fatalf("handler: %v", err)

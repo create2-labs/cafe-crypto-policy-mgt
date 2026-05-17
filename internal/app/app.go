@@ -6,6 +6,7 @@ import (
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/api"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/config"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/persistence"
 )
 
@@ -55,7 +56,7 @@ func handlerWithOwnerStore(serviceName string, store *api.ReadStore, ownerStore 
 		obs = newAuthObservability()
 	}
 	authCfg.Observability = obs
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc(cpmroutes.Healthz, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(serviceName + " ok"))
 	})

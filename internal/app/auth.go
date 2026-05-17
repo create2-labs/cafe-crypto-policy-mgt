@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/authz"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
 )
 
 type authConfig struct {
@@ -35,18 +36,17 @@ type routeSpec struct {
 	Class  string
 }
 
-var routeInventory = []routeSpec{
-	{Method: http.MethodGet, Path: "/healthz", Class: authz.RouteClassPublicHealth},
-	{Method: http.MethodGet, Path: "/api/cpm/v1/policies/catalog", Class: authz.RouteClassAuthenticated},
-	{Method: http.MethodGet, Path: "/api/cpm/v1/policies/templates", Class: authz.RouteClassAuthenticated},
-	{Method: http.MethodGet, Path: "/api/cpm/v1/policies/instances", Class: authz.RouteClassAuthenticated},
-	{Method: http.MethodPost, Path: "/api/cpm/v1/policies/decisions/explore", Class: authz.RouteClassAuthenticated},
-	{Method: http.MethodPost, Path: "/api/cpm/v1/drafts", Class: authz.RouteClassAuthenticated},
-	{Method: http.MethodGet, Path: "/api/cpm/v1/drafts", Class: authz.RouteClassAuthenticated},
-	{Method: http.MethodPost, Path: "/api/cpm/v1/policies", Class: authz.RouteClassAuthenticated},
-	{Method: http.MethodGet, Path: "/api/cpm/v1/policies", Class: authz.RouteClassAuthenticated},
-	{Method: http.MethodDelete, Path: "/api/cpm/v1/policies", Class: authz.RouteClassAuthenticated},
-	{Method: http.MethodPost, Path: "/internal/policies/references/scan", Class: authz.RouteClassInternalService},
+var routeInventory = buildRouteInventory()
+
+func buildRouteInventory() []routeSpec {
+	routes := []routeSpec{
+		{Method: http.MethodGet, Path: cpmroutes.Healthz, Class: authz.RouteClassPublicHealth},
+		{Method: http.MethodPost, Path: cpmroutes.InternalPolicyReferenceScan, Class: authz.RouteClassInternalService},
+	}
+	for _, ar := range cpmroutes.AuthenticatedRoutes() {
+		routes = append(routes, routeSpec{Method: ar.Method, Path: ar.Path, Class: authz.RouteClassAuthenticated})
+	}
+	return routes
 }
 
 type principalContextKey struct{}

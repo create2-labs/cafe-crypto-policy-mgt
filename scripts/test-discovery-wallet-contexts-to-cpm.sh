@@ -7,6 +7,10 @@
 #   Discovery scan -> poll CBOM -> local mapping -> CPM explore -> optional persist
 set -euo pipefail
 
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/cpm-route-paths.sh
+source "${_SCRIPT_DIR}/lib/cpm-route-paths.sh"
+
 show_help() {
   local self
   self=$(basename "$0")
@@ -89,8 +93,8 @@ esac
 DISCOVERY_BASE="${DISCOVERY_BASE:-http://localhost:8080}"
 CPM_BASE="${CPM_BASE:-http://localhost:8082}"
 DISCOVERY_WALLET_CONTEXTS_PATH="${DISCOVERY_WALLET_CONTEXTS_PATH:-/discovery/wallet-policy-contexts}"
-CPM_EXPLORE_PATH="${CPM_EXPLORE_PATH:-/api/cpm/v1/policies/decisions/explore}"
-CPM_PERSIST_PATH="${CPM_PERSIST_PATH:-/api/cpm/v1/policies}"
+CPM_EXPLORE_PATH="${CPM_EXPLORE_PATH:-${CPM_POLICIES_DECISIONS_EXPLORE}}"
+CPM_PERSIST_PATH="${CPM_PERSIST_PATH:-${CPM_POLICIES}}"
 
 TURNSTILE_TOKEN="${TURNSTILE_TOKEN:-dev-pass}"
 POLL_INTERVAL_SEC="${POLL_INTERVAL_SEC:-5}"

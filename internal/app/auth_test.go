@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -18,16 +19,16 @@ func TestValidateRouteInventory(t *testing.T) {
 }
 
 func TestClassifyRoute(t *testing.T) {
-	if got := classifyRoute(http.MethodGet, "/healthz"); got != authz.RouteClassPublicHealth {
+	if got := classifyRoute(http.MethodGet, cpmroutes.Healthz); got != authz.RouteClassPublicHealth {
 		t.Fatalf("expected healthz class %q, got %q", authz.RouteClassPublicHealth, got)
 	}
-	if got := classifyRoute(http.MethodGet, "/api/cpm/v1/policies/catalog"); got != authz.RouteClassAuthenticated {
+	if got := classifyRoute(http.MethodGet, cpmroutes.PoliciesCatalog); got != authz.RouteClassAuthenticated {
 		t.Fatalf("expected catalog class %q, got %q", authz.RouteClassAuthenticated, got)
 	}
 	if got := classifyRoute(http.MethodGet, "/does-not-exist"); got != authz.RouteClassDeprecatedDisabled {
 		t.Fatalf("expected unknown route class %q, got %q", authz.RouteClassDeprecatedDisabled, got)
 	}
-	if got := classifyRoute(http.MethodPost, "/internal/policies/references/scan"); got != authz.RouteClassInternalService {
+	if got := classifyRoute(http.MethodPost, cpmroutes.InternalPolicyReferenceScan); got != authz.RouteClassInternalService {
 		t.Fatalf("expected internal service class %q, got %q", authz.RouteClassInternalService, got)
 	}
 }
@@ -73,7 +74,7 @@ func TestPrincipalInjectionOnlyOnSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("make token: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies/catalog", nil)
+	req := httptest.NewRequest(http.MethodGet, cpmroutes.PoliciesCatalog, nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
@@ -86,7 +87,7 @@ func TestPrincipalInjectionOnlyOnSuccess(t *testing.T) {
 
 	// Failure path: malformed token should not inject principal and should not call next.
 	called = false
-	req2 := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies/catalog", nil)
+	req2 := httptest.NewRequest(http.MethodGet, cpmroutes.PoliciesCatalog, nil)
 	req2.Header.Set("Authorization", "Bearer malformed")
 	rr2 := httptest.NewRecorder()
 	handler.ServeHTTP(rr2, req2)
@@ -110,7 +111,7 @@ func TestPrincipalInjectionOnlyOnSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("withAuthentication (health): %v", err)
 	}
-	healthReq := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	healthReq := httptest.NewRequest(http.MethodGet, cpmroutes.Healthz, nil)
 	healthRec := httptest.NewRecorder()
 	healthHandler.ServeHTTP(healthRec, healthReq)
 	if healthRec.Code != http.StatusOK || !calledHealth {

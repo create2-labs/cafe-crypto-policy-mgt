@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/authz"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/persistence"
 )
 
@@ -21,7 +22,7 @@ type policyScanReferenceRequest struct {
 // (WORKPLAN_API_PR.md PR5). Caller must gate the mux with service-token auth for this path
 // when CPM_AUTH_REQUIRED is true.
 func registerPolicyReferenceInternalRoute(mux *http.ServeMux, store *persistence.OwnerScopedStore) {
-	mux.HandleFunc("POST /internal/policies/references/scan", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST "+cpmroutes.InternalPolicyReferenceScan, func(w http.ResponseWriter, r *http.Request) {
 		const maxBody = 1 << 16
 		body, err := io.ReadAll(io.LimitReader(r.Body, maxBody+1))
 		if err != nil {

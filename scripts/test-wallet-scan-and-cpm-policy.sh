@@ -4,6 +4,10 @@
 #
 set -euo pipefail
 
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/cpm-route-paths.sh
+source "${_SCRIPT_DIR}/lib/cpm-route-paths.sh"
+
 show_help() {
   local self
   self=$(basename "$0")
@@ -254,7 +258,7 @@ REQUEST_BODY=$(jq -nc \
   '{policy_context: $ctx, selection_request: $sel}')
 
 echo "Calling CPM decisions/explore ..."
-EXPLORE_RESP=$(jq -cn --argjson body "$REQUEST_BODY" '$body' | json_post "${CPM_BASE}/api/cpm/v1/policies/decisions/explore" "${CPM_HEADERS[@]}") \
+EXPLORE_RESP=$(jq -cn --argjson body "$REQUEST_BODY" '$body' | json_post "${CPM_BASE}${CPM_POLICIES_DECISIONS_EXPLORE}" "${CPM_HEADERS[@]}") \
   || die "CPM decisions/explore failed"
 
 echo "$EXPLORE_RESP" | jq .
@@ -291,7 +295,7 @@ PERSIST_BODY=$(jq -nc \
   '{id:$id, scan_id:$scan, payload:$payload}')
 
 echo "Persisting policy ${POLICY_ID} (owner-scoped store) ..."
-PERSIST_RESP=$(jq -cn --argjson body "$PERSIST_BODY" '$body' | json_post "${CPM_BASE}/api/cpm/v1/policies" "${CPM_HEADERS[@]}") \
+PERSIST_RESP=$(jq -cn --argjson body "$PERSIST_BODY" '$body' | json_post "${CPM_BASE}${CPM_POLICIES}" "${CPM_HEADERS[@]}") \
   || die "CPM POST /cpm/policies failed"
 
 echo "$PERSIST_RESP" | jq .

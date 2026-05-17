@@ -4,6 +4,8 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
 )
 
 // scanUUIDPattern matches canonical UUID strings (Discovery scan_id).
@@ -22,5 +24,5 @@ func NormalizeDiscoveryScanID(s string) (string, error) {
 }
 
 func isOwnerPoliciesGETPath(path string) bool {
-	return path == "/api/cpm/v1/policies"
+	return path == cpmroutes.Policies
 }

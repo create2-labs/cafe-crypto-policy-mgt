@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/authz"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/persistence"
 )
 
@@ -23,7 +24,7 @@ func registerOwnerScopedRoutes(mux *http.ServeMux, store *persistence.OwnerScope
 	if obs == nil {
 		obs = newAuthObservability()
 	}
-	registerOwnerScopedRoutesForPrefix(mux, "/api/cpm/v1", store, obs)
+	registerOwnerScopedRoutesForPrefix(mux, cpmroutes.V1Base, store, obs)
 }
 
 func registerOwnerScopedRoutesForPrefix(mux *http.ServeMux, base string, store *persistence.OwnerScopedStore, obs *authObservability) {

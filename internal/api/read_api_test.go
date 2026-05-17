@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -34,9 +35,9 @@ func TestLoadReadStoreAndRoutes(t *testing.T) {
 		method string
 		path   string
 	}{
-		{method: http.MethodGet, path: "/api/cpm/v1/policies/catalog"},
-		{method: http.MethodGet, path: "/api/cpm/v1/policies/templates"},
-		{method: http.MethodGet, path: "/api/cpm/v1/policies/instances"},
+		{method: http.MethodGet, path: cpmroutes.PoliciesCatalog},
+		{method: http.MethodGet, path: cpmroutes.PoliciesTemplates},
+		{method: http.MethodGet, path: cpmroutes.PoliciesInstances},
 	} {
 		req := httptest.NewRequest(tc.method, tc.path, nil)
 		rec := httptest.NewRecorder()
@@ -93,7 +94,7 @@ func TestDecisionExplorePreservesDeployabilityDistinction(t *testing.T) {
 	}
 
 	assertStatus := func(expected string) {
-		req := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/policies/decisions/explore", bytes.NewReader(raw))
+		req := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, bytes.NewReader(raw))
 		rec := httptest.NewRecorder()
 		mux.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
@@ -172,7 +173,7 @@ func TestDecisionExplore_optionA_policy_context(t *testing.T) {
 		t.Fatalf("marshal: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/policies/decisions/explore", bytes.NewReader(raw))
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, bytes.NewReader(raw))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
@@ -243,7 +244,7 @@ func TestDecisionExplore_discoveryV1WalletScanDetailEnvelope(t *testing.T) {
 		t.Fatalf("marshal: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/policies/decisions/explore", bytes.NewReader(raw))
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, bytes.NewReader(raw))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
@@ -296,7 +297,7 @@ func TestDecisionExplore_targetAddressFlatPolicyContext(t *testing.T) {
 		t.Fatalf("marshal: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/policies/decisions/explore", bytes.NewReader(raw))
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, bytes.NewReader(raw))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
@@ -355,7 +356,7 @@ func TestDecisionExplore_doesNotMutateReadStoreInstances(t *testing.T) {
 		t.Fatalf("marshal: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/policies/decisions/explore", bytes.NewReader(raw))
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, bytes.NewReader(raw))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
