@@ -36,8 +36,8 @@ Steps
   1) POST /auth/signin
   2) POST /discovery/scan
   3) Poll GET .../discovery/cbom/{address} until 200 (scan response does not include internal NATS scan UUID)
-  4) POST .../api/v1/policies/decisions/explore with policy_context + selection_request (no top-level scan_id unless AUTH-02 is wired)
-  5) POST .../api/v1/cpm/policies (unless SKIP_PERSIST=1)
+  4) POST .../api/cpm/v1/policies/decisions/explore with policy_context + selection_request (no top-level scan_id unless AUTH-02 is wired)
+  5) POST .../api/cpm/v1/policies (unless SKIP_PERSIST=1)
 
 Example
   export DISCOVERY_BASE=http://localhost:8080 CPM_BASE=http://localhost:8082
@@ -254,7 +254,7 @@ REQUEST_BODY=$(jq -nc \
   '{policy_context: $ctx, selection_request: $sel}')
 
 echo "Calling CPM decisions/explore ..."
-EXPLORE_RESP=$(jq -cn --argjson body "$REQUEST_BODY" '$body' | json_post "${CPM_BASE}/api/v1/policies/decisions/explore" "${CPM_HEADERS[@]}") \
+EXPLORE_RESP=$(jq -cn --argjson body "$REQUEST_BODY" '$body' | json_post "${CPM_BASE}/api/cpm/v1/policies/decisions/explore" "${CPM_HEADERS[@]}") \
   || die "CPM decisions/explore failed"
 
 echo "$EXPLORE_RESP" | jq .
@@ -291,7 +291,7 @@ PERSIST_BODY=$(jq -nc \
   '{id:$id, scan_id:$scan, payload:$payload}')
 
 echo "Persisting policy ${POLICY_ID} (owner-scoped store) ..."
-PERSIST_RESP=$(jq -cn --argjson body "$PERSIST_BODY" '$body' | json_post "${CPM_BASE}/api/v1/cpm/policies" "${CPM_HEADERS[@]}") \
+PERSIST_RESP=$(jq -cn --argjson body "$PERSIST_BODY" '$body' | json_post "${CPM_BASE}/api/cpm/v1/policies" "${CPM_HEADERS[@]}") \
   || die "CPM POST /cpm/policies failed"
 
 echo "$PERSIST_RESP" | jq .

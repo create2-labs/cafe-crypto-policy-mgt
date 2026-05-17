@@ -22,10 +22,5 @@ func NormalizeDiscoveryScanID(s string) (string, error) {
 }
 
 func isOwnerPoliciesGETPath(path string) bool {
-	switch path {
-	case "/api/v1/cpm/policies", "/api/cpm/v1/policies":
-		return true
-	default:
-		return false
-	}
+	return path == "/api/cpm/v1/policies"
 }

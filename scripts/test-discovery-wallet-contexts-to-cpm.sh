@@ -29,9 +29,9 @@ Optional
                                   via nginx HTTPS edge: set to /api/discovery/wallet-policy-contexts
   SCAN_ID                         Select one authorized scan context by id
   CPM_EXPLORE_PATH                CPM explore endpoint path
-                                  default: /api/v1/policies/decisions/explore
+                                  default: /api/cpm/v1/policies/decisions/explore
   CPM_PERSIST_PATH                CPM persist endpoint path
-                                  default: /api/v1/cpm/policies
+                                  default: /api/cpm/v1/policies
   TARGET_POSTURE                  selection_request.target_posture
                                   default: hybrid
   ALLOW_NEW_WALLET                true/false; default: false
@@ -89,8 +89,8 @@ esac
 DISCOVERY_BASE="${DISCOVERY_BASE:-http://localhost:8080}"
 CPM_BASE="${CPM_BASE:-http://localhost:8082}"
 DISCOVERY_WALLET_CONTEXTS_PATH="${DISCOVERY_WALLET_CONTEXTS_PATH:-/discovery/wallet-policy-contexts}"
-CPM_EXPLORE_PATH="${CPM_EXPLORE_PATH:-/api/v1/policies/decisions/explore}"
-CPM_PERSIST_PATH="${CPM_PERSIST_PATH:-/api/v1/cpm/policies}"
+CPM_EXPLORE_PATH="${CPM_EXPLORE_PATH:-/api/cpm/v1/policies/decisions/explore}"
+CPM_PERSIST_PATH="${CPM_PERSIST_PATH:-/api/cpm/v1/policies}"
 
 TURNSTILE_TOKEN="${TURNSTILE_TOKEN:-dev-pass}"
 POLL_INTERVAL_SEC="${POLL_INTERVAL_SEC:-5}"

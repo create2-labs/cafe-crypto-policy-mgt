@@ -86,9 +86,7 @@ func RegisterReadRoutes(mux *http.ServeMux, store *ReadStore) error {
 	if store == nil {
 		return ErrStoreNil
 	}
-	for _, prefix := range []string{"/api/v1/policies", "/api/cpm/v1/policies"} {
-		registerReadRoutesForPrefix(mux, store, prefix)
-	}
+	registerReadRoutesForPrefix(mux, store, "/api/cpm/v1/policies")
 	return nil
 }
 

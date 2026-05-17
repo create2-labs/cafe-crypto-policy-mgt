@@ -34,9 +34,9 @@ func TestLoadReadStoreAndRoutes(t *testing.T) {
 		method string
 		path   string
 	}{
-		{method: http.MethodGet, path: "/api/v1/policies/catalog"},
-		{method: http.MethodGet, path: "/api/v1/policies/templates"},
-		{method: http.MethodGet, path: "/api/v1/policies/instances"},
+		{method: http.MethodGet, path: "/api/cpm/v1/policies/catalog"},
+		{method: http.MethodGet, path: "/api/cpm/v1/policies/templates"},
+		{method: http.MethodGet, path: "/api/cpm/v1/policies/instances"},
 	} {
 		req := httptest.NewRequest(tc.method, tc.path, nil)
 		rec := httptest.NewRecorder()
@@ -93,7 +93,7 @@ func TestDecisionExplorePreservesDeployabilityDistinction(t *testing.T) {
 	}
 
 	assertStatus := func(expected string) {
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/policies/decisions/explore", bytes.NewReader(raw))
+		req := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/policies/decisions/explore", bytes.NewReader(raw))
 		rec := httptest.NewRecorder()
 		mux.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
@@ -172,7 +172,7 @@ func TestDecisionExplore_optionA_policy_context(t *testing.T) {
 		t.Fatalf("marshal: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/policies/decisions/explore", bytes.NewReader(raw))
+	req := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/policies/decisions/explore", bytes.NewReader(raw))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
@@ -243,16 +243,11 @@ func TestDecisionExplore_discoveryV1WalletScanDetailEnvelope(t *testing.T) {
 		t.Fatalf("marshal: %v", err)
 	}
 
-	for _, path := range []string{
-		"/api/v1/policies/decisions/explore",
-		"/api/cpm/v1/policies/decisions/explore",
-	} {
-		req := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(raw))
-		rec := httptest.NewRecorder()
-		mux.ServeHTTP(rec, req)
-		if rec.Code != http.StatusOK {
-			t.Fatalf("%s status: got %d body=%s", path, rec.Code, rec.Body.String())
-		}
+	req := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/policies/decisions/explore", bytes.NewReader(raw))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: got %d body=%s", rec.Code, rec.Body.String())
 	}
 }
 
@@ -360,7 +355,7 @@ func TestDecisionExplore_doesNotMutateReadStoreInstances(t *testing.T) {
 		t.Fatalf("marshal: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/policies/decisions/explore", bytes.NewReader(raw))
+	req := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/policies/decisions/explore", bytes.NewReader(raw))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {

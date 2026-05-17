@@ -46,7 +46,7 @@ func TestAuthErrorPayloadContract(t *testing.T) {
 		{
 			name:       "missing token",
 			method:     http.MethodGet,
-			target:     "/api/v1/policies/catalog",
+			target:     "/api/cpm/v1/policies/catalog",
 			cfg:        authConfig{Required: true, SessionValidationURL: introspectUnavailable.URL},
 			wantStatus: http.StatusUnauthorized,
 			wantCode:   authCodeUnauthenticated,
@@ -54,7 +54,7 @@ func TestAuthErrorPayloadContract(t *testing.T) {
 		{
 			name:       "malformed token",
 			method:     http.MethodGet,
-			target:     "/api/v1/policies/catalog",
+			target:     "/api/cpm/v1/policies/catalog",
 			authHeader: "Bearer malformed",
 			cfg:        authConfig{Required: true, SessionValidationURL: introspectUnavailable.URL},
 			wantStatus: http.StatusUnauthorized,
@@ -63,7 +63,7 @@ func TestAuthErrorPayloadContract(t *testing.T) {
 		{
 			name:       "validation unavailable",
 			method:     http.MethodGet,
-			target:     "/api/v1/policies/catalog",
+			target:     "/api/cpm/v1/policies/catalog",
 			authHeader: "Bearer " + mustTokenEnvelope(t, "user-1"),
 			cfg:        authConfig{Required: true, SessionValidationURL: introspectUnavailable.URL},
 			wantStatus: http.StatusServiceUnavailable,
@@ -72,7 +72,7 @@ func TestAuthErrorPayloadContract(t *testing.T) {
 		{
 			name:       "scan id malformed",
 			method:     http.MethodPost,
-			target:     "/api/v1/policies/decisions/explore",
+			target:     "/api/cpm/v1/policies/decisions/explore",
 			body:       `{"scan_id":42}`,
 			authHeader: "Bearer " + mustTokenEnvelope(t, "user-1"),
 			cfg: authConfig{
@@ -111,7 +111,7 @@ func TestAuthErrorPayloadContract(t *testing.T) {
 			SessionValidationURL: introspect.URL,
 			ScanAuthorizationURL: scanForbidden.URL,
 		})
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/policies/decisions/explore", strings.NewReader(`{"scan_id":"scan-deny"}`))
+		req := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/policies/decisions/explore", strings.NewReader(`{"scan_id":"scan-deny"}`))
 		req.Header.Set("Authorization", "Bearer "+mustTokenEnvelope(t, "user-1"))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
@@ -129,7 +129,7 @@ func TestAuthRequestIDHeaderAndPayload(t *testing.T) {
 	h := mustAuthHandler(t, authConfig{Required: true, SessionValidationURL: introspect.URL})
 
 	t.Run("propagates incoming request id", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/policies/catalog", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies/catalog", nil)
 		req.Header.Set("Authorization", "Bearer "+mustTokenEnvelope(t, "user-1"))
 		req.Header.Set("X-Request-Id", "rid-from-client")
 		rec := httptest.NewRecorder()
@@ -141,7 +141,7 @@ func TestAuthRequestIDHeaderAndPayload(t *testing.T) {
 	})
 
 	t.Run("generates missing request id", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/policies/catalog", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies/catalog", nil)
 		req.Header.Set("Authorization", "Bearer "+mustTokenEnvelope(t, "user-1"))
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, req)
@@ -157,7 +157,7 @@ func TestAuthRequestIDHeaderAndPayload(t *testing.T) {
 	})
 
 	t.Run("sanitizes invalid incoming request id", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/policies/catalog", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies/catalog", nil)
 		req.Header.Set("Authorization", "Bearer "+mustTokenEnvelope(t, "user-1"))
 		req.Header.Set("X-Request-Id", "bad\nid")
 		rec := httptest.NewRecorder()
@@ -190,7 +190,7 @@ func TestAuthLogsDoNotLeakSensitiveData(t *testing.T) {
 	})
 
 	rawToken := mustTokenEnvelope(t, "user@example.com")
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/policies/catalog", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies/catalog", nil)
 	req.Header.Set("Authorization", "Bearer "+rawToken+"raw-fragment")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -229,18 +229,18 @@ func TestAuthMetricsCounters(t *testing.T) {
 		Observability:        obs,
 	})
 
-	successReq := httptest.NewRequest(http.MethodGet, "/api/v1/policies/catalog", nil)
+	successReq := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies/catalog", nil)
 	successReq.Header.Set("Authorization", "Bearer "+mustTokenEnvelope(t, "user-1"))
 	h.ServeHTTP(httptest.NewRecorder(), successReq)
 
-	missingTokenReq := httptest.NewRequest(http.MethodGet, "/api/v1/policies/catalog", nil)
+	missingTokenReq := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies/catalog", nil)
 	h.ServeHTTP(httptest.NewRecorder(), missingTokenReq)
 
-	denyReq := httptest.NewRequest(http.MethodPost, "/api/v1/policies/decisions/explore", strings.NewReader(`{"scan_id":"deny"}`))
+	denyReq := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/policies/decisions/explore", strings.NewReader(`{"scan_id":"deny"}`))
 	denyReq.Header.Set("Authorization", "Bearer "+mustTokenEnvelope(t, "user-1"))
 	h.ServeHTTP(httptest.NewRecorder(), denyReq)
 
-	unavailableReq := httptest.NewRequest(http.MethodPost, "/api/v1/policies/decisions/explore", strings.NewReader(`{"scan_id":"slow"}`))
+	unavailableReq := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/policies/decisions/explore", strings.NewReader(`{"scan_id":"slow"}`))
 	unavailableReq.Header.Set("Authorization", "Bearer "+mustTokenEnvelope(t, "user-1"))
 	h.ServeHTTP(httptest.NewRecorder(), unavailableReq)
 
