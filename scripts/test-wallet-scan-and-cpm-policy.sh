@@ -7,6 +7,8 @@ set -euo pipefail
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/cpm-route-paths.sh
 source "${_SCRIPT_DIR}/lib/cpm-route-paths.sh"
+# shellcheck source=lib/discovery-route-paths.sh
+source "${_SCRIPT_DIR}/lib/discovery-route-paths.sh"
 
 show_help() {
   local self
@@ -32,14 +34,14 @@ Optional
   CPM_SKIP_AUTH=1      Omit Authorization header to CPM (local dev without CPM auth only)
   SKIP_PERSIST=1       Stop after POST .../policies/decisions/explore (skip .../cpm/policies)
   SCAN_ID_BINDING      Optional scan_id only for persist payload if you have a Discovery UUID
-  EXTRA_SCAN_BODY      Extra JSON merged into POST /discovery/scan; default: {}
+  EXTRA_SCAN_BODY      Extra JSON merged into POST /discovery/v1/scan; default: {}
   CURL_INSECURE=1      curl -k (self-signed TLS or unknown CA locally)
   CURL_REDIRECT=0      Disable curl redirect following (-L off)
 
 Steps
   1) POST /auth/signin
-  2) POST /discovery/scan
-  3) Poll GET .../discovery/cbom/{address} until 200 (scan response does not include internal NATS scan UUID)
+  2) POST /discovery/v1/scan (returns scan_id + status requested)
+  3) Poll GET .../discovery/cbom/{address} until 200
   4) POST .../api/cpm/v1/policies/decisions/explore with policy_context + selection_request (no top-level scan_id unless AUTH-02 is wired)
   5) POST .../api/cpm/v1/policies (unless SKIP_PERSIST=1)
 
@@ -159,10 +161,16 @@ SCAN_PAYLOAD=$(jq -nc \
   --argjson extra "$EXTRA_SCAN_BODY" \
   '{address:$addr} + $extra')
 
-SCAN_RESP=$(jq -cn --argjson body "$SCAN_PAYLOAD" '$body' | json_post "${DISCOVERY_BASE}/discovery/scan" "${DISCOVERY_HEADERS[@]}") \
+SCAN_RESP=$(jq -cn --argjson body "$SCAN_PAYLOAD" '$body' | json_post "${DISCOVERY_BASE}${DISCOVERY_V1_SCAN}" "${DISCOVERY_HEADERS[@]}") \
   || die "queue scan failed"
 
 echo "$SCAN_RESP" | jq .
+
+V1_SCAN_ID=$(echo "$SCAN_RESP" | jq -r '.scan_id // empty')
+if [[ -n "$V1_SCAN_ID" && -z "${SCAN_ID_BINDING:-}" ]]; then
+  SCAN_ID_BINDING="$V1_SCAN_ID"
+  echo "Using scan_id from v1 scan response for persist: ${SCAN_ID_BINDING}"
+fi
 
 echo "Waiting for CBOM (scanner + persistence async) ..."
 CBOM=""

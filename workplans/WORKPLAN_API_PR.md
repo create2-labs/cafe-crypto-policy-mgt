@@ -4,7 +4,7 @@
 
 **Règles d’exécution (propriétaire humain) :** l’agent / les contributeurs ne font **pas** de commit, push, merge ni tags ; revue, git et publication restent manuelles. Chaque PR : branche locale, changements ciblés, tests, puis proposition de titre/message de commit et de PR (en anglais dans les sections dédiées ci‑dessous).
 
-**Statut du document :** plan de découpe ; jalon OpenAPI **mergé** — **PR1a** [`cafe-discovery` PR #49](https://github.com/create2-labs/cafe-discovery/pull/49), **PR1b** [`cafe-crypto-policy-mgt` PR #26](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/26). **Chaîne livrée sur `main` (Discovery + CPM, prérequis PR6)** — **PR2** absorbé dans **`cafe-discovery` [#51](https://github.com/create2-labs/cafe-discovery/pull/51)** (PR dédiée **[#50](https://github.com/create2-labs/cafe-discovery/pull/50)** fermée sans merge) ; **PR3** [#51](https://github.com/create2-labs/cafe-discovery/pull/51) ; **PR4** [#52](https://github.com/create2-labs/cafe-discovery/pull/52) ; **PR5** [`cafe-crypto-policy-mgt` #27](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/27) ; **PR6** [#53](https://github.com/create2-labs/cafe-discovery/pull/53) ; **PR8** [`cafe-crypto-policy-mgt` #29](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/29). **PR9** (edge) — [`cafe-deploy` #11](https://github.com/create2-labs/cafe-deploy/pull/11). **PR10** (frontend) — [`cafe-frontend` #52](https://github.com/create2-labs/cafe-frontend/pull/52). **PR11a** (cleanup routes Discovery legacy) — [`cafe-discovery` #54](https://github.com/create2-labs/cafe-discovery/pull/54). Suite : **PR7**+, **PR11b**, **PR11c** (factorisation chemins API par dépôt), **fermeture dette CBOM** (**PR13a**→**PR13c**), doc (**PR12**), selon **dépendances** et **revue propriétaire** ; ce document reste la découpe de référence.
+**Statut du document :** plan de découpe ; jalon OpenAPI **mergé** — **PR1a** [`cafe-discovery` PR #49](https://github.com/create2-labs/cafe-discovery/pull/49), **PR1b** [`cafe-crypto-policy-mgt` PR #26](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/26). **Chaîne livrée sur `main` (Discovery + CPM, prérequis PR6)** — **PR2** absorbé dans **`cafe-discovery` [#51](https://github.com/create2-labs/cafe-discovery/pull/51)** (PR dédiée **[#50](https://github.com/create2-labs/cafe-discovery/pull/50)** fermée sans merge) ; **PR3** [#51](https://github.com/create2-labs/cafe-discovery/pull/51) ; **PR4** [#52](https://github.com/create2-labs/cafe-discovery/pull/52) ; **PR5** [`cafe-crypto-policy-mgt` #27](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/27) ; **PR6** [#53](https://github.com/create2-labs/cafe-discovery/pull/53) ; **PR7** (contrat public CPM policies) — [`cafe-crypto-policy-mgt` #28](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/28). **PR8** [`cafe-crypto-policy-mgt` #29](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/29). **PR9** (edge) — [`cafe-deploy` #11](https://github.com/create2-labs/cafe-deploy/pull/11). **PR10** (frontend) — [`cafe-frontend` #52](https://github.com/create2-labs/cafe-frontend/pull/52). **PR11a** (cleanup routes Discovery legacy) — [`cafe-discovery` #54](https://github.com/create2-labs/cafe-discovery/pull/54). **PR11b** (cleanup rollout CPM / edge) — CPM [#30](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/30), deploy [#12](https://github.com/create2-labs/cafe-deploy/pull/12). **PR11c** (factorisation chemins API par dépôt) — CPM [#31](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/31), Discovery [#55](https://github.com/create2-labs/cafe-discovery/pull/55), deploy [#13](https://github.com/create2-labs/cafe-deploy/pull/13), frontend [#54](https://github.com/create2-labs/cafe-frontend/pull/54). **PR13a** (parité UI `result` v1 + defaults TLS) — [`cafe-discovery` #56](https://github.com/create2-labs/cafe-discovery/pull/56). Suite : **PR13b**→**PR13c** (fermeture CBOM côté client puis serveur), doc (**PR12**), selon **dépendances** et **revue propriétaire** ; ce document reste la découpe de référence.
 
 ---
 
@@ -13,14 +13,14 @@
 | Domaine | État observé dans le repo | Écart vs `WORKPLAN_API.md` |
 |--------|---------------------------|----------------------------|
 | **Chemins publics Discovery** | **`/discovery/v1`** sur `main` (**[#51](https://github.com/create2-labs/cafe-discovery/pull/51)** …) ; wallets CAFE sous **`/discovery/v1/wallets`**. Edge **PR9** — **`cafe-deploy` [#11](https://github.com/create2-labs/cafe-deploy/pull/11)**. Frontend **PR10** — **`cafe-frontend` [#52](https://github.com/create2-labs/cafe-frontend/pull/52)**. **PR11a** — **`cafe-discovery` [#54](https://github.com/create2-labs/cafe-discovery/pull/54)** : listes/scan/context legacy retirés. | **Plus** d’anciennes listes/POST scan ; routes **hors v1** encore servies (voir **§ Routes Discovery hors v1 après PR11a**). |
-| **Hydratation UI (CBOM)** | **PR10** : listes **v1** + **`GET /discovery/cbom/{address\|url}`** pour cartes (wallet + TLS). Détail v1 **`GET …/scans/{scan_id}`** existe mais **`result`** est **minimal** vs champs UI (`risk_score`, `cipher_suites[]`, etc.). | Cible : hydrater par **`scan_id`** via **`result`** enrichi — **PR13a**→**PR13c** ; puis retirer **`/discovery/cbom/*`**. |
-| **Listes de scans** | **PR4** — **`GET /discovery/v1/wallets/scans`**, **`GET /discovery/v1/tls/scans`** (owner-only ; **pas** les defaults TLS dans la liste owner). | **`GET /discovery/v1/tls/scans/defaults`** (catalogue partagé) — **PR13a** ; aligner OpenAPI. |
+| **Hydratation UI (CBOM)** | **PR13a** [#56](https://github.com/create2-labs/cafe-discovery/pull/56) : détail v1 **`GET …/scans/{scan_id}`** avec **`result`** enrichi (parité champs CBOM). **PR10** / frontend : listes **v1** + hydratation cartes encore via **`GET /discovery/cbom/{address\|url}`** jusqu’à **PR13b**. | **PR13b** bascule client sur détail v1 ; **PR13c** retire **`/discovery/cbom/*`**. |
+| **Listes de scans** | **PR4** — listes owner wallet/TLS. **`GET /discovery/v1/tls/scans/defaults`** + détail default par **`scan_id`** — **PR13a** [#56](https://github.com/create2-labs/cafe-discovery/pull/56). OpenAPI aligné (`discovery-v1.yaml`). | — |
 | **POST scan** | **PR3** — **`POST /discovery/v1/scan`** : **`scan_id`**, **`requested`**, **`location`**. Ancien **`POST /discovery/scan`** retiré — **PR11a** [#54](https://github.com/create2-labs/cafe-discovery/pull/54). | — |
-| **DELETE scans / 409 wallet** | **PR6** — **`DELETE /discovery/v1/wallets/scans/{scan_id}`**, **`DELETE /discovery/v1/tls/scans/{scan_id}`** + vérif CPM (**PR5**). | **409 `WALLET_REFERENCED_BY_POLICY`** (**PR7**). |
-| **wallet-policy-contexts** | Retiré — **PR11a** [#54](https://github.com/create2-labs/cafe-discovery/pull/54) (remplacé par **`wallets/scans`** + CPM **`GET …/policies?scan_id=`** — **PR7**). | — |
-| **CPM** | **PR5** sur `main` — **[#27](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/27)** : **`POST /internal/policies/references/scan`** (token service, verdict **`referenced`**). **PR8** sur `main` — **[#29](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/29)** : **`POST …/policies/decisions/explore`** non persistant, **`policy_context`** compatible détail scan Discovery v1. Toujours **`read_api.go`** / **`owner_routes.go`** sur chemins historiques **`/api/v1/...`** ; pas encore **`GET ?scan_id=`** public, **`DELETE` policies** cible v1, **`/api/cpm/v1`** mux complet (**PR7** / **PR9** / **11b**) selon état du dépôt. | Cible **`/api/cpm/v1/...`**, **`id` + `scan_id` → 400**, **`DELETE` 204/404 uniquement**, liste par **`scan_id`**, **`scan_id` obligatoire** pour le flux Discovery → CPM côté API publique. |
+| **DELETE scans / 409 wallet** | **PR6** — DELETE scans v1 + vérif CPM (**PR5** / **`SCAN_REFERENCED_BY_POLICY`**). | **409 `WALLET_REFERENCED_BY_POLICY`** sur DELETE **wallet** (Discovery — hors périmètre CPM **PR7**). |
+| **wallet-policy-contexts** | Retiré — **PR11a** [#54](https://github.com/create2-labs/cafe-discovery/pull/54) (remplacé par **`wallets/scans`** + CPM **`GET …/policies?scan_id=`** — **PR7** [#28](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/28)). | — |
+| **CPM** | **PR5** [#27](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/27) interne ; **PR7** [#28](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/28) : **`/api/cpm/v1`**, **`GET/POST/DELETE …/policies`**, **`GET ?scan_id=`** (même lookup que PR5), validations **`id`/`scan_id`**, **`scan_id`** obligatoire binding Discovery ; **PR8** [#29](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/29) explore ; **PR11b** [#30](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/30) sans alias §0.3 ; **PR11c** [#31](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/31) (`internal/cpmroutes`). | Alignement continu **`openapi/cpm-v1.yaml`** si le workplan évolue. |
 | **OpenAPI** | **PR1a** + **PR1b** mergées : `openapi/discovery-v1.yaml` ([`cafe-discovery` #49](https://github.com/create2-labs/cafe-discovery/pull/49)), `openapi/cpm-v1.yaml` ([`cafe-crypto-policy-mgt` #26](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/26)). Edge documentée en **PR9** — **`cafe-deploy` [#11](https://github.com/create2-labs/cafe-deploy/pull/11)**. | **Deux** artefacts de contrat distincts (§0.1 + §0.2) ; l’edge se décrit via **`servers`** dans chaque spec. |
-| **Frontend** | **PR10** mergée — **`cafe-frontend` [#52](https://github.com/create2-labs/cafe-frontend/pull/52)** : v1 listes/scan ; **CBOM** pour hydratation ; CPM **`/api/cpm/v1`**. Parcours CPM « spec UX » **hors** PR10 — **Option A**. | **PR13b** migration hydratation ; **PR7** CPM public ; **PR11b** cleanup rollout CPM ; **PR11c** factorisation chemins client. |
+| **Frontend** | **PR10** [#52](https://github.com/create2-labs/cafe-frontend/pull/52) ; **PR11c** [#54](https://github.com/create2-labs/cafe-frontend/pull/54) — `src/api/routePaths.ts`, services Discovery/CPM. **CBOM** encore utilisé pour hydratation cartes (dette **PR13b** ; backend **PR13a** [#56](https://github.com/create2-labs/cafe-discovery/pull/56) prêt). | **PR13b** migration hydratation par **`scan_id`**. |
 
 ---
 
@@ -35,14 +35,14 @@
 | **4** | `discovery/scan-history-lifecycle` | `cafe-discovery` | [#52](https://github.com/create2-labs/cafe-discovery/pull/52) | **2**, **3** | Remplacer les **501** sur listes / détail scans v1 ; perf listes (N+1) ; OpenAPI si écart. | Listes + détail wallet/TLS : **`items`**, pagination, tri, filtres, règles **`result`**. |
 | **5** | `cpm/internal-policy-reference-by-scan` | `cafe-crypto-policy-mgt` | [#27](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/27) | **4** | Charge à chaque DELETE scan ; timeouts, circuit, **SLO** documentés. | **CPM seul** : endpoint **interne** (token service) — « cet owner a-t-il des policies persistées qui référencent ce **`scan_id`** ? » — verdict **`referenced`** (+ **`count`** optionnel logs) ; **pas** d’IDs de policies dans la réponse. |
 | **6** | `discovery/delete-semantics-cpm-reference-check` | `cafe-discovery` | [#53](https://github.com/create2-labs/cafe-discovery/pull/53) | **4**, **5** (et **7** si 409 **`wallet_id`** via CPM) | Latence DELETE ; **503** attendu si CPM indispo ; runbook exploit. | **Discovery** orchestre le DELETE scan / wallet mais **consomme seulement** le verdict CPM ; **503 fail-closed** si la vérif CPM est indisponible. |
-| **7** | `cpm/policies-scan-reference-contract` | `cafe-crypto-policy-mgt` | — | **1b**, **4**, **5** | Liste **`scan_id`** en O(n) en mémoire ; plan DB ; même lookup que **PR5**. | **`/api/cpm/v1/policies`**, **`GET ?scan_id=`** (même lookup owner-scoped que **PR5**), **`DELETE ?id=`**, validations, alias rollout optionnels. |
+| **7** | `cpm/policies-scan-reference-contract` | `cafe-crypto-policy-mgt` | [#28](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/28) | **1b**, **4**, **5** | Liste **`scan_id`** en O(n) en mémoire ; plan DB ; même lookup que **PR5**. | **`/api/cpm/v1/policies`**, **`GET ?scan_id=`** (même lookup owner-scoped que **PR5**), **`DELETE ?id=`**, validations. **Réalisé.** |
 | **8** | `cpm/decisions-explore-contract-check` | `cafe-crypto-policy-mgt` | [#29](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/29) | **1b**, **7** | Validation trop stricte → démos ; garder voie « fixtures » (**PR7**). | **`POST …/policies/decisions/explore`** : non persistant ; DTOs alignés scan v1. |
 | **9** | `deploy/api-v1-edge-alignment` | `cafe-deploy` | [#11](https://github.com/create2-labs/cafe-deploy/pull/11) | **2**, **7** | Coupure si edge avant images ; **ne pas** réintroduire de **`/api/wallets`** (hors **`/api/discovery/v1/wallets`**). | NGINX / env : **`/api/discovery/v1`**, **`/api/cpm/v1`** ; chemins §0.3 **temporaires** documentés. |
 | **10** | `frontend/api-coherency-migration` | `cafe-frontend` | [#52](https://github.com/create2-labs/cafe-frontend/pull/52) | **9** (ou stack locale équivalente) | Bundles / **SW** staging ; procédure de purge ; **CRUD wallets** : base **`/api/discovery/v1/wallets`**. | Clients vers nouveaux chemins et enveloppes. |
 | **11a** | `cleanup/remove-obsolete-discovery-routes` | `cafe-discovery` | [#54](https://github.com/create2-labs/cafe-discovery/pull/54) | **10** | Intégrateurs sur anciennes URLs — note release ; **11b** peut suivre. | Retrait listes/scan/context legacy ; **conserver** routes hors v1 (CBOM, utilities, assessments). **Réalisé.** |
-| **11b** | `cleanup/remove-cpm-rollout-and-client-leftovers` | `cafe-crypto-policy-mgt`, `cafe-frontend`, `cafe-crypto-policy-mgt/scripts`, `cafe-deploy` | — | **10**, **11a** | Diff « fourre-tout » ; **ne pas** y mélanger CBOM (**PR13**) ni factorisation chemins (**11c**). | Alias **§0.3** CPM / nginx, scripts, reliquats client CPM. |
-| **11c** | `refactor/centralize-api-route-paths` | `cafe-crypto-policy-mgt`, `cafe-discovery`, `cafe-deploy`, `cafe-frontend` *(PR Git **par dépôt**, pas de lib partagée inter-repo)* | — | **11b** (chemins canoniques figés) | Refactor pure ; risque dérive auth ↔ mux si test d’alignement absent. | Constantes / helpers **locaux** : mux, auth, tests, scripts, clients — **sans** mutualisation inter-dépôt. |
-| **13a** | `discovery/v1-scan-result-ui-parity` | `cafe-discovery` | — | **11a** | `result` trop large vs spec minimale — revue OpenAPI ; defaults TLS lecture par `scan_id`. | Enrichir **`result`** v1 + **`GET …/tls/scans/defaults`** + détail default TLS ; OpenAPI aligné. |
+| **11b** | `cleanup/remove-cpm-rollout-and-client-leftovers` | `cafe-crypto-policy-mgt`, `cafe-crypto-policy-mgt/scripts`, `cafe-deploy` *(pas de PR Git `cafe-frontend` dédiée — client déjà sur v1 ; **11c** [#54](https://github.com/create2-labs/cafe-frontend/pull/54) pour les chemins)* | CPM [#30](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/30), deploy [#12](https://github.com/create2-labs/cafe-deploy/pull/12) | **10**, **11a**, **7** | Déployer CPM + nginx ensemble. | Alias **§0.3** CPM / nginx retirés ; scripts CPM + e2e sur **`/api/cpm/v1`**. **Réalisé** (CPM + deploy). |
+| **11c** | `refactor/centralize-api-route-paths` | `cafe-crypto-policy-mgt`, `cafe-discovery`, `cafe-deploy`, `cafe-frontend` *(PR Git **par dépôt**, pas de lib partagée inter-repo)* | CPM [#31](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/31), Discovery [#55](https://github.com/create2-labs/cafe-discovery/pull/55), deploy [#13](https://github.com/create2-labs/cafe-deploy/pull/13), frontend [#54](https://github.com/create2-labs/cafe-frontend/pull/54) | **11b** (chemins canoniques figés) | Refactor pure ; risque dérive auth ↔ mux si test d’alignement absent. | Constantes / helpers **locaux** : mux, auth, tests, scripts, clients — **sans** mutualisation inter-dépôt. **Réalisé.** |
+| **13a** | `discovery/v1-scan-result-ui-parity` | `cafe-discovery` | [#56](https://github.com/create2-labs/cafe-discovery/pull/56) | **11a** | `result` plus large que le minimal spec — revue OpenAPI ; defaults TLS lecture par `scan_id`. | Enrichir **`result`** v1 + **`GET …/tls/scans/defaults`** + détail default TLS ; OpenAPI aligné. **Réalisé.** |
 | **13b** | `frontend/v1-scan-detail-hydration` | `cafe-frontend` | — | **13a** | Régression cartes si mapping incomplet ; charge N× détail (garder concurrency). | Hydrater listes via **`GET …/scans/{scan_id}`** ; retirer appels **`/discovery/cbom/*`**. |
 | **13c** | `discovery/remove-cbom-route` | `cafe-discovery`, `cafe-deploy` (scripts) | — | **13b** | Intégrateurs sur CBOM — note release. | Supprimer **`GET /discovery/cbom/*`** ; e2e sans CBOM. |
 | **13d** | `discovery/utilities-and-assessments-v1` *(optionnel)* | `cafe-discovery` | — | **11b**, **13c** | Périmètre flou si mélangé avec **13**. | Migrer ou documenter **`assessments/request`**, **`rpcs`**, **`scanners`**. |
@@ -60,7 +60,7 @@
 
 **Principe de dépôt :** le contrat Discovery est **possédé** par `cafe-discovery` ; le contrat CPM par `cafe-crypto-policy-mgt`. Aucun dépôt ne concentre l’OpenAPI de l’autre — évite l’ambiguïté « le CPM possède aussi Discovery ».
 
-**Coordination :** **PR1a** et **PR1b** sont **mergées** — [`cafe-discovery` #49](https://github.com/create2-labs/cafe-discovery/pull/49), [`cafe-crypto-policy-mgt` #26](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/26). **Chaîne implémentation Discovery/CPM (PR plan 2→6) sur `main` :** [#51](https://github.com/create2-labs/cafe-discovery/pull/51) (PR2+PR3), [#52](https://github.com/create2-labs/cafe-discovery/pull/52) (PR4), [`cafe-crypto-policy-mgt` #27](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/27) (PR5), [#53](https://github.com/create2-labs/cafe-discovery/pull/53) (PR6) — voir **suivi PR Git** dans le tableau et les chapitres **PR2** … **PR6** ci‑dessous. **PR8** livrée [`cafe-crypto-policy-mgt` #29](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/29). **PR7** peut s’appuyer sur **`cpm-v1.yaml`** et le lookup **PR5**.
+**Coordination :** **PR1a** et **PR1b** sont **mergées** — [`cafe-discovery` #49](https://github.com/create2-labs/cafe-discovery/pull/49), [`cafe-crypto-policy-mgt` #26](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/26). **Chaîne implémentation Discovery/CPM (PR plan 2→6) sur `main` :** [#51](https://github.com/create2-labs/cafe-discovery/pull/51) (PR2+PR3), [#52](https://github.com/create2-labs/cafe-discovery/pull/52) (PR4), [`cafe-crypto-policy-mgt` #27](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/27) (PR5), [#53](https://github.com/create2-labs/cafe-discovery/pull/53) (PR6). **PR7** livrée [`cafe-crypto-policy-mgt` #28](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/28). **PR8** [#29](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/29). **PR11b** CPM [#30](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/30), deploy [#12](https://github.com/create2-labs/cafe-deploy/pull/12). **PR11c** — voir chapitre **PR11c**.
 
 ---
 
@@ -307,6 +307,8 @@ Both endpoints must rely on the same internal owner-scoped policy lookup logic t
 
 ## PR7 — Contrat public CPM policies (`/api/cpm/v1`, GET par `scan_id`, DELETE, validation)
 
+**Merge :** livré dans **`cafe-crypto-policy-mgt`** via [**PR #28**](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/28) (`feat(cpm): add v1 policies API and scan_id contract`).
+
 - **Branch:** `cpm/policies-scan-reference-contract`
 - **Repository:** `cafe-crypto-policy-mgt`
 - **Objective:** Implémenter **§0.2** sur le mux (alias **§0.3** optionnels marqués dépréciés) ; **`GET /policies?id=`** vs **`GET /policies?scan_id=`** mutuellement exclusifs → **400** ; **`DELETE /policies?id=`** **204/404 uniquement** ; **`POST /policies`** rejette **`scan_id`** manquant pour le flux Discovery → CPM (exceptions documentées : brouillons, fixtures, tests hors produit).
@@ -324,7 +326,7 @@ Both endpoints must rely on the same internal owner-scoped policy lookup logic t
 - **Proposed PR title:** `CPM v1: policies contract and scan_id correlation`
 - **Proposed PR body:** Catalog sous nouveau préfixe ; doublons §0.3 temporaires ; **`GET …/policies?scan_id=`** pour l’UI — même lookup owner-scoped que **`POST /internal/policies/references/scan`** (PR **5**) ; distinct en surface HTTP seulement.
 - **Risks:** Store en mémoire : liste par **`scan_id`** en O(n) — acceptable MVP ; documenter pour passage DB.
-- **Completion criteria:** Contrat public aligné avec **`openapi/cpm-v1.yaml`** (mises à jour si besoin) ; table d’auth à jour.
+- **Completion criteria:** Contrat public aligné avec **`openapi/cpm-v1.yaml`** (mises à jour si besoin) ; table d’auth à jour. **Réalisé** — [PR #28](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/28) ; alias rollout retirés ensuite en **PR11b** [#30](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/30).
 
 ---
 
@@ -376,7 +378,7 @@ Both endpoints must rely on the same internal owner-scoped policy lookup logic t
 - **Repository:** `cafe-frontend`
 - **Objective:** Basculer les appels Discovery vers **`/discovery/v1/...`** (via base **`/api`**), adopter **`items`**, traiter la réponse **`POST /scan`** (**`location`**, **`scan_id`**), CPM vers **`/api/cpm/v1/...`** aligné avec **9**. **CRUD wallets** : tout appeler sous **`/api/discovery/v1/wallets`** (plus d’URL **`/wallets`** ou **`/api/.../wallets`** hors ce préfixe).
 - **Scope:** `src/services/scanService.js`, `tlsService.js`, services / composables **wallets** (création, liste, suppression, etc.), `cpm/apiCpmDataSource.ts`, composables / tests associés ; `.env.example` si besoin.
-- **Out of scope:** Suppression backend des anciennes routes — **réalisée** en **PR11a** ([#54](https://github.com/create2-labs/cafe-discovery/pull/54)) ; suppression **`GET /discovery/cbom/*`** (**PR13c**) ; enrichissement **`result`** v1 (**PR13a**) ; hydratation détail (**PR13b**) ; nettoyage rollout CPM (**11b**).
+- **Out of scope:** Suppression backend des anciennes routes — **réalisée** en **PR11a** ([#54](https://github.com/create2-labs/cafe-discovery/pull/54)) ; suppression **`GET /discovery/cbom/*`** (**PR13c**) ; enrichissement **`result`** v1 — **réalisé** **PR13a** ([#56](https://github.com/create2-labs/cafe-discovery/pull/56)) ; hydratation détail (**PR13b**) ; nettoyage rollout CPM (**11b**).
 - **Dependencies:** **PR9** (ou overrides locaux coordonnés).
 - **Tests:** Mise à jour Vitest/Jest pour builders d’URL et parsers ; `apiCpmDataSource.spec.ts`.
 - **Validation commands:** `cd cafe-frontend && npm run test` (ou script CI du projet) ; `npm run build` si applicable.
@@ -385,7 +387,7 @@ Both endpoints must rely on the same internal owner-scoped policy lookup logic t
 - **Proposed PR title:** `Frontend: API coherency migration for Discovery and CPM`
 - **Proposed PR body:** Liste des endpoints remplacés ; note feature-flag si applicable.
 - **Risks:** Anciens bundles / SW en staging — procédure de purge.
-- **Completion criteria:** Parcours scan + listes v1 + appels CPM catalogue/explore via edge OK contre la stack **9**. **Réalisé** — [`cafe-frontend` PR #52](https://github.com/create2-labs/cafe-frontend/pull/52). *(Hydratation CBOM legacy et defaults TLS : dette **PR13** ; page CPM complète en mode `api` — Option A.)*
+- **Completion criteria:** Parcours scan + listes v1 + appels CPM catalogue/explore via edge OK contre la stack **9**. **Réalisé** — [`cafe-frontend` PR #52](https://github.com/create2-labs/cafe-frontend/pull/52). *(Hydratation cartes encore CBOM + defaults TLS côté client : **PR13b** ; backend détail v1 enrichi : **PR13a** [#56](https://github.com/create2-labs/cafe-discovery/pull/56).)*
 
 ---
 
@@ -396,20 +398,20 @@ Both endpoints must rely on the same internal owner-scoped policy lookup logic t
 | Route | Auth | Rôle actuel | Sortie planifiée |
 |-------|------|-------------|------------------|
 | **`/discovery/v1/*`** | Bearer owner | Contrat canonique (listes, détail, POST scan, wallets CAFE, DELETE) | **Garder** |
-| **`GET /discovery/cbom/*`** | Bearer owner | Hydratation UI par **adresse / URL** (champs carte : `risk_score`, `cipher_suites[]`, CycloneDX, etc.) | **PR13b** bascule client → **PR13c** retrait serveur |
+| **`GET /discovery/cbom/*`** | Bearer owner | Hydratation UI **frontend** par adresse/URL (legacy) ; équivalent métier dans détail v1 **`result`** depuis **PR13a** [#56](https://github.com/create2-labs/cafe-discovery/pull/56) | **PR13b** bascule client → **PR13c** retrait serveur |
 | **`POST /discovery/assessments/request`** | Bearer owner | Demande d’évaluation (hors OpenAPI v1) | **PR13d** (optionnel) ou annexe |
 | **`GET /discovery/rpcs`**, **`GET /discovery/scanners`** | Public | Catalogues utilitaires | **PR13d** (optionnel) ou annexe OpenAPI |
 
-**Écart workplan (détail scan) :** `GET …/wallets|tls/scans/{scan_id}` renvoie aujourd’hui un **`result` minimal** (`WalletScanResult` / `TlsScanResult` dans `discovery-v1.yaml`). Le CBOM legacy expose davantage de champs UI. **PR13a** aligne **`result`** sur les besoins UI, puis **PR13b** / **PR13c** ferment le CBOM.
+**Détail scan (post-PR13a) :** `GET …/wallets|tls/scans/{scan_id}` renvoie un **`result` enrichi** (parité champs UI / CBOM) — livré **PR13a** [#56](https://github.com/create2-labs/cafe-discovery/pull/56). **PR13b** / **PR13c** : le client cesse d’appeler CBOM, puis le serveur retire la route.
 
-**Defaults TLS :** `GET /discovery/v1/tls/scans` liste **uniquement** les scans **owner** (`default=false`). Le catalogue partagé est **`GET /discovery/v1/tls/scans/defaults`** (**PR13a**). Le frontend ne doit plus déduire les defaults depuis la liste owner + flag `default` (comportement **PR10** obsolète après séparation listes).
+**Defaults TLS :** `GET /discovery/v1/tls/scans` liste **uniquement** les scans **owner** (`default=false`). Catalogue partagé : **`GET /discovery/v1/tls/scans/defaults`** ; détail catalogue par **`scan_id`** (y compris `is_default`) — **PR13a** [#56](https://github.com/create2-labs/cafe-discovery/pull/56). Le frontend ne doit plus déduire les defaults depuis la liste owner + flag `default` (comportement **PR10** obsolète ; **PR13b** pour `listDefaultScans()` côté client).
 
 ---
 
 ## Chaîne PR13 — Fermeture dette CBOM
 
 ```text
-PR13a (Discovery: result enrichi + defaults TLS)
+PR13a (Discovery: result enrichi + defaults TLS) — mergé [#56](https://github.com/create2-labs/cafe-discovery/pull/56)
   → PR13b (Frontend: hydratation par scan_id, plus de CBOM)
     → PR13c (Discovery + scripts: retirer GET /discovery/cbom/*)
       → PR12 (Doc: exemples sans CBOM)
@@ -428,7 +430,7 @@ PR13d (optionnel): utilities / assessments hors v1
 - **Repository:** `cafe-discovery` uniquement
 - **Objective:** Retirer les handlers, routes Fiber et tests associés aux chemins **remplacés par v1** une fois **PR10** déployée : **`GET /discovery/scans`**, **`GET /discovery/tls/scans`**, **`GET /discovery/wallet-policy-contexts`**, **`POST /discovery/scan`**, et code mort associé.
 - **Scope:** `internal/app/container.go`, `discovery.go`, `tls.go`, tests ; **ne pas** retirer **`GET /discovery/cbom/*`**, **`POST /discovery/assessments/request`**, **`GET /discovery/rpcs`**, **`GET /discovery/scanners`** (voir tableau ci‑dessus).
-- **Out of scope:** **`GET /discovery/cbom/*`** (**PR13c**) ; enrichissement **`result`** v1 (**PR13a**) ; frontend ; nginx ; CPM.
+- **Out of scope:** **`GET /discovery/cbom/*`** (**PR13c**) ; enrichissement **`result`** v1 — **réalisé** **PR13a** ([#56](https://github.com/create2-labs/cafe-discovery/pull/56)) ; frontend ; nginx ; CPM.
 - **Dependencies:** **PR10** (clients sur v1) ; **9** déployé sur les cibles où le cleanup s’applique.
 - **Tests:** `cd cafe-discovery && go test ./...` ; grep du repo sans références aux anciens chemins enregistrés.
 - **Validation commands:** Idem ; smoke `curl` direct sur backend si utile.
@@ -443,6 +445,8 @@ PR13d (optionnel): utilities / assessments hors v1
 
 ## PR11b — Retrait alias rollout CPM, edge, scripts et reliquats client
 
+**Merge :** CPM [#30](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/30), deploy [#12](https://github.com/create2-labs/cafe-deploy/pull/12). Pas de PR Git **`cafe-frontend`** dédiée (client déjà sur **`/api/cpm/v1`** en **PR10** ; chemins centralisés en **PR11c** [#54](https://github.com/create2-labs/cafe-frontend/pull/54)).
+
 - **Branch:** `cleanup/remove-cpm-rollout-and-client-leftovers`
 - **Repositories:** `cafe-crypto-policy-mgt`, `cafe-frontend`, `cafe-crypto-policy-mgt/scripts`, `cafe-deploy` (pas `cafe-discovery` — couvert par **11a**)
 - **Objective:** Supprimer les chemins **§0.3** / double enregistrement sur le mux CPM, mettre à jour **nginx** / compose pour ne plus exposer les alias temporaires, aligner **scripts** et toute **référence résiduelle** frontend (grep, defaults, commentaires). **PR11a** mergée ([#54](https://github.com/create2-labs/cafe-discovery/pull/54)) : plus de routes Discovery legacy côté backend.
@@ -456,13 +460,15 @@ PR13d (optionnel): utilities / assessments hors v1
 - **Proposed PR title:** `Cleanup: CPM rollout removal and client/deploy leftovers`
 - **Proposed PR body:** Checklist alias retirés ; lien **11a** ; note opérateur pour l’ordre de déploiement.
 - **Risks:** PR « filet » si **11b** inclut trop de changements non liés — garder le diff **strictement** rollout + reliquats ; tag ou versionnement des **deux** specs OpenAPI si besoin.
-- **Completion criteria:** Plus d’alias rollout documentés comme actifs ; grep sans **`/api/v1/cpm/`** ni doubles handlers CPM cibles ; edge ne route plus vers chemins supprimés.
+- **Completion criteria:** Plus d’alias rollout documentés comme actifs ; grep sans **`/api/v1/cpm/`** ni doubles handlers CPM cibles ; edge ne route plus vers chemins supprimés. **Réalisé** — CPM [#30](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/30), deploy [#12](https://github.com/create2-labs/cafe-deploy/pull/12).
 
 ---
 
 ## PR11c — Factorisation des chemins API (par dépôt, sans lib inter-repo)
 
-**Principe :** après **PR11b**, les préfixes publics sont stables (**`/api/cpm/v1`**, **`/discovery/v1`**, **`/api/discovery/v1`** à l’edge, etc.). Les littéraux restent **éparpillés** (mux, inventaire auth, tests, scripts shell, clients). **PR11c** centralise ces chaînes **dans chaque dépôt concerné** — **pas** de package ni de module partagé entre repos (contrats OpenAPI et déploiements restent découplés).
+**Merge :** livré **CPM** via [**PR #31**](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/31) (`internal/cpmroutes`), **Discovery** via [**PR #55**](https://github.com/create2-labs/cafe-discovery/pull/55) (`internal/discoveryroutes`), **deploy** via [**PR #13**](https://github.com/create2-labs/cafe-deploy/pull/13) (`scripts/lib/api-route-paths.sh`), **frontend** via [**PR #54**](https://github.com/create2-labs/cafe-frontend/pull/54) (`src/api/routePaths.ts`).
+
+**Principe :** après **PR11b**, les préfixes publics sont stables (**`/api/cpm/v1`**, **`/discovery/v1`**, **`/api/discovery/v1`** à l’edge, etc.). Les littéraux étaient **éparpillés** (mux, inventaire auth, tests, scripts shell, clients). **PR11c** centralise ces chaînes **dans chaque dépôt concerné** — **pas** de package ni de module partagé entre repos (contrats OpenAPI et déploiements restent découplés).
 
 **Découpe Git :** une **PR Git par dépôt** (même nom de branche proposé partout pour la lisibilité) ; revue et merge **indépendants**. Aucune obligation de merger tous les dépôts le même jour : l’ordre n’affecte pas le comportement runtime tant que **11b** est déjà en place.
 
@@ -486,11 +492,13 @@ PR13d (optionnel): utilities / assessments hors v1
 - **Proposed PR title:** `Refactor: centralize API route paths (per repository)`
 - **Proposed PR body:** Liste des fichiers par dépôt ; rappel **pas de lib inter-repo** ; lien **PR11b** ; PRs sœurs dans les autres dépôts si applicable ; test d’alignement auth/mux si ajouté.
 - **Risks:** Diff large mais mécanique — séparer **11b** et **11c** pour la revue ; oublier un littéral dans un script → grep de non-régression par dépôt.
-- **Completion criteria:** Chemins canoniques définis **une fois par dépôt** ; mux et auth CPM alignés sur les mêmes constantes ; tests importent ces constantes ; **pas** de nouveau préfixe rollout ; contrat edge inchangé vs **11b**.
+- **Completion criteria:** Chemins canoniques définis **une fois par dépôt** ; mux et auth CPM alignés sur les mêmes constantes ; tests importent ces constantes ; **pas** de nouveau préfixe rollout ; contrat edge inchangé vs **11b**. **Réalisé** — CPM [#31](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/31), Discovery [#55](https://github.com/create2-labs/cafe-discovery/pull/55), deploy [#13](https://github.com/create2-labs/cafe-deploy/pull/13), frontend [#54](https://github.com/create2-labs/cafe-frontend/pull/54).
 
 ---
 
 ## PR13a — Parité UI du champ `result` v1 (Discovery)
+
+**Merge :** livré dans **`cafe-discovery`** via [**PR #56**](https://github.com/create2-labs/cafe-discovery/pull/56) (branche `discovery/v1-scan-result-ui-parity`).
 
 - **Branch:** `discovery/v1-scan-result-ui-parity`
 - **Repository:** `cafe-discovery`
@@ -500,12 +508,12 @@ PR13d (optionnel): utilities / assessments hors v1
 - **Dependencies:** **PR11a** ([#54](https://github.com/create2-labs/cafe-discovery/pull/54)) ; **PR4** (détail v1 existant).
 - **Tests:** `go test ./...` ; tests contrat OpenAPI si présents ; curls détail wallet/TLS vs champs UI attendus.
 - **Validation commands:** `curl` détail par `scan_id` (owner + default TLS) ; liste defaults vs liste owner disjointes.
-- **Proposed commit title:** `Discovery v1: enrich scan result for UI parity and TLS defaults catalog`
+- **Proposed commit title:** `feat(discovery): enrich v1 scan result for UI parity and TLS defaults`
 - **Proposed commit message:** `Expand WalletScanResult/TlsScanResult per WORKPLAN_API. Add GET /discovery/v1/tls/scans/defaults. Allow default TLS scan detail by scan_id. Update discovery-v1.yaml.`
-- **Proposed PR title:** `Discovery v1: scan result UI parity and TLS defaults endpoint`
+- **Proposed PR title:** `feat(discovery): v1 scan result UI parity and TLS defaults catalog`
 - **Proposed PR body:** Tableau champs CBOM → `result` ; lien **PR13b** ; note OpenAPI.
 - **Risks:** `result` plus large que le minimal spec — revue propriétaire ; versioning documenté si besoin.
-- **Completion criteria:** Détail v1 suffisant pour rendre CBOM optionnel côté UI ; defaults TLS listables et lisibles par `scan_id` ; OpenAPI à jour.
+- **Completion criteria:** Détail v1 suffisant pour rendre CBOM optionnel côté UI ; defaults TLS listables et lisibles par `scan_id` ; OpenAPI à jour. **Réalisé** — [`cafe-discovery` PR #56](https://github.com/create2-labs/cafe-discovery/pull/56).
 
 ---
 
@@ -516,7 +524,7 @@ PR13d (optionnel): utilities / assessments hors v1
 - **Objective:** Remplacer les appels **`GET /discovery/cbom/{address|url}`** par **`GET /discovery/v1/wallets|tls/scans/{scan_id}`** lors du rendu des cartes ; conserver listes synopsis v1 ; utiliser **`listDefaultScans()`** / defaults endpoint (**PR13a**).
 - **Scope:** Stores/composables scan wallet et TLS, services, mappers synopsis → carte ; tests Vitest/Jest.
 - **Out of scope:** Suppression route CBOM serveur (**PR13c**) ; enrichissement backend (**PR13a** fait en amont).
-- **Dependencies:** **PR13a** déployée (ou stack locale avec `result` enrichi).
+- **Dependencies:** **PR13a** mergée ([#56](https://github.com/create2-labs/cafe-discovery/pull/56)) — déployer Discovery `main` (ou image incluant #56) avant merge **13b**.
 - **Tests:** `npm run test` ; smoke manuel listes + ouverture carte + defaults TLS.
 - **Validation commands:** Réseau navigateur : plus de requêtes vers `/discovery/cbom/` en parcours nominal.
 - **Proposed commit title:** `Frontend: hydrate scan cards from Discovery v1 detail by scan_id`
@@ -585,13 +593,13 @@ PR13d (optionnel): utilities / assessments hors v1
 ## Rappel global (git et implémentation)
 
 - **Pas de commit, push, merge ou tags** depuis le plan automatisé : le propriétaire humain garde la main sur git et la publication.
-- **Jalon OpenAPI** — **PR1a** [#49](https://github.com/create2-labs/cafe-discovery/pull/49), **PR1b** [#26](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/26). Chaîne **PR2→PR6** : [#51](https://github.com/create2-labs/cafe-discovery/pull/51), [#52](https://github.com/create2-labs/cafe-discovery/pull/52), CPM [#27](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/27), [#53](https://github.com/create2-labs/cafe-discovery/pull/53). **PR8** [#29](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/29). **PR9** [`cafe-deploy` #11](https://github.com/create2-labs/cafe-deploy/pull/11). **PR10** [`cafe-frontend` #52](https://github.com/create2-labs/cafe-frontend/pull/52). **PR11a** [`cafe-discovery` #54](https://github.com/create2-labs/cafe-discovery/pull/54). **Suite recommandée :** **PR7** → **PR11b** → **PR11c** *(PR Git par dépôt)* → **PR13a** → **PR13b** → **PR13c** → **PR12** (option **PR13d**). Détail par chapitre ci‑dessus.
+- **Jalon OpenAPI** — **PR1a** [#49](https://github.com/create2-labs/cafe-discovery/pull/49), **PR1b** [#26](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/26). Chaîne **PR2→PR6** : [#51](https://github.com/create2-labs/cafe-discovery/pull/51), [#52](https://github.com/create2-labs/cafe-discovery/pull/52), CPM [#27](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/27), [#53](https://github.com/create2-labs/cafe-discovery/pull/53). **PR7** CPM [#28](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/28). **PR8** [#29](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/29). **PR9** [`cafe-deploy` #11](https://github.com/create2-labs/cafe-deploy/pull/11). **PR10** [`cafe-frontend` #52](https://github.com/create2-labs/cafe-frontend/pull/52). **PR11a** [`cafe-discovery` #54](https://github.com/create2-labs/cafe-discovery/pull/54). **PR11b** CPM [#30](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/30), deploy [#12](https://github.com/create2-labs/cafe-deploy/pull/12). **PR11c** CPM [#31](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/31), Discovery [#55](https://github.com/create2-labs/cafe-discovery/pull/55), deploy [#13](https://github.com/create2-labs/cafe-deploy/pull/13), frontend [#54](https://github.com/create2-labs/cafe-frontend/pull/54). **PR13a** [`cafe-discovery` #56](https://github.com/create2-labs/cafe-discovery/pull/56). **Suite recommandée :** **PR13b** → **PR13c** → **PR12** (option **PR13d**). Détail par chapitre ci‑dessus.
 
 ### Instruction type — après jalon OpenAPI (PR #49 + #26)
 
 Lorsque vous ouvrez une PR d’implémentation (**PR2+**), lier la **PR Git** dans la colonne **PR Git** du tableau de suivi et pointer vers les specs sur `main` :
 
-> OpenAPI jalon merged (Discovery PR #49, CPM PR #26). Chaîne **PR2→PR6** documentée avec liens Git (ex. **PR6** → Discovery **#53** ; **PR2**/**PR3** → **#51** ; **PR4** → **#52** ; **PR5** → CPM **#27** ; **#50** fermée sans merge). **PR8** → CPM [**#29**](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/29). **PR9** → **`cafe-deploy` [#11](https://github.com/create2-labs/cafe-deploy/pull/11)**. **PR10** → **`cafe-frontend` [#52](https://github.com/create2-labs/cafe-frontend/pull/52)**. **PR11a** → **`cafe-discovery` [#54](https://github.com/create2-labs/cafe-discovery/pull/54)**. Après **PR10**, la dette **CBOM** est suivie par **PR13a→PR13c** (ne pas la traiter dans **PR11b**). **PR11c** : factorisation des chemins **par dépôt** après **11b**, sans lib inter-repo. Mettre à jour le **résumé exécutif** lorsque le comportement livré diverge. Poursuivre selon **approbation propriétaire** et **dépendances**.
+> OpenAPI jalon merged (Discovery PR #49, CPM PR #26). Chaîne **PR2→PR6** documentée avec liens Git (ex. **PR6** → Discovery **#53** ; **PR2**/**PR3** → **#51** ; **PR4** → **#52** ; **PR5** → CPM **#27** ; **#50** fermée sans merge). **PR7** → CPM [**#28**](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/28). **PR8** → [**#29**](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/29). **PR9** → **`cafe-deploy` [#11](https://github.com/create2-labs/cafe-deploy/pull/11)**. **PR10** → **`cafe-frontend` [#52](https://github.com/create2-labs/cafe-frontend/pull/52)**. **PR11a** → **`cafe-discovery` [#54](https://github.com/create2-labs/cafe-discovery/pull/54)**. **PR11b** → CPM [**#30**](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/30), deploy [**#12**](https://github.com/create2-labs/cafe-deploy/pull/12). **PR11c** → CPM [**#31**](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/31), Discovery [**#55**](https://github.com/create2-labs/cafe-discovery/pull/55), deploy [**#13**](https://github.com/create2-labs/cafe-deploy/pull/13), frontend [**#54**](https://github.com/create2-labs/cafe-frontend/pull/54). **PR13a** → Discovery [**#56**](https://github.com/create2-labs/cafe-discovery/pull/56). Dette **CBOM** : **PR13b→PR13c**. Mettre à jour le **résumé exécutif** lorsque le comportement livré diverge.
 
 ### Fusion optionnelle de PRs (si vous voulez réduire le nombre)
 

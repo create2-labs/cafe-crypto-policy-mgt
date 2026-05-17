@@ -230,41 +230,6 @@ func newAuthedTestHandler(t *testing.T) http.Handler {
 	return h
 }
 
-func newAuthedTestHandlerWithScanAuth(t *testing.T) http.Handler {
-	t.Helper()
-	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
-		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_valid.json"),
-		},
-		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_valid.json"),
-		},
-	})
-	if err != nil {
-		t.Fatalf("LoadReadStore: %v", err)
-	}
-	introspect := newDiscoveryValidationServer(t, discoveryValidationTestConfig{status: http.StatusOK})
-	t.Cleanup(introspect.Close)
-	scanAuth := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"allowed":true}`))
-	}))
-	t.Cleanup(scanAuth.Close)
-	h, err := handler("cafe-cpm", store, authConfig{
-		Required:                    true,
-		SessionValidationURL:        introspect.URL,
-		SessionValidationTimeoutSec: 3,
-		ScanAuthorizationURL:        scanAuth.URL,
-		ScanAuthorizationTimeoutSec: 2,
-		ClockSkewSec:                30,
-	})
-	if err != nil {
-		t.Fatalf("handler: %v", err)
-	}
-	return h
-}
-
 func mustToken(t *testing.T, userID string) string {
 	t.Helper()
 	token, err := makeDiscoveryHybridToken(map[string]any{
