@@ -111,7 +111,7 @@ func TestHandlerRequiresAuthForBusinessRoutes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("handler: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/policies/catalog", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies/catalog", nil)
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
 	if res.Code != http.StatusUnauthorized {
@@ -150,7 +150,7 @@ func TestHandlerRejectsMalformedBearerHeader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("handler: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/policies/catalog", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies/catalog", nil)
 	req.Header.Set("Authorization", "Token abc")
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
@@ -191,7 +191,7 @@ func TestHandlerAcceptsValidBearerToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("make token: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/policies/catalog", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies/catalog", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
@@ -232,7 +232,7 @@ func TestHandlerRejectsExpiredDiscoveryToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("make token: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/policies/catalog", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies/catalog", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
@@ -273,7 +273,7 @@ func TestHandlerRejectsDiscoveryDeniedToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("make token: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/policies/catalog", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies/catalog", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
@@ -317,7 +317,7 @@ func TestHandlerReturns503OnValidationTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("handler: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/policies/catalog", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies/catalog", nil)
 	token, err := makeDiscoveryHybridToken(map[string]any{
 		"user_id": "u1",
 		"email":   "u@example.com",
@@ -366,7 +366,7 @@ func TestHandlerReturns503OnValidation5xx(t *testing.T) {
 	if err != nil {
 		t.Fatalf("make token: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/policies/catalog", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies/catalog", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
@@ -410,7 +410,7 @@ func TestHandlerRejectsValidationSuccessButMissingUserID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("make token: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/policies/catalog", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies/catalog", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
@@ -455,7 +455,7 @@ func TestHandlerPropagatesRequestIDToDiscoveryValidation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("make token: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/policies/catalog", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies/catalog", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("X-Request-Id", "rid-123")
 	res := httptest.NewRecorder()
@@ -503,7 +503,7 @@ func TestHandlerFailsClosedWhenScanIDPresentButAuthzNotConfigured(t *testing.T) 
 	}
 	req := httptest.NewRequest(
 		http.MethodPost,
-		"/api/v1/policies/decisions/explore",
+		"/api/cpm/v1/policies/decisions/explore",
 		strings.NewReader(`{"scan_id":"scan-123","policy_context":{"scan_id":"scan-123","wallet_type":"EOA","chain_ids":[1],"current_pq_posture":"classical_only","scanned_at":"2026-01-01T00:00:00Z"},"selection_request":{"target_posture":"hybrid","target_chain_ids":[1],"require_multichain":false,"allow_new_wallet":false,"address_continuity_required":true,"key_rotation_required":true,"recovery_required":true,"minimum_maturity":1,"approval_mode":"manual"}}`),
 	)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -549,7 +549,7 @@ func TestHandlerContinuesWhenAuthzNotConfiguredAndNoScanID(t *testing.T) {
 	}
 	req := httptest.NewRequest(
 		http.MethodPost,
-		"/api/v1/policies/decisions/explore",
+		"/api/cpm/v1/policies/decisions/explore",
 		strings.NewReader(`{"policy_context":{"wallet_type":"EOA","chain_ids":[1],"current_pq_posture":"classical_only","scanned_at":"2026-01-01T00:00:00Z"},"selection_request":{"target_posture":"hybrid","target_chain_ids":[1],"require_multichain":false,"allow_new_wallet":false,"address_continuity_required":true,"key_rotation_required":true,"recovery_required":true,"minimum_maturity":1,"approval_mode":"manual"}}`),
 	)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -630,7 +630,7 @@ func assertTokenRejected(t *testing.T, algorithms []string, expectedStatus int) 
 	if err != nil {
 		t.Fatalf("make token envelope: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/policies/catalog", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies/catalog", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)

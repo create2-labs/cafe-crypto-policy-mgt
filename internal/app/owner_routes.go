@@ -23,9 +23,7 @@ func registerOwnerScopedRoutes(mux *http.ServeMux, store *persistence.OwnerScope
 	if obs == nil {
 		obs = newAuthObservability()
 	}
-	for _, base := range []string{"/api/v1/cpm", "/api/cpm/v1"} {
-		registerOwnerScopedRoutesForPrefix(mux, base, store, obs)
-	}
+	registerOwnerScopedRoutesForPrefix(mux, "/api/cpm/v1", store, obs)
 }
 
 func registerOwnerScopedRoutesForPrefix(mux *http.ServeMux, base string, store *persistence.OwnerScopedStore, obs *authObservability) {
