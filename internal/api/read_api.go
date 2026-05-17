@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/policy"
 )
 
@@ -86,7 +87,7 @@ func RegisterReadRoutes(mux *http.ServeMux, store *ReadStore) error {
 	if store == nil {
 		return ErrStoreNil
 	}
-	registerReadRoutesForPrefix(mux, store, "/api/cpm/v1/policies")
+	registerReadRoutesForPrefix(mux, store, cpmroutes.PoliciesPrefix)
 	return nil
 }
 

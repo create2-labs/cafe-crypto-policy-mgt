@@ -1,0 +1,8 @@
+# Canonical CPM API path constants (WORKPLAN_API_PR PR11c). Source from scripts: . "$(dirname "$0")/lib/cpm-route-paths.sh"
+CPM_V1_BASE="/api/cpm/v1"
+CPM_POLICIES="${CPM_V1_BASE}/policies"
+CPM_POLICIES_CATALOG="${CPM_POLICIES}/catalog"
+CPM_POLICIES_TEMPLATES="${CPM_POLICIES}/templates"
+CPM_POLICIES_INSTANCES="${CPM_POLICIES}/instances"
+CPM_POLICIES_DECISIONS_EXPLORE="${CPM_POLICIES}/decisions/explore"
+CPM_DRAFTS="${CPM_V1_BASE}/drafts"

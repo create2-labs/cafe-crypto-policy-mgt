@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,7 +14,7 @@ import (
 )
 
 func TestExtractScanIDsForAuthorization(t *testing.T) {
-	req := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/policies/decisions/explore", strings.NewReader(`{"scan_id":"scan-123","policy_context":{"scan_id":"scan-123"}}`))
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, strings.NewReader(`{"scan_id":"scan-123","policy_context":{"scan_id":"scan-123"}}`))
 	scanIDs, authErr, status := extractScanIDsForAuthorization(req)
 	if authErr.Code != "" || status != http.StatusOK {
 		t.Fatalf("expected no error, got code=%q status=%d", authErr.Code, status)
@@ -45,7 +46,7 @@ func TestExtractScanIDsForAuthorizationVariants(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/policies/decisions/explore", strings.NewReader(tc.body))
+			req := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, strings.NewReader(tc.body))
 			scanIDs, authErr, status := extractScanIDsForAuthorization(req)
 			if tc.wantErr {
 				if authErr.Code == "" || status != http.StatusBadRequest {
@@ -70,7 +71,7 @@ func TestExtractScanIDsForAuthorizationVariants(t *testing.T) {
 
 func TestExtractScanIDsForAuthorizationGETPolicies(t *testing.T) {
 	scan := "550e8400-e29b-41d4-a716-446655440000"
-	req := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies?scan_id="+scan, nil)
+	req := httptest.NewRequest(http.MethodGet, cpmroutes.Policies+"?scan_id="+scan, nil)
 	ids, authErr, status := extractScanIDsForAuthorization(req)
 	if authErr.Code != "" || status != http.StatusOK {
 		t.Fatalf("expected ok, got code=%q status=%d", authErr.Code, status)
@@ -79,7 +80,7 @@ func TestExtractScanIDsForAuthorizationGETPolicies(t *testing.T) {
 		t.Fatalf("expected normalized scan id, got %#v", ids)
 	}
 
-	reqBoth := httptest.NewRequest(http.MethodGet, "/api/cpm/v1/policies?id=a&scan_id="+scan, nil)
+	reqBoth := httptest.NewRequest(http.MethodGet, cpmroutes.Policies+"?id=a&scan_id="+scan, nil)
 	_, ae2, st2 := extractScanIDsForAuthorization(reqBoth)
 	if ae2.Code == "" || st2 != http.StatusBadRequest {
 		t.Fatalf("expected 400 conflict, got code=%q status=%d", ae2.Code, st2)
@@ -177,7 +178,7 @@ func TestWithAuthenticationAllowsRequestWhenScanAuthzAllowed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("make token: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/policies/decisions/explore", strings.NewReader(`{"scan_id":"scan-123","policy_context":{"scan_id":"scan-123","wallet_type":"EOA","current_pq_posture":"classical_only","chain_ids":[1],"scanned_at":"2026-01-01T00:00:00Z"},"selection_request":{"target_posture":"hybrid","target_chain_ids":[1],"require_multichain":false,"allow_new_wallet":false,"address_continuity_required":true,"key_rotation_required":true,"recovery_required":true,"minimum_maturity":1,"approval_mode":"manual"}}`))
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, strings.NewReader(`{"scan_id":"scan-123","policy_context":{"scan_id":"scan-123","wallet_type":"EOA","current_pq_posture":"classical_only","chain_ids":[1],"scanned_at":"2026-01-01T00:00:00Z"},"selection_request":{"target_posture":"hybrid","target_chain_ids":[1],"require_multichain":false,"allow_new_wallet":false,"address_continuity_required":true,"key_rotation_required":true,"recovery_required":true,"minimum_maturity":1,"approval_mode":"manual"}}`))
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("X-User-Id", "fake-client-header")
 	res := httptest.NewRecorder()
