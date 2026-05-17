@@ -10,6 +10,8 @@ set -euo pipefail
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/cpm-route-paths.sh
 source "${_SCRIPT_DIR}/lib/cpm-route-paths.sh"
+# shellcheck source=lib/discovery-route-paths.sh
+source "${_SCRIPT_DIR}/lib/discovery-route-paths.sh"
 
 show_help() {
   local self
@@ -28,9 +30,9 @@ Optional
                                   default: http://localhost:8080
   CPM_BASE                        CPM root URL (no trailing slash)
                                   default: http://localhost:8082
-  DISCOVERY_WALLET_CONTEXTS_PATH  Authenticated Discovery wallet-contexts path (appended to DISCOVERY_BASE)
-                                  default: /discovery/wallet-policy-contexts (direct backend :8080)
-                                  via nginx HTTPS edge: set to /api/discovery/wallet-policy-contexts
+  DISCOVERY_WALLET_CONTEXTS_PATH  Authenticated Discovery wallet scans list path (appended to DISCOVERY_BASE)
+                                  default: /discovery/v1/wallets/scans (direct backend :8080)
+                                  via nginx HTTPS edge: set to /api/discovery/v1/wallets/scans
   SCAN_ID                         Select one authorized scan context by id
   CPM_EXPLORE_PATH                CPM explore endpoint path
                                   default: /api/cpm/v1/policies/decisions/explore
@@ -54,7 +56,7 @@ Legacy smoke-test mode only (NOT Option A product flow)
   TURNSTILE_TOKEN                 Sign-in token; default: dev-pass
   POLL_INTERVAL_SEC               Legacy CBOM poll interval; default: 5
   POLL_MAX_ATTEMPTS               Legacy CBOM max attempts; default: 60
-  EXTRA_SCAN_BODY                 Legacy extra JSON for POST /discovery/scan; default: {}
+  EXTRA_SCAN_BODY                 Legacy extra JSON for POST /discovery/v1/scan; default: {}
 
 Security / transport
   CURL_INSECURE=1                 curl -k for local self-signed TLS
@@ -92,7 +94,7 @@ esac
 
 DISCOVERY_BASE="${DISCOVERY_BASE:-http://localhost:8080}"
 CPM_BASE="${CPM_BASE:-http://localhost:8082}"
-DISCOVERY_WALLET_CONTEXTS_PATH="${DISCOVERY_WALLET_CONTEXTS_PATH:-/discovery/wallet-policy-contexts}"
+DISCOVERY_WALLET_CONTEXTS_PATH="${DISCOVERY_WALLET_CONTEXTS_PATH:-${DISCOVERY_V1_WALLET_SCANS}}"
 CPM_EXPLORE_PATH="${CPM_EXPLORE_PATH:-${CPM_POLICIES_DECISIONS_EXPLORE}}"
 CPM_PERSIST_PATH="${CPM_PERSIST_PATH:-${CPM_POLICIES}}"
 
@@ -218,7 +220,7 @@ if [[ "$LEGACY_SCAN_AND_CBOM_FLOW" == "1" ]]; then
     --argjson extra "$EXTRA_SCAN_BODY" \
     '{address:$addr} + $extra')
 
-  SCAN_RESP=$(jq -cn --argjson body "$SCAN_PAYLOAD" '$body' | json_post "${DISCOVERY_BASE}/discovery/scan" "${DISCOVERY_HEADERS[@]}") \
+  SCAN_RESP=$(jq -cn --argjson body "$SCAN_PAYLOAD" '$body' | json_post "${DISCOVERY_BASE}${DISCOVERY_V1_SCAN}" "${DISCOVERY_HEADERS[@]}") \
     || die "queue scan failed"
   printf '%s\n' "$SCAN_RESP" | jq .
 
@@ -285,9 +287,9 @@ if [[ "$LEGACY_SCAN_AND_CBOM_FLOW" == "1" ]]; then
   [[ "$(printf '%s' "$SELECTED_CONTEXT" | jq -r '.wallet_address')" != "" ]] || die "legacy context mapping did not produce wallet address"
 else
   CONTEXTS_URL="${DISCOVERY_BASE}${DISCOVERY_WALLET_CONTEXTS_PATH}"
-  echo "Loading authenticated wallet policy contexts from Discovery..."
+  echo "Loading authenticated wallet scans from Discovery (GET ${DISCOVERY_WALLET_CONTEXTS_PATH})..."
   CONTEXTS_RAW=$(json_get "$CONTEXTS_URL" "${DISCOVERY_HEADERS[@]}") \
-    || die "failed to load wallet policy contexts"
+    || die "failed to load wallet scans"
 
   CONTEXTS=$(printf '%s' "$CONTEXTS_RAW" | jq -c '
     def as_contexts:
@@ -297,11 +299,11 @@ else
     as_contexts
     | map({
         scan_id: (.scanId // .scan_id // empty),
-        wallet_address: (.walletAddress // .wallet_address // .address // empty),
+        wallet_address: (.walletAddress // .wallet_address // .target_address // .address // empty),
         wallet_type: (.walletType // .wallet_type // .account_kind // "unknown"),
         chain_ids: ((.chainIds // .chain_ids) | if type == "array" then . else [] end),
         current_pq_posture: (.currentPQPosture // .current_pq_posture // "unknown"),
-        scanned_at: (.scannedAt // .scanned_at // .observed_at // empty),
+        scanned_at: (.scannedAt // .scanned_at // .created_at // .observed_at // empty),
         status: (.status // .scanStatus // .scan_status // "unknown"),
         raw: .
       })
@@ -314,19 +316,19 @@ else
 
   eligible_count=$(printf '%s' "$ELIGIBLE_CONTEXTS" | jq 'length')
   if [[ "$eligible_count" -eq 0 ]]; then
-    die "no eligible completed wallet policy contexts found. Run a wallet scan first."
+    die "no eligible completed wallet scans found. Run a wallet scan first (POST ${DISCOVERY_V1_SCAN})."
   fi
 
   if [[ -n "${SCAN_ID:-}" ]]; then
     SELECTED_CONTEXT=$(printf '%s' "$ELIGIBLE_CONTEXTS" | jq -c --arg sid "$SCAN_ID" '
       map(select(.scan_id == $sid)) | .[0] // empty
     ')
-    [[ -n "$SELECTED_CONTEXT" ]] || die "SCAN_ID '${SCAN_ID}' was not found in your authenticated eligible wallet contexts"
+    [[ -n "$SELECTED_CONTEXT" ]] || die "SCAN_ID '${SCAN_ID}' was not found in your authenticated eligible wallet scans"
   else
     if [[ "$eligible_count" -eq 1 ]]; then
       SELECTED_CONTEXT=$(printf '%s' "$ELIGIBLE_CONTEXTS" | jq -c '.[0]')
     else
-      echo "Multiple eligible wallet contexts found:"
+      echo "Multiple eligible wallet scans found:"
       printf '%s' "$ELIGIBLE_CONTEXTS" | jq -r '
         (["scan_id","wallet_address","wallet_type","chain_ids","current_pq_posture","scanned_at","status"] | @tsv),
         (.[] | [
@@ -346,12 +348,30 @@ fi
 
 SELECTED_SCAN_ID=$(printf '%s' "$SELECTED_CONTEXT" | jq -r '.scan_id // empty')
 if [[ "$LEGACY_SCAN_AND_CBOM_FLOW" != "1" ]]; then
-  [[ -n "$SELECTED_SCAN_ID" ]] || die "selected wallet context is missing scan_id"
+  [[ -n "$SELECTED_SCAN_ID" ]] || die "selected wallet scan is missing scan_id"
 fi
 SELECTED_CHAINS=$(printf '%s' "$SELECTED_CONTEXT" | jq -c '.chain_ids // []')
 
-echo "Selected wallet context:"
+echo "Selected wallet scan:"
 printf '%s\n' "$SELECTED_CONTEXT" | jq '{scan_id,wallet_address,wallet_type,chain_ids,current_pq_posture,scanned_at,status}'
+
+POLICY_CONTEXT_JSON=""
+if [[ "$LEGACY_SCAN_AND_CBOM_FLOW" != "1" ]]; then
+  enc_scan_id=$(jq -rn --arg u "$SELECTED_SCAN_ID" '$u|@uri')
+  DETAIL_URL="${DISCOVERY_BASE}${DISCOVERY_V1_WALLET_SCANS}/${enc_scan_id}"
+  echo "Loading wallet scan detail (GET ${DISCOVERY_V1_WALLET_SCANS}/{scan_id})..."
+  SCAN_DETAIL=$(json_get "$DETAIL_URL" "${DISCOVERY_HEADERS[@]}") \
+    || die "failed to load wallet scan detail for scan_id=${SELECTED_SCAN_ID}"
+  POLICY_CONTEXT_JSON=$(printf '%s' "$SCAN_DETAIL" | jq -c '
+    {
+      scan_id: (.scan_id // ""),
+      status: (.status // ""),
+      result: (.result // empty)
+    }
+    | select(.scan_id != "" and (.result | type) == "object")
+  ')
+  [[ -n "$POLICY_CONTEXT_JSON" ]] || die "wallet scan detail missing result (scan may not be terminal yet)"
+fi
 
 SELECTION_JSON=$(jq -nc \
   --arg target_posture "$TARGET_POSTURE" \
@@ -375,26 +395,39 @@ SELECTION_JSON=$(jq -nc \
   }
 ')
 
-REQUEST_BODY=$(jq -nc \
-  --arg scan_id "$SELECTED_SCAN_ID" \
-  --argjson ctx "$SELECTED_CONTEXT" \
-  --argjson sel "$SELECTION_JSON" '
-  (if ($scan_id | length) > 0 then {scan_id: $scan_id} else {} end) + {
-    policy_context: (
-      {
-        wallet_address: $ctx.wallet_address,
-        wallet_type: $ctx.wallet_type,
-        chain_ids: ($ctx.chain_ids // []),
-        current_pq_posture: $ctx.current_pq_posture,
-        scanned_at: $ctx.scanned_at,
-        status: $ctx.status
-      }
-      + (if ($ctx.current_algorithm // "") != "" then {current_algorithm: $ctx.current_algorithm} else {} end)
-      + (if ($scan_id | length) > 0 then {scan_id: ($ctx.scan_id // $scan_id)} else {} end)
-    ),
-    selection_request: $sel
-  }
-')
+if [[ "$LEGACY_SCAN_AND_CBOM_FLOW" == "1" ]]; then
+  REQUEST_BODY=$(jq -nc \
+    --arg scan_id "$SELECTED_SCAN_ID" \
+    --argjson ctx "$SELECTED_CONTEXT" \
+    --argjson sel "$SELECTION_JSON" '
+    (if ($scan_id | length) > 0 then {scan_id: $scan_id} else {} end) + {
+      policy_context: (
+        {
+          wallet_address: $ctx.wallet_address,
+          wallet_type: $ctx.wallet_type,
+          chain_ids: ($ctx.chain_ids // []),
+          current_pq_posture: $ctx.current_pq_posture,
+          scanned_at: $ctx.scanned_at,
+          status: $ctx.status
+        }
+        + (if ($ctx.current_algorithm // "") != "" then {current_algorithm: $ctx.current_algorithm} else {} end)
+        + (if ($scan_id | length) > 0 then {scan_id: ($ctx.scan_id // $scan_id)} else {} end)
+      ),
+      selection_request: $sel
+    }
+  ')
+else
+  REQUEST_BODY=$(jq -nc \
+    --arg scan_id "$SELECTED_SCAN_ID" \
+    --argjson policy_context "$POLICY_CONTEXT_JSON" \
+    --argjson sel "$SELECTION_JSON" '
+    {
+      scan_id: $scan_id,
+      policy_context: $policy_context,
+      selection_request: $sel
+    }
+  ')
+fi
 
 echo "Calling CPM decisions/explore ..."
 EXPLORE_RESP=$(jq -cn --argjson body "$REQUEST_BODY" '$body' | json_post "${CPM_BASE}${CPM_EXPLORE_PATH}" "${CPM_HEADERS[@]}") \
