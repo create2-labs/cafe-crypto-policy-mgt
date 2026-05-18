@@ -41,8 +41,8 @@ Optional
 Steps
   1) POST /auth/signin
   2) POST /discovery/v1/scan (returns scan_id + status requested)
-  3) Poll GET .../discovery/cbom/{address} until 200
-  4) POST .../api/cpm/v1/policies/decisions/explore with policy_context + selection_request (no top-level scan_id unless AUTH-02 is wired)
+  3) Poll GET .../discovery/v1/wallets/scans/{scan_id} until status=completed (AUTH-02 can-read requires a persisted scan row)
+  4) POST .../api/cpm/v1/policies/decisions/explore with scan-bound policy_context + selection_request
   5) POST .../api/cpm/v1/policies (unless SKIP_PERSIST=1)
 
 Example
@@ -172,79 +172,56 @@ if [[ -n "$V1_SCAN_ID" && -z "${SCAN_ID_BINDING:-}" ]]; then
   echo "Using scan_id from v1 scan response for persist: ${SCAN_ID_BINDING}"
 fi
 
-echo "Waiting for CBOM (scanner + persistence async) ..."
-CBOM=""
-http_last=""
+if [[ -z "${SCAN_ID_BINDING:-}" ]]; then
+  die "scan_id missing from POST ${DISCOVERY_V1_SCAN} response; cannot bind persist to Discovery"
+fi
+
+echo "Waiting for wallet scan ${SCAN_ID_BINDING} to reach completed (${DISCOVERY_V1_WALLET_SCANS}/{scan_id}) ..."
+SCAN_DETAIL=""
 for attempt in $(seq 1 "$POLL_MAX_ATTEMPTS"); do
-  # URL-encode path segment for address
-  enc_addr=$(jq -rn --arg u "$WALLET_ADDRESS" '$u|@uri')
-  raw=$(curl "${CURL_OPTS[@]}" "${DISCOVERY_HEADERS[@]}" -w '\n%{http_code}' "${DISCOVERY_BASE}/discovery/cbom/${enc_addr}") || true
+  enc_scan_id=$(jq -rn --arg u "$SCAN_ID_BINDING" '$u|@uri')
+  raw=$(curl "${CURL_OPTS[@]}" "${DISCOVERY_HEADERS[@]}" -w '\n%{http_code}' \
+    "${DISCOVERY_BASE}${DISCOVERY_V1_WALLET_SCANS}/${enc_scan_id}") || true
   http_last=$(echo "$raw" | tail -n1)
   body=$(echo "$raw" | sed '$d')
-  if [[ "$http_last" == "200" ]]; then
-    CBOM="$body"
-    break
-  fi
-  if [[ "$http_last" != "404" ]]; then
-    die "unexpected CBOM status ${http_last}: ${body}"
-  fi
-  echo "  attempt ${attempt}/${POLL_MAX_ATTEMPTS}: not ready (${http_last}), sleeping ${POLL_INTERVAL_SEC}s"
+  case "$http_last" in
+    200)
+      scan_status=$(echo "$body" | jq -r '.status // empty')
+      case "$scan_status" in
+        completed)
+          SCAN_DETAIL="$body"
+          break
+          ;;
+        failed)
+          die "wallet scan failed: ${body}"
+          ;;
+        *)
+          echo "  attempt ${attempt}/${POLL_MAX_ATTEMPTS}: status=${scan_status:-unknown}, sleeping ${POLL_INTERVAL_SEC}s"
+          ;;
+      esac
+      ;;
+    404)
+      echo "  attempt ${attempt}/${POLL_MAX_ATTEMPTS}: scan detail not found (${http_last}), sleeping ${POLL_INTERVAL_SEC}s"
+      ;;
+    *)
+      die "unexpected scan detail status ${http_last}: ${body}"
+      ;;
+  esac
   sleep "$POLL_INTERVAL_SEC"
 done
-[[ -n "$CBOM" ]] || die "timed out waiting for CBOM (${POLL_MAX_ATTEMPTS} attempts)"
+[[ -n "$SCAN_DETAIL" ]] || die "timed out waiting for wallet scan to complete (${POLL_MAX_ATTEMPTS} attempts)"
 
-echo "CBOM received."
-echo "$CBOM" | jq '{address, type: .type, algorithm, key_exposed: .key_exposed, networks: .networks, scanned_at: .scanned_at}'
+echo "Wallet scan completed."
+echo "$SCAN_DETAIL" | jq '{scan_id, status, result: (.result | {target_address, wallet_type, chain_ids, current_pq_posture, scanned_at})}'
 
-# Map CBOM → policy_context for decisions/explore (network names → chain_ids; no synthetic default chain).
-POLICY_CTX=$(echo "$CBOM" | jq -c --arg wal "$WALLET_ADDRESS" '
-  def chain_map:
-    {
-      "ethereum-mainnet": 1,
-      "mainnet": 1,
-      "ethereum": 1,
-      "polygon": 137,
-      "base": 8453,
-      "arbitrum": 42161,
-      "arbitrum-one": 42161,
-      "optimism": 10,
-      "bsc": 56,
-      "avalanche": 43114,
-      "sepolia": 11155111
-    };
-  (.networks // []) as $nets
-  | ($nets | map(ascii_downcase | chain_map[.]) | map(select(. != null))) as $mapped
-  | ((.chainIds // .chain_ids) | if type == "array" then . else [] end) as $direct
-  | (if ($direct | length) > 0 then $direct else $mapped end) as $chain_ids
-  | ((.algorithm // "") | ascii_downcase) as $alg
-  | (if (($alg | test("ecdsa")) or ($alg | test("secp256k1"))) then "secp256k1_ecrecover"
-     elif (($alg == "") or (.type == null)) then "secp256k1_ecrecover"
-     elif ($alg != "") then $alg
-     else "secp256k1_ecrecover"
-     end) as $curr_alg
-  | {
-      wallet_address: $wal,
-      wallet_type: (
-        if ((.type // "") | ascii_downcase) == "eoa" then "EOA"
-        elif (((.type // "") | ascii_downcase) == "smart_account")
-             or (((.type // "") | ascii_downcase) == "erc4337_smart_account") then "AA"
-        else (.type // "unknown")
-        end
-      ),
-      chain_ids: $chain_ids,
-      current_algorithm: $curr_alg,
-      current_pq_posture: (
-        if ((.nist_level // 99) <= 1) then "classical_only"
-        elif ((.nist_level // 0) >= 5) then "full_pq"
-        else "hybrid"
-        end
-      ),
-      scanned_at: (.scanned_at // (now | strftime("%Y-%m-%dT%H:%M:%SZ")))
-    }
+POLICY_CONTEXT_JSON=$(echo "$SCAN_DETAIL" | jq -c '
+  {scan_id, status, result}
+  | select(.scan_id != null and (.result | type) == "object")
 ')
+[[ -n "$POLICY_CONTEXT_JSON" ]] || die "wallet scan detail missing terminal result payload"
 
 SELECTION_JSON=$(jq -nc \
-  --argjson chains "$(echo "$POLICY_CTX" | jq '.chain_ids')" \
+  --argjson chains "$(echo "$POLICY_CONTEXT_JSON" | jq '.result.chain_ids // []')" \
   '
   {
     target_posture: "hybrid",
@@ -259,11 +236,11 @@ SELECTION_JSON=$(jq -nc \
   }
 ')
 
-# Omit top-level scan_id unless CPM AUTH-02 + Discovery can-read are wired for your scan UUID.
 REQUEST_BODY=$(jq -nc \
-  --argjson ctx "$POLICY_CTX" \
+  --arg scan_id "$SCAN_ID_BINDING" \
+  --argjson policy_context "$POLICY_CONTEXT_JSON" \
   --argjson sel "$SELECTION_JSON" \
-  '{policy_context: $ctx, selection_request: $sel}')
+  '{scan_id: $scan_id, policy_context: $policy_context, selection_request: $sel}')
 
 echo "Calling CPM decisions/explore ..."
 EXPLORE_RESP=$(jq -cn --argjson body "$REQUEST_BODY" '$body' | json_post "${CPM_BASE}${CPM_POLICIES_DECISIONS_EXPLORE}" "${CPM_HEADERS[@]}") \
@@ -280,12 +257,19 @@ if [[ "${SKIP_PERSIST:-}" == "1" ]]; then
 fi
 
 POLICY_ID=$(uuidgen 2>/dev/null | tr '[:upper:]' '[:lower:]' || openssl rand -hex 16)
-SCAN_ID_BINDING="${SCAN_ID_BINDING:-}"
 
 PERSIST_PAYLOAD=$(echo "$EXPLORE_RESP" | jq -nc \
   --arg wal "$WALLET_ADDRESS" \
   --arg pid "$TOP_POLICY" \
-  --argjson cbom "$(echo "$CBOM" | jq -c '{address,algorithm,type,key_exposed,networks,nist_level,scanned_at}')" \
+  --argjson cbom "$(echo "$POLICY_CONTEXT_JSON" | jq -c '.result | {
+    address: .target_address,
+    algorithm,
+    type,
+    key_exposed,
+    networks,
+    nist_level,
+    scanned_at
+  }')" \
   --argjson decision "$(echo "$EXPLORE_RESP" | jq -c '.decision')" '
   {
     workflow: "wallet-scan-and-cpm-policy.sh",

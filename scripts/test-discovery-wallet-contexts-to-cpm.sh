@@ -323,7 +323,11 @@ else
     SELECTED_CONTEXT=$(printf '%s' "$ELIGIBLE_CONTEXTS" | jq -c --arg sid "$SCAN_ID" '
       map(select(.scan_id == $sid)) | .[0] // empty
     ')
-    [[ -n "$SELECTED_CONTEXT" ]] || die "SCAN_ID '${SCAN_ID}' was not found in your authenticated eligible wallet scans"
+    if [[ -z "$SELECTED_CONTEXT" ]]; then
+      echo "Available eligible scan_id values:" >&2
+      printf '%s' "$ELIGIBLE_CONTEXTS" | jq -r '.[].scan_id' >&2
+      die "SCAN_ID '${SCAN_ID}' was not found in your authenticated eligible wallet scans"
+    fi
   else
     if [[ "$eligible_count" -eq 1 ]]; then
       SELECTED_CONTEXT=$(printf '%s' "$ELIGIBLE_CONTEXTS" | jq -c '.[0]')
