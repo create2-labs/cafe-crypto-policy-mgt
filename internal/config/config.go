@@ -11,6 +11,7 @@ const (
 	defaultService                     = "cafe-cpm"
 	defaultAuthRequired                = true
 	defaultAuthClockSkewSec            = 30
+	defaultDiscoveryHTTPTimeoutSec     = 5
 	defaultSessionValidationTimeoutSec = 3
 	defaultScanAuthorizationTimeoutSec = 3
 	defaultPolicyCatalogPath           = "/app/policy/policy_graph_catalog_valid.json"
@@ -32,9 +33,14 @@ type Config struct {
 	// PolicyReferenceInternalServiceToken gates POST /internal/policies/references/scan (Discovery PR6).
 	PolicyReferenceInternalServiceToken string
 	AuthClockSkewSec                    int
-	PolicyCatalogPath                   string
-	PolicyTemplatePaths                 []string
-	PolicyInstancePaths                 []string
+	// DiscoveryHTTPBaseURL is the Discovery service origin for server-side GET /discovery/v1/... (PR13g).
+	DiscoveryHTTPBaseURL string
+	DiscoveryHTTPTimeoutSec int
+	// NATSURL enables publishing policy.assessment.requested from POST …/policies/assessment/request (PR13g).
+	NATSURL string
+	PolicyCatalogPath   string
+	PolicyTemplatePaths []string
+	PolicyInstancePaths []string
 }
 
 func LoadFromEnv() Config {
@@ -51,6 +57,9 @@ func LoadFromEnv() Config {
 		ScanAuthorizationServiceToken:       getEnv("CAFE_SCAN_AUTHORIZATION_SERVICE_TOKEN", ""),
 		PolicyReferenceInternalServiceToken: getEnv("CAFE_POLICY_REFERENCE_INTERNAL_SERVICE_TOKEN", ""),
 		AuthClockSkewSec:                    getEnvInt("CPM_AUTH_CLOCK_SKEW_SEC", defaultAuthClockSkewSec),
+		DiscoveryHTTPBaseURL:                getEnv("CAFE_DISCOVERY_HTTP_BASE", ""),
+		DiscoveryHTTPTimeoutSec:             getEnvInt("CAFE_DISCOVERY_HTTP_TIMEOUT_SEC", defaultDiscoveryHTTPTimeoutSec),
+		NATSURL:                             getEnv("CPM_NATS_URL", ""),
 		PolicyCatalogPath:                   getEnv("CPM_POLICY_CATALOG_PATH", defaultPolicyCatalogPath),
 		PolicyTemplatePaths:                 parseCommaList(getEnv("CPM_POLICY_TEMPLATE_PATHS", defaultPolicyTemplatePaths)),
 		PolicyInstancePaths:                 parseCommaList(getEnv("CPM_POLICY_INSTANCE_PATHS", defaultPolicyInstancePaths)),

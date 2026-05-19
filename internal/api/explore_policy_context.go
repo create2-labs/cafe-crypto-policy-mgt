@@ -23,6 +23,7 @@ type walletPolicyContextWire struct {
 	CurrentPQPosture string  `json:"current_pq_posture,omitempty"`
 	ScannedAt        string  `json:"scanned_at,omitempty"`
 	Status           string  `json:"status,omitempty"`
+	KeyExposed       bool    `json:"key_exposed,omitempty"`
 }
 
 // walletScanResultV1Wire matches Discovery v1 WalletScanResult (subset used for explore).
@@ -32,7 +33,9 @@ type walletScanResultV1Wire struct {
 	WalletType       string  `json:"wallet_type,omitempty"`
 	CurrentPQPosture string  `json:"current_pq_posture,omitempty"`
 	CurrentAlgorithm string  `json:"current_algorithm,omitempty"`
+	Algorithm        string  `json:"algorithm,omitempty"`
 	ScannedAt        string  `json:"scanned_at,omitempty"`
+	KeyExposed       bool    `json:"key_exposed,omitempty"`
 }
 
 // parsePolicyContextFlexible accepts either the legacy flat policy_context or a Discovery v1
@@ -55,9 +58,10 @@ func parsePolicyContextFlexible(raw []byte) (*walletPolicyContextWire, error) {
 			TargetAddress:    strings.TrimSpace(res.TargetAddress),
 			WalletType:       res.WalletType,
 			ChainIDs:         append([]int64(nil), res.ChainIDs...),
-			CurrentAlgorithm: res.CurrentAlgorithm,
+			CurrentAlgorithm: pickAlgorithm(res.CurrentAlgorithm, res.Algorithm),
 			CurrentPQPosture: res.CurrentPQPosture,
 			ScannedAt:        res.ScannedAt,
+			KeyExposed:       res.KeyExposed,
 		}
 		if sid, ok := top["scan_id"]; ok {
 			var s string
@@ -91,7 +95,7 @@ func observationFromWalletPolicyContext(pc *walletPolicyContextWire) (walletobse
 		return walletobserved.Payload{}, fmt.Errorf("policy_context.wallet_type resolves to invalid account_kind %q", kind)
 	}
 
-	algo := strings.TrimSpace(pc.CurrentAlgorithm)
+	algo := normalizeWireAlgorithmID(pc.CurrentAlgorithm)
 	if algo == "" {
 		algo = string(v01.AlgorithmSecp256k1ECRecover)
 	}
@@ -129,7 +133,7 @@ func observationFromWalletPolicyContext(pc *walletPolicyContextWire) (walletobse
 		ChainIDs:         chains,
 		AccountKind:      kind,
 		CurrentAlgorithm: algo,
-		PublicKeyExposed: false,
+		PublicKeyExposed: pc.KeyExposed,
 		IsMultichain:     len(chains) > 1,
 		ObservedAt:       observedAt,
 		CurrentPQPosture: pq,
@@ -198,4 +202,28 @@ func observationFromDecisionExplore(req *decisionExploreRequest) (walletobserved
 		return walletobserved.Payload{}, fmt.Errorf("policy_context is required")
 	}
 	return observationFromWalletPolicyContext(req.PolicyContext)
+}
+
+func pickAlgorithm(current, algorithm string) string {
+	if strings.TrimSpace(current) != "" {
+		return strings.TrimSpace(current)
+	}
+	return strings.TrimSpace(algorithm)
+}
+
+func normalizeWireAlgorithmID(raw string) string {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return ""
+	}
+	ls := strings.ToLower(s)
+	if v01.IsValidAlgorithmID(ls) {
+		return ls
+	}
+	switch strings.NewReplacer("-", "_", " ", "_").Replace(ls) {
+	case "ecdsa_secp256k1", "secp256k1":
+		return string(v01.AlgorithmSecp256k1ECRecover)
+	default:
+		return s
+	}
 }

@@ -117,6 +117,56 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  /policies/assessment/request:
+    post:
+      tags: [policies]
+      summary: Request asynchronous policy assessment for a Discovery wallet scan
+      description: |
+        **Wallet scans only** (WORKPLAN_API_PR PR13g). Replaces the removed Discovery route
+        `POST /discovery/assessments/request`. TLS scans are **not** supported for CPM policy assessment.
+
+        CPM fetches authoritative scan detail from Discovery (`GET /discovery/v1/wallets/scans/{scan_id}`)
+        and emits `policy.assessment.requested.v0.1` on NATS. The request body must **not** include
+        `policy_context` (server builds observation from Discovery).
+
+        | Situation | HTTP |
+        |-----------|------|
+        | `policy_context` present | **400** |
+        | Invalid `scan_id` / `selection_request` | **400** |
+        | Authz deny / unknown scan / TLS scan / missing `result` | **404** |
+        | Discovery authz or detail unavailable | **503** |
+        | Accepted for async processing | **202** |
+      operationId: postPoliciesAssessmentRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PolicyAssessmentRequest"
+      responses:
+        "202":
+          description: Assessment command accepted for async processing.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyAssessmentRequestAccepted"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Scan not found or not eligible (owner-scoped wallet scan only).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Discovery or NATS publish unavailable (fail-closed).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /policies:
     get:
       tags: [policies]
@@ -353,3 +403,38 @@ components:
         decision:
           type: object
           additionalProperties: true
+
+    PolicyAssessmentRequest:
+      type: object
+      required: [scan_id, selection_request]
+      description: |
+        Async policy assessment trigger for a **Discovery wallet scan** only. Do **not** send
+        `policy_context` (returns **400** if present). CPM reconstructs observation from Discovery
+        wallet scan detail (`GET /discovery/v1/wallets/scans/{scan_id}`).
+      properties:
+        scan_id:
+          type: string
+          format: uuid
+          description: Discovery wallet scan id (owner-scoped).
+        selection_request:
+          type: object
+          description: Same shape as `selection_request` on `POST …/decisions/explore`.
+          additionalProperties: true
+        client_request_id:
+          type: string
+          description: Optional client correlation id (not the NATS idempotence key).
+      additionalProperties: false
+
+    PolicyAssessmentRequestAccepted:
+      type: object
+      required: [event_id, correlation_id]
+      properties:
+        event_id:
+          type: string
+          description: Idempotence key for `policy.assessment.requested.v0.1`.
+        correlation_id:
+          type: string
+          description: Typically the `scan_id`.
+        client_request_id:
+          type: string
+          description: Echo of optional client request id when provided.

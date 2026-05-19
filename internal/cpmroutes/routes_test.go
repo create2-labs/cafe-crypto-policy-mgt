@@ -34,3 +34,19 @@ func TestPoliciesDecisionsExplore_MethodPost(t *testing.T) {
 		t.Fatal("PoliciesDecisionsExplore missing from AuthenticatedRoutes")
 	}
 }
+
+func TestPoliciesAssessmentRequest_MethodPost(t *testing.T) {
+	t.Parallel()
+	found := false
+	for _, route := range cpmroutes.AuthenticatedRoutes() {
+		if route.Path == cpmroutes.PoliciesAssessmentRequest {
+			if route.Method != http.MethodPost {
+				t.Fatalf("assessment/request method = %s, want POST", route.Method)
+			}
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("PoliciesAssessmentRequest missing from AuthenticatedRoutes")
+	}
+}
