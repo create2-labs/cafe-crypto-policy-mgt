@@ -23,9 +23,17 @@ state_get() { grep "^${1}|" "$STATE_FILE" 2>/dev/null | head -1 | cut -d'|' -f2-
 
 run_lint() {
   if ! have golangci-lint; then
-    (cd "$REPO_ROOT" && go vet ./... 2>&1) && state_set lint "go vet OK" || state_set lint "échec go vet"
+    if (cd "$REPO_ROOT" && go vet ./... 2>&1); then
+      state_set lint "go vet OK"
+    else
+      state_set lint "échec go vet"
+    fi
   else
-    (cd "$REPO_ROOT" && golangci-lint run ./... 2>&1) && state_set lint "golangci-lint OK" || state_set lint "échec golangci-lint"
+    if (cd "$REPO_ROOT" && golangci-lint run ./... 2>&1); then
+      state_set lint "golangci-lint OK"
+    else
+      state_set lint "échec golangci-lint"
+    fi
   fi
 }
 run_gov() {
