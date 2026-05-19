@@ -13,6 +13,8 @@ const (
 	PoliciesTemplates        = PoliciesPrefix + "/templates"
 	PoliciesInstances        = PoliciesPrefix + "/instances"
 	PoliciesDecisionsExplore = PoliciesPrefix + "/decisions/explore"
+	// PoliciesAssessmentRequest is the async wallet-scan-only policy assessment trigger (WORKPLAN_API_PR PR13g).
+	PoliciesAssessmentRequest = PoliciesPrefix + "/assessment/request"
 
 	Drafts = V1Base + "/drafts"
 
@@ -38,6 +40,7 @@ func AuthenticatedRoutes() []AuthenticatedRoute {
 		{Method: http.MethodGet, Path: PoliciesTemplates},
 		{Method: http.MethodGet, Path: PoliciesInstances},
 		{Method: http.MethodPost, Path: PoliciesDecisionsExplore},
+		{Method: http.MethodPost, Path: PoliciesAssessmentRequest},
 		{Method: http.MethodPost, Path: Drafts},
 		{Method: http.MethodGet, Path: Drafts},
 		{Method: http.MethodPost, Path: Policies},

@@ -224,6 +224,7 @@ func TestDecisionExplore_discoveryV1WalletScanDetailEnvelope(t *testing.T) {
 				"chain_ids":          []int64{1},
 				"wallet_type":        "eoa",
 				"current_pq_posture": "hybrid",
+				"algorithm":          "ECDSA-secp256k1",
 				"observations":       []any{},
 			},
 		},

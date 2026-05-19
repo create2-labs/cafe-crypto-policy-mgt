@@ -28,6 +28,12 @@ type authConfig struct {
 	PolicyReferenceInternalServiceToken string
 	ClockSkewSec                        int
 	Observability                       *authObservability
+	// DiscoveryHTTPBaseURL is the Discovery service origin (e.g. http://discovery:8080) for
+	// GET /discovery/v1/wallets/scans/{scan_id} during POST …/policies/assessment/request (PR13g).
+	DiscoveryHTTPBaseURL string
+	DiscoveryHTTPTimeoutSec int
+	// AssessmentNATSPublish publishes the policy.assessment.requested payload; nil → 503 on the route.
+	AssessmentNATSPublish func(ctx context.Context, subject string, payload []byte) error
 }
 
 type routeSpec struct {
@@ -404,6 +410,10 @@ func extractScanIDsForAuthorization(r *http.Request) ([]string, authz.APIError, 
 	if r == nil {
 		return nil, authz.APIError{}, http.StatusOK
 	}
+	// PR13g: scan authorization for this route uses 404 on deny; middleware would return 403.
+	if r.Method == http.MethodPost && r.URL.Path == cpmroutes.PoliciesAssessmentRequest {
+		return nil, authz.APIError{}, http.StatusOK
+	}
 	if r.Method == http.MethodGet && isOwnerPoliciesGETPath(r.URL.Path) {
 		return scanIDsFromOwnerPoliciesGETQuery(r)
 	}
@@ -610,6 +620,108 @@ func authorizeScanAccess(
 			Message: "scan authorization unavailable",
 			Details: map[string]any{"reason": "scan_authorization_unexpected_status"},
 		}, http.StatusServiceUnavailable, "scan_authorization_unexpected_status"
+	}
+}
+
+// authorizeScanReadForAssessment mirrors authorizeScanAccess but maps owner-scope deny to **404**
+// for POST …/policies/assessment/request (WORKPLAN_API_PR PR13g).
+func authorizeScanReadForAssessment(
+	ctx context.Context,
+	principal authz.Principal,
+	scanID string,
+	cfg authConfig,
+	requestID string,
+) (authz.APIError, int) {
+	if strings.TrimSpace(scanID) == "" {
+		return authz.APIError{
+			Code:    authCodeScanIDMalformed,
+			Message: "scan_id is malformed",
+			Details: map[string]any{"reason": "scan_id_malformed"},
+		}, http.StatusBadRequest
+	}
+	if strings.TrimSpace(cfg.ScanAuthorizationURL) == "" {
+		return authz.APIError{
+			Code:    authCodeScanUnavailable,
+			Message: "scan authorization unavailable",
+			Details: map[string]any{"reason": "scan_authorization_url_not_configured"},
+		}, http.StatusServiceUnavailable
+	}
+	timeoutSec := cfg.ScanAuthorizationTimeoutSec
+	if timeoutSec <= 0 {
+		timeoutSec = 3
+	}
+	endpoint := strings.TrimSuffix(cfg.ScanAuthorizationURL, "/") + "/" + url.PathEscape(scanID) + "/can-read"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, http.NoBody)
+	if err != nil {
+		return authz.APIError{
+			Code:    authCodeScanUnavailable,
+			Message: "scan authorization unavailable",
+			Details: map[string]any{"reason": "scan_authorization_request_build_failed"},
+		}, http.StatusServiceUnavailable
+	}
+	req.Header.Set("X-User-Id", principal.UserID)
+	if principal.TenantID != "" {
+		req.Header.Set("X-Tenant-Id", principal.TenantID)
+	}
+	if requestID != "" {
+		req.Header.Set("X-Request-Id", requestID)
+	}
+	if cfg.ScanAuthorizationServiceToken != "" {
+		req.Header.Set("Authorization", "Bearer "+cfg.ScanAuthorizationServiceToken)
+	}
+	client := &http.Client{Timeout: time.Duration(timeoutSec) * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return authz.APIError{
+			Code:    authCodeScanUnavailable,
+			Message: "scan authorization unavailable",
+			Details: map[string]any{"reason": "scan_authorization_request_failed"},
+		}, http.StatusServiceUnavailable
+	}
+	defer func() { _ = resp.Body.Close() }()
+	switch resp.StatusCode {
+	case http.StatusOK:
+		var parsed scanAuthorizationResponse
+		if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+			return authz.APIError{
+				Code:    authCodeScanUnavailable,
+				Message: "scan authorization unavailable",
+				Details: map[string]any{"reason": "scan_authorization_invalid_response"},
+			}, http.StatusServiceUnavailable
+		}
+		if !parsed.Allowed {
+			return authz.APIError{
+				Code:    authCodeScanForbidden,
+				Message: "scan not found",
+				Details: map[string]any{"reason": "scan_not_found"},
+			}, http.StatusNotFound
+		}
+		return authz.APIError{}, http.StatusOK
+	case http.StatusForbidden, http.StatusNotFound:
+		return authz.APIError{
+			Code:    authCodeScanForbidden,
+			Message: "scan not found",
+			Details: map[string]any{"reason": "scan_not_found"},
+		}, http.StatusNotFound
+	case http.StatusUnauthorized:
+		return authz.APIError{
+			Code:    authCodeScanUnavailable,
+			Message: "scan authorization unavailable",
+			Details: map[string]any{"reason": "scan_authorization_upstream_unauthorized"},
+		}, http.StatusServiceUnavailable
+	default:
+		if resp.StatusCode >= 500 {
+			return authz.APIError{
+				Code:    authCodeScanUnavailable,
+				Message: "scan authorization unavailable",
+				Details: map[string]any{"reason": "scan_authorization_upstream_5xx"},
+			}, http.StatusServiceUnavailable
+		}
+		return authz.APIError{
+			Code:    authCodeScanUnavailable,
+			Message: "scan authorization unavailable",
+			Details: map[string]any{"reason": "scan_authorization_unexpected_status"},
+		}, http.StatusServiceUnavailable
 	}
 }
 

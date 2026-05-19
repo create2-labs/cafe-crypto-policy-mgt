@@ -1,12 +1,15 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/api"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/config"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
+	cpmmats "github.com/create2-labs/cafe-crypto-policy-mgt/internal/integration/nats"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/persistence"
 )
 
@@ -21,6 +24,16 @@ func Run(cfg config.Config) error {
 		return fmt.Errorf("load read store: %w", err)
 	}
 
+	var assessmentPublish func(context.Context, string, []byte) error
+	if u := strings.TrimSpace(cfg.NATSURL); u != "" {
+		closeNATS, pub, err := cpmmats.ConnectPublisher(u)
+		if err != nil {
+			return err
+		}
+		defer closeNATS()
+		assessmentPublish = pub.Publish
+	}
+
 	h, err := handler(cfg.ServiceName, store, authConfig{
 		Required:                            cfg.AuthRequired,
 		SessionValidationURL:                cfg.SessionValidationURL,
@@ -31,6 +44,9 @@ func Run(cfg config.Config) error {
 		ScanAuthorizationServiceToken:       cfg.ScanAuthorizationServiceToken,
 		PolicyReferenceInternalServiceToken: cfg.PolicyReferenceInternalServiceToken,
 		ClockSkewSec:                        cfg.AuthClockSkewSec,
+		DiscoveryHTTPBaseURL:                cfg.DiscoveryHTTPBaseURL,
+		DiscoveryHTTPTimeoutSec:             cfg.DiscoveryHTTPTimeoutSec,
+		AssessmentNATSPublish:               assessmentPublish,
 	})
 	if err != nil {
 		return err
@@ -63,6 +79,7 @@ func handlerWithOwnerStore(serviceName string, store *api.ReadStore, ownerStore 
 	if err := api.RegisterReadRoutes(mux, store); err != nil {
 		return nil, fmt.Errorf("register read routes: %w", err)
 	}
+	registerPoliciesAssessmentRequestRoute(mux, authCfg)
 	registerOwnerScopedRoutes(mux, ownerStore, obs)
 	registerPolicyReferenceInternalRoute(mux, ownerStore)
 	protected, err := withAuthentication(mux, authCfg)
