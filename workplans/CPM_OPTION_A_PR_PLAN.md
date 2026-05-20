@@ -24,6 +24,7 @@ Hard rules from product/architecture (alignées `WORKPLAN_API_PR.md`):
 - **Ne pas réintroduire** l’ancienne façade **`GET /discovery/wallet-policy-contexts`** : **retirée** avec **PR11a** [#54](https://github.com/create2-labs/cafe-discovery/pull/54).
 - **Do not** claim Discovery is DB-free today; Persistence Service remains the **target** authoritative scan-data owner—Discovery backend still has DB access in the interim.
 - **Respect AUTH-██** already merged (principal, scan binding, fail-closed behavior where configured).
+- **Scripts smoke CPM (Option A) — v1 uniquement (#34) :** un seul parcours bash actif — **`test-discovery-v1-wallet-scans-to-cpm.sh`** (liste + détail **v1** → explore → persist). **Aucun** mode legacy dans les scripts : pas de **`LEGACY_SCAN_AND_CBOM_FLOW`**, pas de polling CBOM, pas de **`test-discovery-wallet-contexts-to-cpm.sh`** ni **`test-wallet-scan-and-cpm-policy.sh`**. *(Distinct des routes Discovery historiques encore montées côté serveur — voir **WORKPLAN_API_PR** ; le plan Option A ne les réintroduit pas dans les scripts ni la doc active.)*
 - **Frontend:** no direct DB; no unauthenticated Persistence Service calls; **no `mock-discovery-scan-placeholder` in API mode** once Option A wiring (**F4**) lands — aujourd’hui le placeholder est **explicitement** dans le périmètre V1 mock (**`CPM_FRONTEND_PR_PLAN_V1.md`**, PR 5 / PR 12).
 
 ---
