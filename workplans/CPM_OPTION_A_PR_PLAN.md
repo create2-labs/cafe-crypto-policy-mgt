@@ -70,6 +70,7 @@ Synthèse à jour des **jalons mergés** documentés dans le workplan API et le 
 
 - **Plan CPM frontend V1 :** **clos** — **`CPM_FRONTEND_PR_PLAN_V1.md`**, dernier merge **PR 15** → [#53](https://github.com/create2-labs/cafe-frontend/pull/53) (2026-05-15) : **`CpmDataSource`**, Vue Flow verrouillé, validation / EOA / persist, **`createApiCpmDataSource`** (**PR 12** [#45](https://github.com/create2-labs/cafe-frontend/pull/45)), gates erreurs (**PR 13c**), etc.
 - **`CPM_SELECTION_CONTEXT_SCAN_ID`** / valeur **`mock-discovery-scan-placeholder`** : **explicitement dans le périmètre livré V1** (sélection de template + explore en API mode avec contexte synthétique jusqu’à branchement scan réel). Le retrait conditionné **API mode** relève des PR **F4+**.
+- **Data source wallet scan v1 (Option A F1) :** **mergé** — **cafe-frontend** [#58](https://github.com/create2-labs/cafe-frontend/pull/58) : `createWalletScanV1DataSource()` (`listWalletScans`, `getWalletScanDetail`), DTOs OpenAPI / A2 §3.1, module `src/discovery/` — séparé de **`CpmDataSource`** et de **`scanService.js`** (cartes UI).
 - **Parcours scan nominal hors CPM :** migration **Discovery v1** + hydratation cartes (**PR10** [#52](https://github.com/create2-labs/cafe-frontend/pull/52), **PR13b** sur `main`, **PR13e** [#56](https://github.com/create2-labs/cafe-frontend/pull/56)) — réutilisable pour la liste/détail wallet côté Option A.
 - **E2E navigateur :** toujours un sujet pour **F5** (Vitest comme base V1 ; Playwright ou équivalent si la gouvernance repo l’accepte).
 
@@ -126,9 +127,9 @@ Ces points **doivent** être traités ou reportés **explicitement** avant de fi
 
 **Ordre de merge suggéré** : **A → B → C → F → D** (l’ordre des lignes du tableau). Phase **C** (scripts + tests de contrat) avant **F** (frontend **post-V1**).
 
-**Note — évolution vs ancienne rédaction :** **A1**, **A2**, **B1**, **B2**, **C1** (#34) et **C2** (#35) sont **mergés** sur `main` selon **`WORKPLAN_API_PR.md`**. Ce tableau marque cet état pour éviter de replanifier du travail déjà livré ; la suite (**F\***, **D1**) continue sous forme de petites PR.
+**Note — évolution vs ancienne rédaction :** **A1**, **A2**, **B1**, **B2**, **C1** (#34), **C2** (#35) et **F1** ([#58](https://github.com/create2-labs/cafe-frontend/pull/58)) sont **mergés** sur `main` (backend selon **`WORKPLAN_API_PR.md`** ; **F1** sur `cafe-frontend`). Ce tableau marque cet état pour éviter de replanifier du travail déjà livré ; la suite (**F2–F5**, **D1**) continue sous forme de petites PR.
 
-**Référence frontend :** **`CPM_FRONTEND_PR_PLAN_V1.md`** — V1 terminé ; **F1–F5** = **suite** après **PR 12** (API data source).
+**Référence frontend :** **`CPM_FRONTEND_PR_PLAN_V1.md`** — V1 terminé ; **F2–F5** = **suite** après **PR 12** (API data source) et **F1** ([#58](https://github.com/create2-labs/cafe-frontend/pull/58)).
 
 Remplir **Statut**, **N° PR**, **Lien**, **Assigné**, **Notes** au fil des travaux. Valeurs suggérées pour **Statut** : `à faire` · `en cours` · `PR ouverte` · `en revue` · `mergé` · `supersedé` · `bloqué`.
 
@@ -140,7 +141,7 @@ Remplir **Statut**, **N° PR**, **Lien**, **Assigné**, **Notes** au fil des tra
 | 4 | B2 | cafe-crypto-policy-mgt | — | **Policies** + **GET ?scan_id=** + règles persist **binding** | mergé | 28 | [#28](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/28) | | Voir aussi **PR5/6** Discovery↔CPM référence scan. |
 | 5 | C1 | cafe-crypto-policy-mgt | `option-a/c1-option-a-script` | Script smoke : sign-in → **v1** list/detail → explore → persist | mergé | 34 | [#34](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/34) | | `test-discovery-v1-wallet-scans-to-cpm.sh` ; plus de scripts CBOM / contexts legacy. |
 | 6 | C2 | cafe-crypto-policy-mgt (+ discovery si besoin) | `option-a/c2-contract-api-tests` | Tests contrat **v1** + CPM (complément **go test** existants) | mergé | 35 | [#35](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/35) | | `internal/contract` ; golden A2 §3.1 ; pas de garde-fou shell `wallet-policy-contexts` (volontairement hors scope). |
-| 7 | F1 | cafe-frontend | `option-a/f1-discovery-v1-wallet-scan-data-source` | Data source **liste + détail** scans wallet v1 | | | | | Post **PR 12** ; pas de couplage CPM dans le client HTTP Discovery. |
+| 7 | F1 | cafe-frontend | `option-a/f1-discovery-v1-wallet-scan-data-source` | Data source **liste + détail** scans wallet v1 | mergé | 58 | [#58](https://github.com/create2-labs/cafe-frontend/pull/58) | | `src/discovery/walletScanV1DataSource.ts` ; post **PR 12** ; pas de couplage CPM dans le client HTTP Discovery. |
 | 8 | F2 | cafe-frontend | `option-a/f2-frontend-cpm-scan-context` | Composable **`useCpmScanContext`** (sélection `scan_id`) | | | | | |
 | 9 | F3 | cafe-frontend | `option-a/f3-frontend-cpm-scan-selector` | UI sélecteur de scan CPM (données v1) | | | | | |
 | 10 | F4 | cafe-frontend | `option-a/f4-frontend-feed-scan-context-to-cpm` | Brancher contexte réel sur **`apiCpmDataSource` / explore** | | | | | Retirer **`mock-discovery-scan-placeholder`** en **API mode** quand un scan valide est choisi. |
@@ -427,6 +428,8 @@ Compléter la couverture **CI-friendly** alignée **`openapi/discovery-v1.yaml`*
 
 ## PR F1 — Frontend **Discovery v1 wallet scan** data source
 
+**Statut : mergé** — **cafe-frontend** [#58](https://github.com/create2-labs/cafe-frontend/pull/58).
+
 **Branch:** `option-a/f1-discovery-v1-wallet-scan-data-source`
 
 **Contexte :** suite à **`CPM_FRONTEND_PR_PLAN_V1.md`** (**clos** — **PR 12** API `CpmDataSource`). Ce module est **séparé** de **`CpmDataSource`** : HTTP Discovery uniquement.
@@ -606,6 +609,6 @@ grep -R "wallet-policy-contexts" cafe-crypto-policy-mgt/scripts --include='*.sh'
 
 ---
 
-_Révision document : aligné sur [`WORKPLAN_API_PR.md`](./WORKPLAN_API_PR.md) et [`CPM_FRONTEND_PR_PLAN_V1.md`](./CPM_FRONTEND_PR_PLAN_V1.md) ; jalons **A1, A2, B1, B2, C1 (#34), C2 (#35)** marqués **mergé** ; la surface `wallet-policy-contexts` est **historique** ; le contrat nominal est **Discovery v1** `wallets/scans` + **CPM** `/api/cpm/v1`. **Suite :** **F1–F5** (frontend post-V1) ; **D1** — doc intégrée ; **F4** — test transport interdisant `mock-discovery-scan-placeholder` sur explore._
+_Révision document : aligné sur [`WORKPLAN_API_PR.md`](./WORKPLAN_API_PR.md) et [`CPM_FRONTEND_PR_PLAN_V1.md`](./CPM_FRONTEND_PR_PLAN_V1.md) ; jalons **A1, A2, B1, B2, C1 (#34), C2 (#35), F1 (#58)** marqués **mergé** ; la surface `wallet-policy-contexts` est **historique** ; le contrat nominal est **Discovery v1** `wallets/scans` + **CPM** `/api/cpm/v1`. **Suite :** **F2–F5** (frontend post-V1) ; **D1** — doc intégrée ; **F4** — test transport interdisant `mock-discovery-scan-placeholder` sur explore._
 
 _End of PR plan._
