@@ -64,6 +64,7 @@ Synthèse à jour des **jalons mergés** documentés dans le workplan API et le 
 - **Assessment async :** **`POST /api/cpm/v1/policies/assessment/request`** — **PR13g** [#33](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/33) — **sans** `policy_context` client.
 - **OpenAPI :** **`openapi/cpm-v1.yaml`** — **PR1b** [#26](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/26).
 - **Scripts :** **`scripts/test-discovery-v1-wallet-scans-to-cpm.sh`** — smoke Option A v1 uniquement (sign-in → list/detail → explore → persist optionnel) ; **#34** mergé. Suppression des scripts legacy CBOM / `wallet-policy-contexts`. CI : **`bash -n`** sur le smoke script (`.github/workflows/ci.yml`).
+- **Tests contrat Option A :** **`internal/contract`** + **`internal/app/option_a_contract_test.go`** — **C2** [#35](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/35) (golden mapping A2 §3.1, explore/persist/assessment, formes Discovery v1 via fixtures).
 
 ### cafe-frontend
 
@@ -125,7 +126,7 @@ Ces points **doivent** être traités ou reportés **explicitement** avant de fi
 
 **Ordre de merge suggéré** : **A → B → C → F → D** (l’ordre des lignes du tableau). Phase **C** (scripts + tests de contrat) avant **F** (frontend **post-V1**).
 
-**Note — évolution vs ancienne rédaction :** **A1**, **A2**, **B1**, **B2** et **C1** sont **mergés** sur `main` selon **`WORKPLAN_API_PR.md`** et **#34** (scripts v1). Ce tableau marque cet état pour éviter de replanifier du travail déjà livré ; la suite (**C2** gels contrat, **F\***, **D1**) continue sous forme de petites PR.
+**Note — évolution vs ancienne rédaction :** **A1**, **A2**, **B1**, **B2**, **C1** (#34) et **C2** (#35) sont **mergés** sur `main` selon **`WORKPLAN_API_PR.md`**. Ce tableau marque cet état pour éviter de replanifier du travail déjà livré ; la suite (**F\***, **D1**) continue sous forme de petites PR.
 
 **Référence frontend :** **`CPM_FRONTEND_PR_PLAN_V1.md`** — V1 terminé ; **F1–F5** = **suite** après **PR 12** (API data source).
 
@@ -138,7 +139,7 @@ Remplir **Statut**, **N° PR**, **Lien**, **Assigné**, **Notes** au fil des tra
 | 3 | B1 | cafe-crypto-policy-mgt | — | **Explore** + `policy_context` aligné détail v1 | mergé | 29 | [#29](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/29) | | Suite : durcissements optionnels + doc seulement si écart. |
 | 4 | B2 | cafe-crypto-policy-mgt | — | **Policies** + **GET ?scan_id=** + règles persist **binding** | mergé | 28 | [#28](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/28) | | Voir aussi **PR5/6** Discovery↔CPM référence scan. |
 | 5 | C1 | cafe-crypto-policy-mgt | `option-a/c1-option-a-script` | Script smoke : sign-in → **v1** list/detail → explore → persist | mergé | 34 | [#34](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/34) | | `test-discovery-v1-wallet-scans-to-cpm.sh` ; plus de scripts CBOM / contexts legacy. |
-| 6 | C2 | cafe-crypto-policy-mgt (+ discovery si besoin) | `option-a/c2-contract-api-tests` | Tests contrat **v1** + CPM (complément **go test** existants) | | | | | Matrice : items liste v1, détail, explore, persist **binding=discovery**. |
+| 6 | C2 | cafe-crypto-policy-mgt (+ discovery si besoin) | `option-a/c2-contract-api-tests` | Tests contrat **v1** + CPM (complément **go test** existants) | mergé | 35 | [#35](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/35) | | `internal/contract` ; golden A2 §3.1 ; pas de garde-fou shell `wallet-policy-contexts` (volontairement hors scope). |
 | 7 | F1 | cafe-frontend | `option-a/f1-discovery-v1-wallet-scan-data-source` | Data source **liste + détail** scans wallet v1 | | | | | Post **PR 12** ; pas de couplage CPM dans le client HTTP Discovery. |
 | 8 | F2 | cafe-frontend | `option-a/f2-frontend-cpm-scan-context` | Composable **`useCpmScanContext`** (sélection `scan_id`) | | | | | |
 | 9 | F3 | cafe-frontend | `option-a/f3-frontend-cpm-scan-selector` | UI sélecteur de scan CPM (données v1) | | | | | |
@@ -345,7 +346,7 @@ Voir chapitres **PR5**, **PR6**, **PR7** dans **`WORKPLAN_API_PR.md`**.
 - **Help** documente edge **`/api/discovery/v1/wallets/scans`**, **`/api/cpm/v1/...`**
 - **`CURL_REDIRECT`** default **`0`** ; pas d’impression JWT/mot de passe
 - Ambiguïté multi-scan sans **`SCAN_ID`** → échec explicite documenté
-- Aucune sous-chaîne route legacy **`wallet-policy-contexts`** dans **`scripts/**/*.sh`** (vérification manuelle / **C2** pour automatiser)
+- Aucune sous-chaîne route legacy **`wallet-policy-contexts`** dans **`scripts/**/*.sh`** (vérification manuelle ; garde-fou shell automatisé **non** retenu post-**#35**)
 
 ### 4. Tests
 
@@ -359,7 +360,7 @@ Manual: `SKIP_PERSIST=1` against local stack.
 ### 5. Explicit non-goals
 
 - Scripts CBOM ou **`LEGACY_SCAN_AND_CBOM_FLOW`** (retirés avec **#34**).
-- Garde-fou shell versionné en CI — reporté à **C2** si réintroduit (`scripts/ci/…`).
+- Garde-fou shell versionné en CI — **non** livré (**#35** : revue manuelle / smoke C1 suffisant).
 
 ### 6. Suggested commit message (historique)
 
@@ -382,6 +383,8 @@ bash -n scripts/test-discovery-v1-wallet-scans-to-cpm.sh; manual SKIP_PERSIST=1
 ---
 
 ## PR C2 — Tests contrat **v1**
+
+**Statut : mergé** — **cafe-crypto-policy-mgt** [#35](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/35).
 
 **Branch:** `option-a/c2-contract-api-tests`
 
@@ -409,10 +412,10 @@ Compléter la couverture **CI-friendly** alignée **`openapi/discovery-v1.yaml`*
 - Persist **`binding=discovery`** sans **`scan_id`** valide → **4xx** ; avec UUID → **`item.scan_id`** renseigné
 - (Rappel) Assessment request avec **`policy_context`** → **400** (**PR13g**)
 
-**Régression façade retirée (obligatoire — même logique que C1)**
+**Régression façade retirée (C1 — non automatisée en #35)**
 
-- Test automatisé (**`go test`** + **`TestScript`**, cible **`Makefile`**, ou job CI) invoquant la **même** condition d’échec que **C1** sur **`cafe-crypto-policy-mgt/scripts/**/*.sh`**.  
-- **`*.md`** (documentation / workplans) **exclus**, y compris s’ils mentionnent encore l’historique **`wallet-policy-contexts`**. Dériver la commande dans un petit shell versionné (ex. **`scripts/ci/assert-scripts-use-discovery-wallet-scans-v1-only.sh`**) pour que **C2** + **CI** partagent une seule source — **hors périmètre #34** (CI actuelle : **`bash -n`** uniquement).
+- **#35** n’a **pas** ajouté de script **`assert-scripts-use-discovery-wallet-scans-v1-only.sh`** ni de test Go l’appelant (décision produit : smoke C1 + revue manuelle suffisants).  
+- **`*.md`** (documentation / workplans) restent **exclus** d’un éventuel grep scripts ; mentions historiques **`wallet-policy-contexts`** autorisées en doc.
 
 **Golden mapping (couplé A2)**
 
@@ -586,10 +589,8 @@ cd cafe-frontend && npm run typecheck && npm run lint
 **Edge (rappel) :** parcours navigateur contre **`https://<host>/api/discovery/v1/...`** et **`/api/cpm/v1/...`** — **`WORKPLAN_API_PR.md` PR9**.
 
 ```bash
-# Interdiction route morte dans les scripts shell actifs (identique à C1 / C2)
-if grep -R "wallet-policy-contexts" cafe-crypto-policy-mgt/scripts --include='*.sh' -n; then
-  exit 1
-fi
+# (Optionnel) Interdiction route morte dans les scripts shell actifs — revue manuelle (non automatisé en C2 #35)
+grep -R "wallet-policy-contexts" cafe-crypto-policy-mgt/scripts --include='*.sh' -n || true
 ```
 
 ---
@@ -605,6 +606,6 @@ fi
 
 ---
 
-_Révision document : aligné sur [`WORKPLAN_API_PR.md`](./WORKPLAN_API_PR.md) et [`CPM_FRONTEND_PR_PLAN_V1.md`](./CPM_FRONTEND_PR_PLAN_V1.md) ; jalons **A1, A2, B1, B2, C1 (#34)** marqués **mergé** ; la surface `wallet-policy-contexts` est **historique** ; le contrat nominal est **Discovery v1** `wallets/scans` + **CPM** `/api/cpm/v1`. **Suite :** **C2** — grep/CI automatisé sur `scripts/**/*.sh` ; **F4** — test transport interdisant `mock-discovery-scan-placeholder` sur explore ; **A2 §3.1** — mapping normatif détail v1 → `policy_context`._
+_Révision document : aligné sur [`WORKPLAN_API_PR.md`](./WORKPLAN_API_PR.md) et [`CPM_FRONTEND_PR_PLAN_V1.md`](./CPM_FRONTEND_PR_PLAN_V1.md) ; jalons **A1, A2, B1, B2, C1 (#34), C2 (#35)** marqués **mergé** ; la surface `wallet-policy-contexts` est **historique** ; le contrat nominal est **Discovery v1** `wallets/scans` + **CPM** `/api/cpm/v1`. **Suite :** **F1–F5** (frontend post-V1) ; **D1** — doc intégrée ; **F4** — test transport interdisant `mock-discovery-scan-placeholder` sur explore._
 
 _End of PR plan._
