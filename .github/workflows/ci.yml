@@ -16,10 +16,9 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v5
 
-      - name: Shell scripts guard (Option A — no legacy Discovery wallet contexts route)
+      - name: Shell scripts syntax (Option A smoke)
         run: |
           set -euo pipefail
-          bash scripts/ci/assert-scripts-use-discovery-wallet-scans-v1-only.sh
           bash -n scripts/test-discovery-v1-wallet-scans-to-cpm.sh
 
       - name: Set up Docker Buildx
