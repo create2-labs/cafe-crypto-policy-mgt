@@ -1,0 +1,13 @@
+{
+  "scan_id": "705c9704-9428-45e0-882d-fae4cb9d2a0b",
+  "status": "completed",
+  "result": {
+    "target_address": "0x0802b015613ef6701192811e595e085a9c560caf",
+    "chain_ids": [1],
+    "wallet_type": "eoa",
+    "current_pq_posture": "hybrid",
+    "algorithm": "ECDSA-secp256k1",
+    "scanned_at": "2026-05-11T10:27:10.187512Z",
+    "key_exposed": false
+  }
+}
