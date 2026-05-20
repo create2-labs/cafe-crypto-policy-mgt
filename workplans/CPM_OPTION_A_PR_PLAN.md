@@ -51,7 +51,7 @@ Evidence from this workspace snapshot:
 - **Explore:** `internal/api/read_api.go` binds `POST /api/v1/policies/decisions/explore` with `decisionExploreRequest` (`scan_id`, `policy_context`, `selection_request`) and converts `policy_context` via `internal/api/explore_policy_context.go`.
 - **Tests:** `internal/api/read_api_test.go` includes `TestDecisionExplore_optionA_policy_context` with Option A-shaped body returning 200.
 - **Persist:** `internal/app/owner_routes.go` — `POST /api/v1/cpm/policies` uses `ownerScopedUpsertRequest` with **`scan_id` as a string field** (currently **optional** at decode — empty allowed); `OwnerScopedStore` stores `ScanID` on `PolicyRecord`.
-- **Scripts:** `scripts/test-discovery-wallet-contexts-to-cpm.sh` already documents Option A default vs `LEGACY_SCAN_AND_CBOM_FLOW=1`; `CURL_REDIRECT` default **0**.
+- **Scripts:** `scripts/test-discovery-v1-wallet-scans-to-cpm.sh` smoke (Discovery **v1** wallet scans → CPM explore); `CURL_REDIRECT` default **0**. CI: `scripts/ci/assert-scripts-use-discovery-wallet-scans-v1-only.sh`.
 
 ### cafe-frontend
 
@@ -352,59 +352,60 @@ go test ./... -count=1
 
 ---
 
-## PR C1 — Script Option A finalization
+## PR C1 — Script Option A finalization (Discovery **v1** wallet scans)
 
 **Branch:** `option-a/c1-option-a-script`
 
 ### 1. Goal
 
-Make **`scripts/test-discovery-wallet-contexts-to-cpm.sh`** the **authoritative bash smoke contract** for Option A: Discovery sign-in → **wallet-policy-contexts** list → deterministic scan selection (**`SCAN_ID`** or uniqueness rules) → CPM explore (Option A body) → optional persist—**without** WALLET_ADDRESS or CBOM polling in default mode (**legacy** gated by **`LEGACY_SCAN_AND_CBOM_FLOW=1`**).
+Make **`scripts/test-discovery-v1-wallet-scans-to-cpm.sh`** the **authoritative bash smoke contract** for Option A: Discovery sign-in → **`GET /discovery/v1/wallets/scans`** → **`GET /discovery/v1/wallets/scans/{scan_id}`** → deterministic scan selection (**`SCAN_ID`** or uniqueness rules) → CPM explore (Option A body) → optional persist. **Do not** call the removed **`/discovery/wallet-policy-contexts`** façade (PR11a on `cafe-discovery`). No CBOM / legacy scan polling scripts.
 
 ### 2. Scope (expected until verified)
 
-- `cafe-crypto-policy-mgt/scripts/test-discovery-wallet-contexts-to-cpm.sh`
-- Cross-reference **`scripts/test-wallet-scan-and-cpm-policy.sh`** (**keep** CBOM narrative as legacy tooling only).
+- `cafe-crypto-policy-mgt/scripts/test-discovery-v1-wallet-scans-to-cpm.sh`
+- **`scripts/ci/assert-scripts-use-discovery-wallet-scans-v1-only.sh`** (shared guard); CI job invokes it plus **`bash -n`** on the smoke script.
 
 ### 3. Acceptance criteria
 
-- Default path uses **`GET /discovery/wallet-policy-contexts`** (direct backend baseline); **help** cites nginx **`/api/discovery/wallet-policy-contexts`**.
+- Default path lists wallet scans via **v1** (direct **`/discovery/v1/wallets/scans`**); **help** cites edge **`/api/discovery/v1/wallets/scans`** and CPM **`/api/cpm/v1/...`** paths.
 - **`CURL_REDIRECT`** default **`0`**; never prints JWT or passwords.
-- Multi-context selection behaves per documented rules (**fail if ambiguous without `SCAN_ID`**).
+- Multi-scan selection behaves per documented rules (**fail if ambiguous without `SCAN_ID`**).
+- **CI / local guard:** **`scripts/**/*.sh`** must contain **no** substring spelling the removed legacy wallet-policy-contexts route (**`grep`** or the versioned **`assert`** script).
 - Works with **`SKIP_PERSIST=1`**; full persist exercised once **B2** semantics are merged.
 
 ### 4. Tests
 
 ```bash
-bash -n cafe-crypto-policy-mgt/scripts/test-discovery-wallet-contexts-to-cpm.sh
-# shellcheck (if installed): shellcheck cafe-crypto-policy-mgt/scripts/test-discovery-wallet-contexts-to-cpm.sh
+bash scripts/ci/assert-scripts-use-discovery-wallet-scans-v1-only.sh
+bash -n cafe-crypto-policy-mgt/scripts/test-discovery-v1-wallet-scans-to-cpm.sh
+# shellcheck (if installed): shellcheck cafe-crypto-policy-mgt/scripts/test-discovery-v1-wallet-scans-to-cpm.sh
 ```
 
 Manual: `SKIP_PERSIST=1` against local stack.
 
 ### 5. Explicit non-goals
 
-- Replacing **`test-wallet-scan-and-cpm-policy.sh`** (CBOM regression path remains).
 - Auto-provisioning wallets or scans unless already scripted elsewhere.
 
 ### 6. Suggested commit message
 
-`scripts: tighten Option A discovery→CPM smoke test`
+`chore(scripts): migrate Option A smoke test to Discovery v1 wallet scans`
 
 ### 7. Suggested PR title
 
-`Option A: finalize wallet-context → CPM script`
+`ci(scripts): Discovery v1 wallet scans smoke + guard legacy route references`
 
 ### 8. PR description template
 
 ```markdown
 ## Summary
-Finalize bash contract for Discovery wallet-policy-contexts → CPM explore (+ optional persist).
+Option A bash smoke uses Discovery **v1** `GET /discovery/v1/wallets/scans` + detail `…/wallets/scans/{scan_id}` and CPM explore/persist; CI asserts no legacy Discovery wallet-*-contexts route string in active `scripts/**/*.sh`.
 
 ## How to validate
-bash -n ..., shellcheck ..., manual SKIP_PERSIST=1 run.
+`bash scripts/ci/assert-scripts-use-discovery-wallet-scans-v1-only.sh`, `bash -n scripts/test-discovery-v1-wallet-scans-to-cpm.sh`, shellcheck (optional), manual `SKIP_PERSIST=1` run.
 
 ## Non-goals
-Legacy CBOM flow remains env-gated only.
+No legacy CBOM or scan-polling smoke scripts.
 ```
 
 ---
@@ -738,7 +739,7 @@ Replaces bash contract tests (those remain authoritative for pure API).
 
 ### 1. Goal
 
-Produce **integrated Option A narrative** spanning **Discovery + CPM + frontend**, including diagrams, endpoint matrix, payloads, AuthN/Z model (**JWT everywhere public**), scripts, **`scan_id` roadmap**, Persistence Service positioning, **`/discovery/scans` distinction**, limits (short-term inability to forge CBOM-backed observation for explore when using façade fields only—clarified), and **`test-discovery-wallet-contexts-to-cpm.sh`**.
+Produce **integrated Option A narrative** spanning **Discovery + CPM + frontend**, including diagrams, endpoint matrix, payloads, AuthN/Z model (**JWT everywhere public**), scripts, **`scan_id` roadmap**, Persistence Service positioning, **`/discovery/scans` distinction**, limits (short-term inability to forge CBOM-backed observation for explore when using façade fields only—clarified), and **`test-discovery-v1-wallet-scans-to-cpm.sh`**.
 
 ### 2. Scope (expected until verified)
 
@@ -806,10 +807,10 @@ cd cafe-crypto-policy-mgt && GOWORK=off go test ./... -count=1
 # Option A bash smoke test (SKIP_PERSIST until persist rules verified)
 SKIP_PERSIST=1 \
   DISCOVERY_EMAIL='user@example.com' DISCOVERY_PASSWORD='secret' \
-  ./cafe-crypto-policy-mgt/scripts/test-discovery-wallet-contexts-to-cpm.sh
+  ./cafe-crypto-policy-mgt/scripts/test-discovery-v1-wallet-scans-to-cpm.sh
 
 # Script syntax / optional shellcheck (C1 expectation)
-bash -n cafe-crypto-policy-mgt/scripts/test-discovery-wallet-contexts-to-cpm.sh
+bash -n cafe-crypto-policy-mgt/scripts/test-discovery-v1-wallet-scans-to-cpm.sh
 
 # Frontend unit tests after F-series land
 cd cafe-frontend && npm test
