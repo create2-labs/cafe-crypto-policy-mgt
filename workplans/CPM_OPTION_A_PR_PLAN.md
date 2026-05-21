@@ -136,7 +136,7 @@ Ces points **doivent** être traités ou reportés **explicitement** avant de fi
 
 **Ordre de merge suggéré** : **A → B → C → F → D** (l’ordre des lignes du tableau). Phase **C** (scripts + tests de contrat) avant **F** (frontend **post-V1**).
 
-**Note — évolution vs ancienne rédaction :** **A1**, **A2**, **B1**, **B2**, **C1** (#34), **C2** (#35), **F1** ([#58](https://github.com/create2-labs/cafe-frontend/pull/58)), **F2** ([#59](https://github.com/create2-labs/cafe-frontend/pull/59)), **F3** ([#60](https://github.com/create2-labs/cafe-frontend/pull/60)), **F4** ([#61](https://github.com/create2-labs/cafe-frontend/pull/61)) et **F5** ([#62](https://github.com/create2-labs/cafe-frontend/pull/62)) sont **mergés** sur `main` (backend selon **`WORKPLAN_API_PR.md`** ; **F1–F5** sur `cafe-frontend`). Ce tableau marque cet état pour éviter de replanifier du travail déjà livré ; la suite (**D1**) continue sous forme de petite PR.
+**Note — évolution vs ancienne rédaction :** **A1**, **A2**, **B1**, **B2**, **C1** (#34), **C2** (#35), **F1** ([#58](https://github.com/create2-labs/cafe-frontend/pull/58)), **F2** ([#59](https://github.com/create2-labs/cafe-frontend/pull/59)), **F3** ([#60](https://github.com/create2-labs/cafe-frontend/pull/60)), **F4** ([#61](https://github.com/create2-labs/cafe-frontend/pull/61)), **F5** ([#62](https://github.com/create2-labs/cafe-frontend/pull/62)) et **D1** ([#36](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/36)) sont **mergés** sur `main` (backend selon **`WORKPLAN_API_PR.md`** ; **F1–F5** sur `cafe-frontend` ; **D1** doc intégrée CPM). Ce tableau marque cet état pour éviter de replanifier du travail déjà livré ; la séquence Option A du plan est **closée**.
 
 **Référence frontend :** **`CPM_FRONTEND_PR_PLAN_V1.md`** — V1 terminé ; séquence Option A **F1–F5** **closée** sur `cafe-frontend` (dernier merge **F5** [#62](https://github.com/create2-labs/cafe-frontend/pull/62)).
 
@@ -155,7 +155,7 @@ Remplir **Statut**, **N° PR**, **Lien**, **Assigné**, **Notes** au fil des tra
 | 9 | F3 | cafe-frontend | `option-a/f3-frontend-cpm-scan-selector` | UI sélecteur de scan CPM (données v1) | mergé | 60 | [#60](https://github.com/create2-labs/cafe-frontend/pull/60) | | `CpmScanSelector` + `cpmScanSelectorDisplay` ; page CPM. |
 | 10 | F4 | cafe-frontend | `option-a/f4-frontend-feed-scan-context-to-cpm` | Brancher contexte réel sur **`apiCpmDataSource` / explore** | mergé | 61 | [#61](https://github.com/create2-labs/cafe-frontend/pull/61) | | `decisions/explore` + `policy_context` v1 ; plus de placeholder sur le fil en API mode ; test transport Vitest. |
 | 11 | F5 | cafe-frontend | `option-a/f5-frontend-e2e` | E2E parcours Option A (**post-V1**) | mergé | 62 | [#62](https://github.com/create2-labs/cafe-frontend/pull/62) | | Vitest intégration `cpmOptionAFlow.e2e.spec.ts` ; mock transport v1 + CPM ; pas de Playwright. |
-| 12 | D1 | cafe-documentation / CPM + liens | `option-a/d1-option-a-docs` | Narratif intégré **v1** + diagrams + scripts | en cours | | | | `docs/CPM_OPTION_A_INTEGRATED.md` ; cafe-documentation `docs/architecture/cpm-option-a-v1-flow.md`. |
+| 12 | D1 | cafe-crypto-policy-mgt (+ liens cafe-documentation) | `option-a/d1-option-a-docs` | Narratif intégré **v1** + diagrams + scripts | mergé | 36 | [#36](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/36) | | `docs/CPM_OPTION_A_INTEGRATED.md` ; README Option A ; liens `CPM_post_v_1_option_a_scan_context.md`. |
 
 ---
 
@@ -558,7 +558,7 @@ Parcours critique : auth → liste scans v1 → sélection → templates / explo
 
 ## PR D1 — Documentation intégrée **(v1 truth)**
 
-**Statut : en cours** — branche `option-a/d1-option-a-docs` (**cafe-crypto-policy-mgt**, **cafe-documentation**).
+**Statut : mergé** — **cafe-crypto-policy-mgt** [#36](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/36).
 
 **Branch:** `option-a/d1-option-a-docs`
 
@@ -566,7 +566,7 @@ Parcours critique : auth → liste scans v1 → sélection → templates / explo
 
 Narratif **Option A réconcilié** : **`WORKPLAN_API_PR.md`** comme chaîne merged ; diagrammes Discovery v1 ↔ CPM v1 ↔ frontend (**post F\***) ; distinguer **explore** (avec `policy_context`) vs **assessment** (**sans** `policy_context` client, **PR13g**).
 
-### 2. Scope (livré sur branche)
+### 2. Scope (mergé #36)
 
 - **`cafe-crypto-policy-mgt/docs/CPM_OPTION_A_INTEGRATED.md`** — narratif intégré, mermaid, matrice URL, C1, jalons mergés
 - **`cafe-crypto-policy-mgt/README.md`** — section Option A + smoke v1 (retrait doc legacy CBOM / `wallet-scan-and-cpm-policy.sh`)
@@ -670,6 +670,6 @@ grep -R "wallet-policy-contexts" cafe-crypto-policy-mgt/scripts --include='*.sh'
 
 ---
 
-_Révision document : aligné sur [`WORKPLAN_API_PR.md`](./WORKPLAN_API_PR.md) et [`CPM_FRONTEND_PR_PLAN_V1.md`](./CPM_FRONTEND_PR_PLAN_V1.md) ; jalons **A1, A2, B1, B2, C1 (#34), C2 (#35), F1 (#58), F2 (#59), F3 (#60), F4 (#61), F5 (#62 cafe-frontend)** marqués **mergé** ; **D1** en cours sur `option-a/d1-option-a-docs` ; la surface `wallet-policy-contexts` est **historique** ; le contrat nominal est **Discovery v1** `wallets/scans` + **CPM** `/api/cpm/v1`._
+_Révision document : aligné sur [`WORKPLAN_API_PR.md`](./WORKPLAN_API_PR.md) et [`CPM_FRONTEND_PR_PLAN_V1.md`](./CPM_FRONTEND_PR_PLAN_V1.md) ; jalons **A1, A2, B1, B2, C1 (#34), C2 (#35), F1 (#58), F2 (#59), F3 (#60), F4 (#61), F5 (#62 cafe-frontend), D1 (#36)** marqués **mergé** ; séquence Option A du plan **closée** ; la surface `wallet-policy-contexts` est **historique** ; le contrat nominal est **Discovery v1** `wallets/scans` + **CPM** `/api/cpm/v1`._
 
 _End of PR plan._
