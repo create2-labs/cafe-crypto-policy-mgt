@@ -6,6 +6,8 @@
 
 **Dépôts concernés (à confirmer par section) :** `cafe-discovery` (observation / scans), `cafe-crypto-policy-mgt` (politiques), `cafe-deploy` / edge (chemins publics).
 
+**Option A (définition produit) :** [`CPM_post_v_1_option_a_scan_context.md`](./CPM_post_v_1_option_a_scan_context.md). **Narratif intégré (jalons mergés) :** [`docs/CPM_OPTION_A_INTEGRATED.md`](../docs/CPM_OPTION_A_INTEGRATED.md) — plan de PR [`CPM_OPTION_A_PR_PLAN.md`](./CPM_OPTION_A_PR_PLAN.md) ; index PR mergées [`WORKPLAN_API_PR.md`](./WORKPLAN_API_PR.md).
+
 ---
 
 ## 0. Convention de chemins publics (cible pour OpenAPI / edge)

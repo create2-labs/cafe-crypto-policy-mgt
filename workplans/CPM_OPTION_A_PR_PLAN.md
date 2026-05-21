@@ -8,7 +8,13 @@ Cross-repository work plan for connecting the **Crypto Policy Management (CPM)**
 
 **Repositories:** `cafe-discovery`, `cafe-crypto-policy-mgt` (CPM), `cafe-frontend`.
 
-**Related design notes:** `cafe-crypto-policy-mgt/cpm_post_v_1_option_a_scan_context.md`, `cafe-crypto-policy-mgt/CPM_AuthN_AuthZ_workplan.md`.
+**Related design notes:** [`CPM_post_v_1_option_a_scan_context.md`](./CPM_post_v_1_option_a_scan_context.md), [`CPM_AuthN_AuthZ_workplan.md`](../CPM_AuthN_AuthZ_workplan.md).
+
+---
+
+## Qu’est-ce qu’Option A ?
+
+**Option A** est le chemin d’intégration **post-V1 CPM** : relier la page Crypto Policy Management à de **vrais scans wallet** de l’utilisateur via le **backend Discovery authentifié** (données persistées derrière Discovery aujourd’hui ; le frontend et CPM n’accèdent pas à la DB). L’utilisateur choisit un **`scan_id`**, le client charge le détail v1 et alimente explore/persist. **Option B** (ultérieur) ferait passer le contexte scan par un Persistence Service extrait ; Option A respecte l’AuthN/AuthZ actuel dans Discovery. Définition produit, flux et contraintes : **[`CPM_post_v_1_option_a_scan_context.md`](./CPM_post_v_1_option_a_scan_context.md)**.
 
 ---
 
@@ -25,7 +31,7 @@ Hard rules from product/architecture (alignées `WORKPLAN_API_PR.md`):
 - **Do not** claim Discovery is DB-free today; Persistence Service remains the **target** authoritative scan-data owner—Discovery backend still has DB access in the interim.
 - **Respect AUTH-██** already merged (principal, scan binding, fail-closed behavior where configured).
 - **Scripts smoke CPM (Option A) — v1 uniquement (#34) :** un seul parcours bash actif — **`test-discovery-v1-wallet-scans-to-cpm.sh`** (liste + détail **v1** → explore → persist). **Aucun** mode legacy dans les scripts : pas de **`LEGACY_SCAN_AND_CBOM_FLOW`**, pas de polling CBOM, pas de **`test-discovery-wallet-contexts-to-cpm.sh`** ni **`test-wallet-scan-and-cpm-policy.sh`**. *(Distinct des routes Discovery historiques encore montées côté serveur — voir **WORKPLAN_API_PR** ; le plan Option A ne les réintroduit pas dans les scripts ni la doc active.)*
-- **Frontend:** no direct DB; no unauthenticated Persistence Service calls; **no `mock-discovery-scan-placeholder` in API mode** once Option A wiring (**F4**) lands — aujourd’hui le placeholder est **explicitement** dans le périmètre V1 mock (**`CPM_FRONTEND_PR_PLAN_V1.md`**, PR 5 / PR 12).
+- **Frontend:** no direct DB; no unauthenticated Persistence Service calls; **no `mock-discovery-scan-placeholder` in API mode** once a real scan is selected — livré **F4** [#61](https://github.com/create2-labs/cafe-frontend/pull/61) ; le placeholder reste limité au mode **mock** V1 (**`CPM_FRONTEND_PR_PLAN_V1.md`**, PR 5 / PR 12).
 
 ---
 
@@ -69,12 +75,13 @@ Synthèse à jour des **jalons mergés** documentés dans le workplan API et le 
 ### cafe-frontend
 
 - **Plan CPM frontend V1 :** **clos** — **`CPM_FRONTEND_PR_PLAN_V1.md`**, dernier merge **PR 15** → [#53](https://github.com/create2-labs/cafe-frontend/pull/53) (2026-05-15) : **`CpmDataSource`**, Vue Flow verrouillé, validation / EOA / persist, **`createApiCpmDataSource`** (**PR 12** [#45](https://github.com/create2-labs/cafe-frontend/pull/45)), gates erreurs (**PR 13c**), etc.
-- **`CPM_SELECTION_CONTEXT_SCAN_ID`** / valeur **`mock-discovery-scan-placeholder`** : **explicitement dans le périmètre livré V1** (sélection de template + explore en API mode avec contexte synthétique jusqu’à branchement scan réel). Le retrait conditionné **API mode** relève des PR **F4+**.
+- **`CPM_SELECTION_CONTEXT_SCAN_ID`** / valeur **`mock-discovery-scan-placeholder`** : périmètre **mock** V1 ; en **API mode**, plus envoyé sur explore une fois un scan v1 choisi (**F4** [#61](https://github.com/create2-labs/cafe-frontend/pull/61)).
 - **Data source wallet scan v1 (Option A F1) :** **mergé** — **cafe-frontend** [#58](https://github.com/create2-labs/cafe-frontend/pull/58) : `createWalletScanV1DataSource()` (`listWalletScans`, `getWalletScanDetail`), DTOs OpenAPI / A2 §3.1, module `src/discovery/` — séparé de **`CpmDataSource`** et de **`scanService.js`** (cartes UI).
-- **Composable scan context CPM (Option A F2) :** **mergé** — **cafe-frontend** [#59](https://github.com/create2-labs/cafe-frontend/pull/59) : `useCpmScanContext()` (`listWalletScans` + détail, sélection `scan_id`, sync **`?scanId=`**, rejet du placeholder en sélection réelle) ; `src/cpm/cpmScanContext.ts` — pas encore branché sur **`useCpmPolicySelection`** / explore (**F4**).
-- **UI sélecteur scan CPM (Option A F3) :** **mergé** — **cafe-frontend** [#60](https://github.com/create2-labs/cafe-frontend/pull/60) : `CpmScanSelector` sur **`CryptoPolicyManagement.vue`**, états vide / erreur / liste v1 ; `cpmScanSelectorDisplay.ts` — explore / **`apiCpmDataSource`** : **F4**.
+- **Composable scan context CPM (Option A F2) :** **mergé** — **cafe-frontend** [#59](https://github.com/create2-labs/cafe-frontend/pull/59) : `useCpmScanContext()` (`listWalletScans` + détail, sélection `scan_id`, sync **`?scanId=`**, rejet du placeholder en sélection réelle) ; `src/cpm/cpmScanContext.ts`.
+- **UI sélecteur scan CPM (Option A F3) :** **mergé** — **cafe-frontend** [#60](https://github.com/create2-labs/cafe-frontend/pull/60) : `CpmScanSelector` sur **`CryptoPolicyManagement.vue`**, états vide / erreur / liste v1 ; `cpmScanSelectorDisplay.ts`.
+- **Explore scan réel → CPM (Option A F4) :** **mergé** — **cafe-frontend** [#61](https://github.com/create2-labs/cafe-frontend/pull/61) : `POST …/policies/decisions/explore` avec `policy_context` v1 ; `useCpmPolicySelection` branché sur `useCpmScanContext` ; adaptateur `decision` → `PolicySelectionResponse` ; test transport sans `mock-discovery-scan-placeholder`.
 - **Parcours scan nominal hors CPM :** migration **Discovery v1** + hydratation cartes (**PR10** [#52](https://github.com/create2-labs/cafe-frontend/pull/52), **PR13b** sur `main`, **PR13e** [#56](https://github.com/create2-labs/cafe-frontend/pull/56)) — réutilisable pour la liste/détail wallet côté Option A.
-- **E2E navigateur :** toujours un sujet pour **F5** (Vitest comme base V1 ; Playwright ou équivalent si la gouvernance repo l’accepte).
+- **E2E Option A post-V1 (F5) :** **mergé** — **cafe-frontend** [#62](https://github.com/create2-labs/cafe-frontend/pull/62) : Vitest + `happy-dom` + mock axios (`cpmOptionAFlow.e2e.spec.ts`) — parcours liste/détail v1 → explore → validate → persist ; garde-fous transport sans `mock-discovery-scan-placeholder` ; pas de Playwright.
 
 ### Edge routing (`cafe-deploy`, `WORKPLAN_API_PR.md` PR9 / PR11b)
 
@@ -91,7 +98,7 @@ GET /discovery/v1/wallets/scans (JWT, pagination items/total/limit/offset)
        ↓
 GET /discovery/v1/wallets/scans/{scan_id} (JWT, détail — DTO source pour policy_context explore)
        ↓
-Frontend: data source liste + détail v1 + useCpmScanContext (F1–F3) → CpmDataSource (PR 12)
+Frontend: data source liste + détail v1 + useCpmScanContext (F1–F3) → explore via CpmDataSource (PR 12 + F4 #61)
        ↓
 POST /api/cpm/v1/policies/decisions/explore
   { scan_id, policy_context, selection_request }
@@ -129,9 +136,9 @@ Ces points **doivent** être traités ou reportés **explicitement** avant de fi
 
 **Ordre de merge suggéré** : **A → B → C → F → D** (l’ordre des lignes du tableau). Phase **C** (scripts + tests de contrat) avant **F** (frontend **post-V1**).
 
-**Note — évolution vs ancienne rédaction :** **A1**, **A2**, **B1**, **B2**, **C1** (#34), **C2** (#35), **F1** ([#58](https://github.com/create2-labs/cafe-frontend/pull/58)), **F2** ([#59](https://github.com/create2-labs/cafe-frontend/pull/59)) et **F3** ([#60](https://github.com/create2-labs/cafe-frontend/pull/60)) sont **mergés** sur `main` (backend selon **`WORKPLAN_API_PR.md`** ; **F1** / **F2** / **F3** sur `cafe-frontend`). Ce tableau marque cet état pour éviter de replanifier du travail déjà livré ; la suite (**F4–F5**, **D1**) continue sous forme de petites PR.
+**Note — évolution vs ancienne rédaction :** **A1**, **A2**, **B1**, **B2**, **C1** (#34), **C2** (#35), **F1** ([#58](https://github.com/create2-labs/cafe-frontend/pull/58)), **F2** ([#59](https://github.com/create2-labs/cafe-frontend/pull/59)), **F3** ([#60](https://github.com/create2-labs/cafe-frontend/pull/60)), **F4** ([#61](https://github.com/create2-labs/cafe-frontend/pull/61)), **F5** ([#62](https://github.com/create2-labs/cafe-frontend/pull/62)) et **D1** ([#36](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/36)) sont **mergés** sur `main` (backend selon **`WORKPLAN_API_PR.md`** ; **F1–F5** sur `cafe-frontend` ; **D1** doc intégrée CPM). Ce tableau marque cet état pour éviter de replanifier du travail déjà livré ; la séquence Option A du plan est **closée**.
 
-**Référence frontend :** **`CPM_FRONTEND_PR_PLAN_V1.md`** — V1 terminé ; **F4–F5** = **suite** après **PR 12** (API data source), **F1** ([#58](https://github.com/create2-labs/cafe-frontend/pull/58)), **F2** ([#59](https://github.com/create2-labs/cafe-frontend/pull/59)) et **F3** ([#60](https://github.com/create2-labs/cafe-frontend/pull/60)).
+**Référence frontend :** **`CPM_FRONTEND_PR_PLAN_V1.md`** — V1 terminé ; séquence Option A **F1–F5** **closée** sur `cafe-frontend` (dernier merge **F5** [#62](https://github.com/create2-labs/cafe-frontend/pull/62)).
 
 Remplir **Statut**, **N° PR**, **Lien**, **Assigné**, **Notes** au fil des travaux. Valeurs suggérées pour **Statut** : `à faire` · `en cours` · `PR ouverte` · `en revue` · `mergé` · `supersedé` · `bloqué`.
 
@@ -144,11 +151,11 @@ Remplir **Statut**, **N° PR**, **Lien**, **Assigné**, **Notes** au fil des tra
 | 5 | C1 | cafe-crypto-policy-mgt | `option-a/c1-option-a-script` | Script smoke : sign-in → **v1** list/detail → explore → persist | mergé | 34 | [#34](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/34) | | `test-discovery-v1-wallet-scans-to-cpm.sh` ; plus de scripts CBOM / contexts legacy. |
 | 6 | C2 | cafe-crypto-policy-mgt (+ discovery si besoin) | `option-a/c2-contract-api-tests` | Tests contrat **v1** + CPM (complément **go test** existants) | mergé | 35 | [#35](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/35) | | `internal/contract` ; golden A2 §3.1 ; pas de garde-fou shell `wallet-policy-contexts` (volontairement hors scope). |
 | 7 | F1 | cafe-frontend | `option-a/f1-discovery-v1-wallet-scan-data-source` | Data source **liste + détail** scans wallet v1 | mergé | 58 | [#58](https://github.com/create2-labs/cafe-frontend/pull/58) | | `src/discovery/walletScanV1DataSource.ts` ; post **PR 12** ; pas de couplage CPM dans le client HTTP Discovery. |
-| 8 | F2 | cafe-frontend | `option-a/f2-frontend-cpm-scan-context` | Composable **`useCpmScanContext`** (sélection `scan_id`) | mergé | 59 | [#59](https://github.com/create2-labs/cafe-frontend/pull/59) | | `useCpmScanContext` + `cpmScanContext` ; sync **`?scanId=`** ; explore : **F4**. |
-| 9 | F3 | cafe-frontend | `option-a/f3-frontend-cpm-scan-selector` | UI sélecteur de scan CPM (données v1) | mergé | 60 | [#60](https://github.com/create2-labs/cafe-frontend/pull/60) | | `CpmScanSelector` + `cpmScanSelectorDisplay` ; page CPM ; pas d’explore (**F4**). |
-| 10 | F4 | cafe-frontend | `option-a/f4-frontend-feed-scan-context-to-cpm` | Brancher contexte réel sur **`apiCpmDataSource` / explore** | | | | | Retirer **`mock-discovery-scan-placeholder`** en **API mode** quand un scan valide est choisi. |
-| 11 | F5 | cafe-frontend | `option-a/f5-frontend-e2e` | E2E parcours Option A (**post-V1**) | | | | | Framework à trancher (Playwright vs extension Vitest/MSW) — governance repo. |
-| 12 | D1 | cafe-documentation / CPM + liens | `option-a/d1-option-a-docs` | Narratif intégré **v1** + diagrams + scripts | | | | | Réf **`WORKPLAN_API_PR.md`** comme tête de chaîne merged. |
+| 8 | F2 | cafe-frontend | `option-a/f2-frontend-cpm-scan-context` | Composable **`useCpmScanContext`** (sélection `scan_id`) | mergé | 59 | [#59](https://github.com/create2-labs/cafe-frontend/pull/59) | | `useCpmScanContext` + `cpmScanContext` ; sync **`?scanId=`**. |
+| 9 | F3 | cafe-frontend | `option-a/f3-frontend-cpm-scan-selector` | UI sélecteur de scan CPM (données v1) | mergé | 60 | [#60](https://github.com/create2-labs/cafe-frontend/pull/60) | | `CpmScanSelector` + `cpmScanSelectorDisplay` ; page CPM. |
+| 10 | F4 | cafe-frontend | `option-a/f4-frontend-feed-scan-context-to-cpm` | Brancher contexte réel sur **`apiCpmDataSource` / explore** | mergé | 61 | [#61](https://github.com/create2-labs/cafe-frontend/pull/61) | | `decisions/explore` + `policy_context` v1 ; plus de placeholder sur le fil en API mode ; test transport Vitest. |
+| 11 | F5 | cafe-frontend | `option-a/f5-frontend-e2e` | E2E parcours Option A (**post-V1**) | mergé | 62 | [#62](https://github.com/create2-labs/cafe-frontend/pull/62) | | Vitest intégration `cpmOptionAFlow.e2e.spec.ts` ; mock transport v1 + CPM ; pas de Playwright. |
+| 12 | D1 | cafe-crypto-policy-mgt (+ liens cafe-documentation) | `option-a/d1-option-a-docs` | Narratif intégré **v1** + diagrams + scripts | mergé | 36 | [#36](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/36) | | `docs/CPM_OPTION_A_INTEGRATED.md` ; README Option A ; liens `CPM_post_v_1_option_a_scan_context.md`. |
 
 ---
 
@@ -468,7 +475,7 @@ Composable : liste + sélection **`scan_id`**, sync **`?scanId=`**, états loadi
 
 ### 3. Acceptance criteria
 
-- **API mode** : pas de **`mock-discovery-scan-placeholder`** comme **scan réellement sélectionné** — cohérent avec **F4** (le mock V1 reste acceptable **tant que** l’utilisateur n’a pas choisi de scan ; documenter la transition).
+- **API mode** : pas de **`mock-discovery-scan-placeholder`** comme **scan réellement sélectionné** — livré **F4** [#61](https://github.com/create2-labs/cafe-frontend/pull/61) (le mock V1 reste acceptable **tant que** l’utilisateur n’a pas choisi de scan).
 - Expose **`selectedScanId`**, **`selectedScanDetail`**, chargement async
 
 ### 4–8. Voir template historique ; remplacer *Discovery contexts* par *v1 scan list/detail*
@@ -500,6 +507,8 @@ Sélecteur alimenté **uniquement** par **F1** (DTO v1 liste + résumé depuis d
 
 ## PR F4 — Brancher scan réel sur **`apiCpmDataSource`**
 
+**Statut : mergé** — **cafe-frontend** [#61](https://github.com/create2-labs/cafe-frontend/pull/61).
+
 **Branch:** `option-a/f4-frontend-feed-scan-context-to-cpm`
 
 ### 1. Goal
@@ -524,25 +533,32 @@ En **API mode**, lorsqu’un scan v1 est sélectionné : **`selectionScanId`** =
 
 ## PR F5 — E2E **post-V1**
 
+**Statut : mergé** — **cafe-frontend** [#62](https://github.com/create2-labs/cafe-frontend/pull/62).
+
 **Branch:** `option-a/f5-frontend-e2e`
 
 ### 1. Goal
 
 Parcours critique : auth → liste scans v1 → sélection → templates / explore → validation → persist avec **`scan_id`** visible.
 
-### 2. Scope
+### 2. Scope (livré)
 
-- Playwright ou autre si gouvernance repo ; base **Vitest** déjà en place (**`CPM_FRONTEND_PR_PLAN_V1.md`**)
+- **Vitest** + `happy-dom` + mock **axios** (pas Playwright) — `src/cpm/cpmOptionAFlow.e2e.spec.ts`, fixtures `src/cpm/fixtures/cpmOptionAFlowFixtures.ts`
+- Monte **`CryptoPolicyManagement.vue`** en mode API ; assert chemins **`/discovery/v1/wallets/scans`** et **`/cpm/v1/...`**
 
-### 3. Acceptance criteria
+### 3. Acceptance criteria (rappel — satisfait sur `main`)
 
 - Aligné **edge** **`/api/discovery/v1`** + **`/api/cpm/v1`**
+- Corps explore/persist sans **`mock-discovery-scan-placeholder`** après sélection scan v1
+- **`scan_id`** visible (sélecteur + métadonnées persist)
 
-### 4–8. Inchangé en intention
+### 4–8. Voir PR [#62](https://github.com/create2-labs/cafe-frontend/pull/62) pour titre commit / description
 
 ---
 
 ## PR D1 — Documentation intégrée **(v1 truth)**
+
+**Statut : mergé** — **cafe-crypto-policy-mgt** [#36](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/36).
 
 **Branch:** `option-a/d1-option-a-docs`
 
@@ -550,15 +566,54 @@ Parcours critique : auth → liste scans v1 → sélection → templates / explo
 
 Narratif **Option A réconcilié** : **`WORKPLAN_API_PR.md`** comme chaîne merged ; diagrammes Discovery v1 ↔ CPM v1 ↔ frontend (**post F\***) ; distinguer **explore** (avec `policy_context`) vs **assessment** (**sans** `policy_context` client, **PR13g**).
 
-### 2. Scope
+### 2. Scope (mergé #36)
 
-- `cafe-crypto-policy-mgt/docs/`, liens **`cafe-documentation`**, **`WORKPLAN_API.md`**, **`CPM_FRONTEND_PR_PLAN_V1.md`**
+- **`cafe-crypto-policy-mgt/docs/CPM_OPTION_A_INTEGRATED.md`** — narratif intégré, mermaid, matrice URL, C1, jalons mergés
+- **`cafe-crypto-policy-mgt/README.md`** — section Option A + smoke v1 (retrait doc legacy CBOM / `wallet-scan-and-cpm-policy.sh`)
+- **`cafe-documentation/docs/architecture/cpm-option-a-v1-flow.md`** — résumé public + liens
+- **`cafe-documentation/README.md`**, **`03-cafe-developer-guide.md`** — Option A `policy_context`, route historique `wallet-policy-contexts`
+- Liens **`WORKPLAN_API.md`**, **`CPM_FRONTEND_PR_PLAN_V1.md`**, A2 Discovery
 
-### 3. Acceptance criteria
+### 3. Acceptance criteria (rappel)
 
 - Schéma : scan → DB Discovery (PS cible long terme) → **v1 list/detail** → UI → **explore** → **persist**
-- Table URL **direct / edge** ; scripts **C1** mis à jour
+- Table URL **direct / edge** ; scripts **C1** documentés (`test-discovery-v1-wallet-scans-to-cpm.sh`)
 - **Pas** de présentation de `wallet-policy-contexts` comme route active sans note *historique*
+
+### 4. Tests
+
+Revue doc uniquement ; `bash -n scripts/test-discovery-v1-wallet-scans-to-cpm.sh` inchangé (C1).
+
+### 6. Suggested commit message
+
+`docs(cpm): add integrated Option A v1 narrative and cross-repo links`
+
+*(cafe-documentation, commit séparé si PR distincte :)* `docs: add CPM Option A architecture entry and developer guide links`
+
+### 7. Suggested PR title
+
+`docs(cpm): integrated Option A Discovery v1 ↔ CPM ↔ frontend narrative`
+
+*(cafe-documentation :)* `docs: CPM Option A v1 flow architecture and guide links`
+
+### 8. PR description template
+
+```markdown
+## Summary
+- Adds integrated Option A narrative (`docs/CPM_OPTION_A_INTEGRATED.md`) aligned with merged WORKPLAN_API_PR.md (A1–C2, F1–F5).
+- Updates CPM README smoke/docs; adds cafe-documentation architecture page and developer-guide Option A explore example.
+- Documents explore (`policy_context` required) vs assessment (`policy_context` forbidden).
+
+## Acceptance
+- Flow diagram scan → Discovery DB (PS target) → v1 list/detail → UI → explore → persist.
+- URL matrix direct/edge; C1 smoke script; historical `wallet-policy-contexts` noted as removed (PR11a).
+
+## References
+PR11a #54, CPM PR8 #29, PR7 #28, PR13g #33, Discovery A2 #60, frontend F1–F5 #58–62.
+
+## Non-goals
+No runtime or OpenAPI behavior changes.
+```
 
 ### 4–8. Référencer **PR11a** suppression façade + **PR8/7/13g**
 
@@ -567,9 +622,9 @@ Narratif **Option A réconcilié** : **`WORKPLAN_API_PR.md`** comme chaîne merg
 ## Risks and open questions
 
 - **Champs PQ / `result` v1**, **`wallet_type`**, **`chain_ids`** — déchargés dans la **table §3.1** **A2** + golden **C2** ; types TS **F1** suivent cette table.
-- **AUTH-02** / latence Discovery : UX fail-closed — sélecteur livré (**F3** #60) ; explore / CPM : **F4**.
+- **AUTH-02** / latence Discovery : UX fail-closed — sélecteur (**F3** #60) et explore CPM (**F4** #61) livrés sur `cafe-frontend`.
 - **Forme du payload persist** (`payload` JSON riche vs minimal) — documenter hors **D1**.
-- **F5 tooling** : Playwright vs extension Vitest/MSW — décision governance **`cafe-frontend`** (**`CPM_FRONTEND_PR_PLAN_V1.md` § backlog** peut informer mais ne remplace pas la décision repo).
+- **F5 tooling** : **tranché** — Vitest + mock axios (**#62**), pas Playwright pour ce parcours ; E2E navigateur live reste hors scope F5.
 
 ---
 
@@ -615,6 +670,6 @@ grep -R "wallet-policy-contexts" cafe-crypto-policy-mgt/scripts --include='*.sh'
 
 ---
 
-_Révision document : aligné sur [`WORKPLAN_API_PR.md`](./WORKPLAN_API_PR.md) et [`CPM_FRONTEND_PR_PLAN_V1.md`](./CPM_FRONTEND_PR_PLAN_V1.md) ; jalons **A1, A2, B1, B2, C1 (#34), C2 (#35), F1 (#58), F2 (#59), F3 (#60 cafe-frontend)** marqués **mergé** ; la surface `wallet-policy-contexts` est **historique** ; le contrat nominal est **Discovery v1** `wallets/scans` + **CPM** `/api/cpm/v1`. **Suite :** **F4–F5** (frontend post-V1) ; **D1** — doc intégrée ; **F4** — test transport interdisant `mock-discovery-scan-placeholder` sur explore._
+_Révision document : aligné sur [`WORKPLAN_API_PR.md`](./WORKPLAN_API_PR.md) et [`CPM_FRONTEND_PR_PLAN_V1.md`](./CPM_FRONTEND_PR_PLAN_V1.md) ; jalons **A1, A2, B1, B2, C1 (#34), C2 (#35), F1 (#58), F2 (#59), F3 (#60), F4 (#61), F5 (#62 cafe-frontend), D1 (#36)** marqués **mergé** ; séquence Option A du plan **closée** ; la surface `wallet-policy-contexts` est **historique** ; le contrat nominal est **Discovery v1** `wallets/scans` + **CPM** `/api/cpm/v1`._
 
 _End of PR plan._
