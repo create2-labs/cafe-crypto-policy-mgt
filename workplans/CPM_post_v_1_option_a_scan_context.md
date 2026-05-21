@@ -1,5 +1,7 @@
 # CPM Post-V1 — Option A: Authenticated scan context through Discovery backend
 
+**Canonical definition of Option A** (product intent, constraints, Option A vs Option B). For the reconciled **v1 API** rollout and merged PR index, see [`CPM_OPTION_A_PR_PLAN.md`](./CPM_OPTION_A_PR_PLAN.md), [`docs/CPM_OPTION_A_INTEGRATED.md`](../docs/CPM_OPTION_A_INTEGRATED.md), and Discovery [`CPM_OPTION_A_DISCOVERY_V1_CONTRACT.md`](https://github.com/create2-labs/cafe-discovery/blob/main/docs/CPM_OPTION_A_DISCOVERY_V1_CONTRACT.md).
+
 ## 1. Purpose
 
 This document describes the work required to connect the CPM frontend page to real wallet scan data after the CPM frontend V1 work is complete.
