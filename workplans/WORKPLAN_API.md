@@ -41,7 +41,7 @@ Si le service CPM est publié sous **`/api/cpm/v1`** (le segment **`cpm`** n’a
 | **GET** | `/api/cpm/v1/policies/instances` |
 | **POST** | `/api/cpm/v1/policies/decisions/explore` |
 | **POST**, **GET**, **DELETE** | `/api/cpm/v1/policies` — instances persistées (**`GET`** / **`DELETE`** avec query **`id`** ; **`GET`** liste owner-scoped avec query **`scan_id`** — **pas** **`id`** + **`scan_id`** ensemble — **§5.2**) |
-| **POST**, **GET** | `/api/cpm/v1/drafts` — brouillons |
+| **POST**, **GET**, **DELETE** | `/api/cpm/v1/drafts` — brouillons (**`DELETE`** avec query **`id`** — **§2.4**, **§4.4**) |
 
 **Remarque :** pas de chemin du type **`/api/cpm/v1/cpm/policies`**. Les **réponses d’erreur** référencent les **instances** persistées comme **`…/policies`** sous ce préfixe (ex. **`409`** scan — **§4.2**).
 
@@ -56,7 +56,7 @@ Tableau **descriptif** de ce que **ingress / edge** ou le **déploiement courant
 | **GET** | `/api/v1/policies/catalog`, **`/api/v1/policies/templates`**, **`/api/v1/policies/instances`** |
 | **POST** | `/api/v1/policies/decisions/explore` |
 | **POST**, **GET**, **DELETE** | `/api/v1/cpm/policies` (query **`id`**) |
-| **POST**, **GET** | `/api/v1/cpm/drafts` |
+| **POST**, **GET**, **DELETE** | `/api/v1/cpm/drafts` (**`DELETE`** avec query **`id`**) |
 
 **Règle :** **§0.3** sert à **coordonner** la coupure (nginx, clients, publications OpenAPI le temps du passage) ; la **référence** reste **§0.2**. Ne pas traiter **§0.3** comme une **deuxième surface officielle** à pérenniser au-delà de la transition. **Fin de migration = suppression effective de §0.3** (retrait ingress + mise à jour des artefacts qui mentionnaient encore ces URLs) ; ce document pourra alors **supprimer le tableau §0.3** ou le réduire à une note d’**historique** hors contrat.
 
@@ -158,23 +158,25 @@ Ce document pose un **modèle cible** cohérent : **collections au pluriel** uni
 
 - **Idempotence `DELETE` (tranché)** — **wallets CAFE**, **`…/wallets/scans/{scan_id}`**, **`…/tls/scans/{scan_id}`**, **instances CPM** : **`204`** \| **`404`** (**§5.4.8**, **§5.4.9** ; scans — **§5.4.6**) ; **`409`** possible sur les **`DELETE`** scan (**§4.2**).
 
-- **Corrélation CPM** : le **`scan_id`** (**UUID**) est la clé de traçabilité **Option A** (CPM) ; il s’applique aux exécutions **wallet** et, lorsque le produit le prévoit, aux exécutions **TLS**. Tant qu’une **politique persistée** référence ce **`scan_id`**, le **`DELETE`** du scan correspondant → **`409`** (**§4.4**).
+- **Corrélation CPM** : le **`scan_id`** (**UUID**) est la clé de traçabilité **Option A** (CPM) pour les exécutions **wallet** (**W1–W7**, assessment/remediation produit actuel). Les scans **TLS** restent sous **Discovery** (**§5.4.6**) ; une référence policy sur un **`scan_id`** TLS ne fait **pas** du TLS une cible assessment/remediation CPM pour cette release. Tant qu’une **politique persistée** référence un **`scan_id`**, le **`DELETE`** du scan correspondant → **`409`** (**§4.4**).
 
 **Couplage wallet ↔ CPM (tranché — familles wallet / `binding=discovery`)**
 
 | # | Règle | Discovery | CPM |
 |---|--------|-----------|-----|
 | **W7** | **CPM** : pas de nouvelle policy / explore tant que le **dernier scan** (plus récent par **`created_at`**) n’est pas **`completed`**. **`POST …/scan`** : l’utilisateur peut **relancer** des scans (nouvelle ligne) tant que le dernier n’est pas **`completed`** — **refus** seulement si un scan est **en cours** (`requested` / `started`) | **`POST …/scan`** → **`409`** (ex. **`SCAN_IN_PROGRESS`**) si la ligne la plus récente est **`requested`** ou **`started`** ; **pas** de **`409`** si elle est **`failed`** (nouvelle tentative autorisée). **`GET …/wallets/scans?address=&latest=true`** : dernier **`completed`** (peut être **`total: 1`** même si un **`failed`** plus récent existe) | **`POST …/policies`** / **explore** → **`400`** (ex. **`LATEST_SCAN_NOT_COMPLETED`**) si la ligne la plus récente n’est pas **`completed`** (`failed` ou en cours inclus) |
-| **W1** | **Pas de nouveau scan** si une **CPM persistée** existe déjà pour la **`target_address`** (en plus de **W7**) | **`POST …/scan`** → **`409`** (ex. **`CPM_EXISTS_FOR_WALLET_TARGET`**) | Lookup owner-scoped (**§4.4**) |
+| **W1** | **Au plus un contexte CPM actif par adresse** : **pas de nouveau scan** si une **policy persistée** **ou** un **brouillon (`draft`)** existe pour la **`target_address`** (après garde scan en cours) | **`POST …/scan`** → **`409`** (ex. **`CPM_EXISTS_FOR_WALLET_TARGET`**) — l’utilisateur doit **finaliser** (`POST …/policies`) ou **supprimer** le brouillon / la policy avant tout rescan | Lookup owner-scoped : **`…/policies`** **et** **`…/drafts`** (**§4.4**) |
 | **W2** | **CPM uniquement sur le dernier scan `completed`** de la cible | **`GET …/wallets/scans?address=&latest=true`** (dernier **`completed`** seulement) | **`400`** si **`scan_id`** ≠ celui de **`latest=true`** |
 | **W3** | **DELETE scan** : **action utilisateur** — d’abord **supprimer la CPM**, puis **`DELETE …/wallets/scans/{scan_id}`** | **`409`** **`SCAN_REFERENCED_BY_POLICY`** tant qu’une policy référence ce **`scan_id`** ; **`204`** une fois les policies retirées | **`DELETE …/policies?id=`** **sans** effet sur les scans (**W4**) ; **`GET …/policies?scan_id=`** pour lister avant DELETE scan |
 | **W4** | **Suppression CPM** sans effet sur les scans | Inchangé | **`DELETE …/policies?id=`** seul |
 | **W5** | **Historique** par adresse | **`GET …/wallets/scans?address=`** | Lecture ; policies par **`scan_id`** |
 | **W6** | **CBOM par scan** | **`GET …/wallets/scans/{scan_id}/cbom`** (**à la demande**) | Hors scope stockage CBOM |
 
-> **Ordre des gardes (wallet) :** **`POST …/scan`** : garde **en cours** (**W7**, `requested` / `started`) puis **W1** (pas de CPM existante). **CPM** : **W7** (dernier scan = **`completed`**) puis **W2** sur **`scan_id`**.
+> **Ordre des gardes (wallet) :** **`POST …/scan`** : garde **en cours** (`requested` / `started`) puis **W1** (pas de policy **ni** de **draft** pour la cible). **CPM** : **W7** (dernier scan = **`completed`**) puis **W2** sur **`scan_id`**.
 
-> **Re-scan / retry :** si le dernier scan est **`failed`**, l’utilisateur lance un **nouveau** **`POST …/scan`** (nouvelle ligne, **point 5**) jusqu’à obtenir un **`completed`** — **sans** obligation de **`DELETE`** le scan **`failed`** au préalable. Pendant un scan **en cours** : pas de nouveau **`POST …/scan`** ni CPM. Après **`completed`** + **W1** OK, re-scan optionnel = encore une nouvelle ligne.
+> **Re-scan / retry :** si le dernier scan est **`failed`**, un nouveau **`POST …/scan`** n’est possible que si **W1** est satisfait (aucune policy **ni** draft sur l’adresse) — sinon **finaliser** ou **supprimer** le contexte CPM actif d’abord. Pas d’obligation de **`DELETE`** le scan **`failed`** lorsque **W1** OK. Pendant un scan **en cours** : pas de **`POST …/scan`** ni CPM.
+
+> **Parcours client (hors API) — brouillon + rescan :** si un **draft** plateforme bloque **W1**, le client **peut** proposer : (1) **sauvegarde locale** du brouillon (export fichier / stockage navigateur) ; (2) **suppression** du draft sur la plateforme (**`DELETE /api/cpm/v1/drafts?id=…`** ou équivalent UI) pour débloquer **`POST …/scan`** ; (3) après un nouveau scan **`completed`**, **rechargement** de la sauvegarde locale **uniquement** si le **dernier scan `completed`** (`latest=true`) a la **même** **`target_address`** **et** le **même** **`wallet_type`** que la sauvegarde — sinon refus UI avec message explicite. Le rechargement **re-lie** le travail au nouveau **`scan_id`** / **`policy_context`** (pas de réutilisation silencieuse d’un ancien `scan_id`). Détail UX : [`cafe-frontend/IMMUTABILITE.md`](../../cafe-frontend/IMMUTABILITE.md).
 
 > **Plans d’implémentation :** [`cafe-discovery/IMMUTABILITE_PR.md`](../../cafe-discovery/IMMUTABILITE_PR.md), [`workplans/IMMUTABILITE_PR.md`](./IMMUTABILITE_PR.md) (CPM), [`cafe-frontend/IMMUTABILITE.md`](../../cafe-frontend/IMMUTABILITE.md) — **découpage PR** ; **ce document** reste la **source de vérité** contrat.
 
@@ -186,6 +188,7 @@ Ce document pose un **modèle cible** cohérent : **collections au pluriel** uni
 
 - **Chemins canoniques** : **`POST` \| `GET` \| `DELETE`** sur la ressource **instances** — **§0.2** (`/api/cpm/v1/policies`) ou **§0.3** (`/api/v1/cpm/policies`) ; **brouillons** **`…/drafts`** (**§0.2** / **§0.3**). JWT + scope propriétaire (`cafe-crypto-policy-mgt`, `internal/app/owner_routes.go`).
 - **`DELETE …/policies?id=…`** (suffixe après préfixe **§0**) : **`204`** si l’instance existait et est supprimée ; **`404`** si inconnue / hors scope / **déjà supprimée** (**idempotence** — **§5.4.9**). **Même query **`id`** que **`GET`**. Pas de **`409`** sur cette route dans ce plan.
+- **`DELETE …/drafts?id=…`** : **`204`** si le brouillon existait et est supprimé ; **`404`** si inconnu / hors scope / **déjà supprimé** (**idempotence** — **§5.4.9**). **Même query **`id`** que **`GET …/drafts?id=…`**. Supprime le brouillon plateforme pour satisfaire **W1** et débloquer **`POST …/scan`** (parcours **§2.2**). Ne supprime **pas** le scan Discovery référencé.
 - Le corps d’écriture **`POST`** inclut **`id`**, **`scan_id`** (liaison **`scan_result`** Discovery / **Option A** CPM lorsque applicable), **`payload`** — affiner uniquement les **règles métier** (ex. **`scan_id` obligatoire** pour certains flux) et l’AUTH scan (AUTH-02).
 
 ---
@@ -247,8 +250,8 @@ La coordination release (frontend, scripts, intégrations) reste nécessaire, ma
 | **Dernier scan `completed`** | **`GET …/wallets/scans?address=0x…&latest=true`** — dernier scan **`completed`** seulement (**§2.2 W2**). **`total: 0`** s’il n’existe **aucun** **`completed`** pour l’adresse (même si des lignes **`failed`** ou en cours existent). |
 | **Garde readiness (W7)** | **`POST …/scan`** : refus si le plus récent est **`requested`** / **`started`** (**`SCAN_IN_PROGRESS`**). **CPM** : refus si le plus récent n’est pas **`completed`** — **§2.2 W7**. |
 | Détail | **`GET …/wallets/scans/{scan_id}`** — **`scan_id`**, **`status`** (lifecycle), **`result`** métier wallet — **exemple JSON** ci‑dessous ; **404** si absent / hors scope. |
-| Lifecycle + immutabilité | **`scan_id`** alloué en **`requested`** (**§2.2**) ; **`result`** immutable après terminal. **Re-scan** = **nouvelle ligne** + **nouveau **`scan_id`**** **seulement** si **aucune** CPM persistée pour la **`target_address`** (**§2.2 W1**). |
-| **POST scan** (wallet) | **`POST …/scan`** avec **`address`** : **`409`** si CPM existante pour la cible (**W1**) ; sinon flux existant (**§8.3**). |
+| Lifecycle + immutabilité | **`scan_id`** alloué en **`requested`** (**§2.2**) ; **`result`** immutable après terminal. **Re-scan** = **nouvelle ligne** + **nouveau **`scan_id`**** **seulement** si **aucune** policy **ni** **draft** CPM pour la **`target_address`** (**§2.2 W1**). |
+| **POST scan** (wallet) | **`POST …/scan`** avec **`address`** : **`409`** si policy **ou** **draft** pour la cible (**W1**) ; sinon flux existant (**§8.3**). |
 | **CBOM** | **`GET …/wallets/scans/{scan_id}/cbom`** — CBOM généré **à la demande** ; **404** si scan absent ; terminal requis (schéma OpenAPI). |
 | Effacement | **`DELETE …/wallets/scans/{scan_id}`** — **`204`** \| **`404`** \| **`409`** ; **`409`** **`SCAN_REFERENCED_BY_POLICY`** si policy référence ce **`scan_id`**. **Parcours utilisateur** : **`GET …/policies?scan_id=`** → **`DELETE …/policies?id=`** → **`DELETE`** scan (**§2.2 W3**, rationale **§4.2**). **Idempotence** : second **`DELETE`** → **`404`** (**§5.4.6**). |
 | Auth | JWT ; **owner-scoped** (+ authz **`scan`** / AUTH‑02 où défini). |
@@ -343,9 +346,10 @@ La coordination release (frontend, scripts, intégrations) reste nécessaire, ma
 
 | Élément | Décision de travail |
 |--------|---------------------|
-| Rôle | **`POST` \| `GET` \| `DELETE …/policies`** (instances, query **`id`** pour **GET**/**DELETE**) ; **`POST` \| `GET …/drafts`** (brouillons). Préfixes **§0.2** (`/api/cpm/v1/`) ou **§0.3** (`/api/v1/cpm/`). |
+| Rôle | **`POST` \| `GET` \| `DELETE …/policies`** (instances, query **`id`** pour **GET**/**DELETE**) ; **`POST` \| `GET` \| `DELETE …/drafts`** (brouillons, query **`id`** pour **GET**/**DELETE**). Préfixes **§0.2** (`/api/cpm/v1/`) ou **§0.3** (`/api/v1/cpm/`). |
 | Corps **`POST`** | **`{ id, scan_id?, payload }`** — règles **`scan_id`** / **AUTH-02** : **§2.4**, OpenAPI. |
 | **`DELETE …/policies?id=…`** | **`204`** \| **`404`** uniquement (**idempotence** **§5.4.9**) ; **pas** de **`409`**. Ne supprime **pas** le **`scan_result`** Discovery (**§2.4**). |
+| **`DELETE …/drafts?id=…`** | **`204`** \| **`404`** uniquement (**idempotence** **§5.4.9**) ; ne supprime **pas** le scan Discovery. Débloque **W1** pour **`POST …/scan`** après suppression du brouillon plateforme (**§2.2**). |
 | Relecture par **`scan_id`** | **`GET …/policies?id=…`** (une instance) ; **`GET …/policies?scan_id=…`** (liste) — **§5.2** ; combinaison **`id`** + **`scan_id`** → **`400`**. |
 | Traçabilité CPM | **`scan_id`** (**UUID**) aligné Discovery / **Option A** ; **`DELETE`** **`…/wallets/scans/{scan_id}`** ou **`…/tls/scans/{scan_id}`** bloqué **`409`** tant que référence — **§4.2**. |
 
@@ -387,7 +391,7 @@ Aucun autre verbe d’exploration n’est ajouté dans cette remise à plat. Si 
 Cela inclut notamment :
 
 - une policy créée après exploration depuis un **scan wallet** ;
-- une policy créée après exploration depuis un **scan TLS**, si le produit active ce cas ;
+- *(hors flux produit actuel)* une policy liée à un scan **TLS** — **pas** de parcours assessment/remediation TLS CPM pour cette release (**§5.4.6**) ;
 - une policy destinée à servir de base à une **remediation** liée à un scan.
 
 **Décision :** **`scan_id`** peut rester **absent** uniquement pour des objets **non** liés à un scan utilisateur, par exemple :
@@ -550,15 +554,22 @@ Structure minimale cible :
 
 Ce schéma est volontairement distinct du wallet. Les deux familles partagent **`scan_id`**, **`status`**, lifecycle, immutabilité et pagination, mais **pas** le même **`result`**.
 
-#### 5.4.6 Corrélation CPM des scans TLS
+#### 5.4.6 Scans TLS — Discovery vs CPM (périmètre produit actuel)
 
-**Décision :** le même invariant **`scan_id`** s’applique aux scans **wallet** et **TLS**. Une instance CPM peut référencer un **`scan_id`** wallet **ou** TLS si le produit active ce type de policy.
+**Décision :** les scans **TLS** restent une responsabilité **Discovery** pour **historique**, **CBOM** (optionnel), **observation** et **inventaire de risque**. Le flux produit **CPM assessment/remediation** actuel (**Option A**, **W1–W7**) est **wallet-only** (scans **wallet / EVM** uniquement).
+
+**TLS scope (tranché) :**
+
+- **oui** : **`scan_id`** stable, historique, résultat terminal immutable, list/detail/delete, CBOM optionnel ;
+- **oui** : inventaire de risque / observation / historique Discovery ;
+- **non** (flux CPM produit actuel) : cible d’**assessment** ou de **remediation** CPM ; pas de migration/remediation TLS dans CPM pour cette release ;
+- **défensif** : si un **`scan_id`** TLS est référencé par une policy persistée (cas technique ou futur), **`DELETE …/tls/scans/{scan_id}`** retourne **`409`** **`SCAN_REFERENCED_BY_POLICY`** — même corps d’erreur que wallet.
 
 **Conséquence :**
 
-- **`DELETE …/wallets/scans/{scan_id}`** retourne **`409`** si une policy référence ce scan **wallet** ;
-- **`DELETE …/tls/scans/{scan_id}`** retourne **`409`** si une policy référence ce scan **TLS** ;
-- le corps d’erreur reste **`SCAN_REFERENCED_BY_POLICY`**.
+- **`DELETE …/wallets/scans/{scan_id}`** → **`409`** si une policy référence ce scan **wallet** ;
+- **`DELETE …/tls/scans/{scan_id}`** → **`409`** si une policy référence ce scan **TLS** (garde défensive) ;
+- **W1**, **W2**, **W7** et lookup **IMM-9b** : **wallet / EVM** uniquement — **pas** d’équivalent TLS sur le parcours CPM courant.
 
 #### 5.4.7 Croisement wallet CAFE et adresse observée
 
@@ -648,7 +659,8 @@ GET    /api/cpm/v1/policies?scan_id=...
 DELETE /api/cpm/v1/policies?id=...
 
 POST   /api/cpm/v1/drafts
-GET    /api/cpm/v1/drafts
+GET    /api/cpm/v1/drafts?id=...
+DELETE /api/cpm/v1/drafts?id=...
 ```
 
 La variante **§0.3** reste **uniquement** un mécanisme de **transition ingress / déploiement**. Elle ne doit **pas** être documentée comme contrat produit **long terme**.
@@ -704,7 +716,8 @@ Le document est **acceptable** lorsque les éléments ci-dessous sont **validés
   - `GET /api/cpm/v1/policies?scan_id=...`
   - `DELETE /api/cpm/v1/policies?id=...`
   - `POST /api/cpm/v1/drafts`
-  - `GET /api/cpm/v1/drafts`
+  - `GET /api/cpm/v1/drafts?id=...`
+  - `DELETE /api/cpm/v1/drafts?id=...`
 
 - La variante rollout **§0.3** est **confirmée** comme **transition ingress / déploiement** uniquement, **sans** statut de contrat produit pérenne.
 - La **suppression** de **§0.3** après bascule vers **§0.2** est **acceptée** (chemins **non** servis, **non** documentés comme supportés — **§0**).
@@ -792,6 +805,13 @@ Les invariants suivants sont **acceptés** comme comportement produit :
   - **jamais** de cascade vers Discovery ;
   - **pas** de **`409`** dans cette release.
 
+- **`DELETE …/drafts?id=...`** :
+  - **`204`** si supprimé ;
+  - **`404`** si inconnu, hors scope ou déjà supprimé ;
+  - **ne supprime pas** le scan Discovery référencé ;
+  - **pas** de **`409`** dans cette release ;
+  - permet de satisfaire **W1** et débloquer **`POST …/scan`** (rescan) après suppression du brouillon plateforme (**§2.2**).
+
 ### 8.6 Contrat CPM validé
 
 - Le **triple GET** catalogue reste **lecture statique**.
@@ -799,8 +819,9 @@ Les invariants suivants sont **acceptés** comme comportement produit :
 - **`explore`** **ne persiste rien**.
 - **`POST …/policies`** persiste une **instance finale**.
 - **`scan_id`** est **obligatoire** pour toute instance issue d’un flux **Discovery → CPM**.
-- Tant que le **dernier scan** n’est pas **`completed`**, **aucune** nouvelle policy / **explore** (**§2.2 W7**). **`POST …/scan`** reste possible si le dernier est **`failed`** (retry) ; **interdit** seulement pendant **`requested`** / **`started`**.
+- Tant que le **dernier scan** n’est pas **`completed`**, **aucune** nouvelle policy / **explore** (**§2.2 W7**). **`POST …/scan`** : **interdit** si scan en cours ; si **`failed`**, retry seulement sans policy **ni** **draft** (**§2.2 W1**).
 - **`scan_id`** pour **explore** / **persist** = **`scan_id`** du **`GET …/wallets/scans?address=&latest=true`** (dernier **`completed`** — **§2.2 W2**) ; sinon **`400`**.
+- **`DELETE …/drafts?id=...`** : **`204`** \| **`404`** ; supprime le brouillon plateforme pour débloquer **W1** / **`POST …/scan`** (**§2.4**).
 - **`GET …/policies?scan_id=...`** est **requis** pour le parcours utilisateur avant **`DELETE`** scan (**§2.2 W3**, **`SCAN_REFERENCED_BY_POLICY`**).
 - **`GET …/policies?id=...`** retourne une **instance unique**.
 - **`GET …/policies?scan_id=...`** retourne une **liste** **owner-scoped**.
@@ -833,9 +854,13 @@ Les **PRs** d’implémentation doivent couvrir au minimum :
 - **`DELETE`** idempotence → second **`DELETE`** → **`404`** ;
 - **`DELETE`** scan avec policy référente → **`409`** ;
 - **`GET …/policies?scan_id=...`** retourne les policies **owner-scoped** ;
-- re-scan **même cible** **sans** CPM persistée (**W1**) → **nouvelle** ligne → nouveau **`scan_id`** ;
-- **`POST …/scan`** avec CPM existante sur la cible → **`409`** ;
-- explore/persist avec **`scan_id`** non latest → **`400`** ;
+- re-scan **même cible** **sans** policy **ni** draft CPM (**W1**) → **nouvelle** ligne → nouveau **`scan_id`** ;
+- **`POST …/scan`** avec policy **ou** draft sur la cible → **`409`** (**W1**) ;
+- **`DELETE …/drafts?id=...`** → **`204`** \| **`404`** ; débloque **W1** pour rescan ;
+- explore/persist avec **`scan_id`** non latest → **`400`** **`SCAN_ID_NOT_LATEST_FOR_TARGET`** ;
+- **W7** CPM : newest row (pas **`latest=true`**) ; **W2** CPM : **`GET …/wallets/scans?address=&latest=true`** (pas **`limit=1`** seul) ;
+- aucune réponse API n’expose **`RUNNING`** ou **`running`** (**lifecycle** : **`started`**) ;
+- TLS : hors scope assessment/remediation CPM produit actuel ; garde **`409`** défensive sur **`DELETE`** scan TLS si policy référence le **`scan_id`** ;
 - **`GET …/wallets/scans?address=&latest=true`** → dernier **`completed`** ; peut être **`total: 1`** avec un **`failed`** plus récent dans l’historique ;
 - **`POST …/scan`** avec dernier scan **`requested`** / **`started`** → **`409`** **`SCAN_IN_PROGRESS`** ; avec dernier **`failed`** → **autorisé** (nouvelle ligne) ;
 - explore/persist avec dernier scan non **`completed`** (`failed` ou en cours) → **`400`** (**W7**) ; cas **`completed` A + `failed` B** (B plus récent) : CPM **400**, **`POST …/scan`** **OK** ;
