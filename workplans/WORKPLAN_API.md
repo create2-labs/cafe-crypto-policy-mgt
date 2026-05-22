@@ -102,6 +102,12 @@ Ce document pose un **modèle cible** cohérent : **collections au pluriel** uni
 - Réponse **paginée** : **`items`**, **`total`**, **`limit`**, **`offset`**. Chaque **`items[]`** = synopsis **minimal**, **pas** le DTO métier complet — réservé à **`GET …/wallets/scans/{scan_id}`**. Anti-**N+1** (**§4.2**).
 - **`GET …/wallets/scans?address=0x…`** : filtre sur **adresse Ethereum** normalisée, **toutes chaînes** si **`chain_id`** absent ; le synopsis peut porter plusieurs **`chain_ids`** (**CAFE** multi-chaînes).
 - **`GET …/wallets/scans?address=…&chain_id=N`** : **même enveloppe** ; **`chain_id`** = raffinement **mono-chaîne** pour cette adresse. **`chain_id`** **sans** **`address`** → **`400 Bad Request`** (**§2.2**).
+- **`GET …/wallets/scans?address=0x…&latest=true`** (tranché — **pas** de route **`/latest`** dédiée) : retourne le **dernier scan terminé avec succès** (**lifecycle `completed`** uniquement — **pas** `failed`, **pas** `requested` / `started`) pour cette adresse. **Même enveloppe** paginée ; **`items`** ≤ 1 ; **`total`** **`0`** ou **`1`**. Tri : **`created_at`** desc, puis **`scan_id`** desc. **`latest=true`** **sans** **`address`** → **`400`**. Avec **`&chain_id=N`** : dernier **`completed`** parmi les scans matchant la chaîne. Usage : **CPM (W2)**, UI (scan de référence policy).
+
+  > *Do not use `limit=1` alone as a substitute for `latest=true`: the newest row by `created_at` may be in progress or failed.*
+
+  > *CPM (**W7**) : si la ligne la plus récente (`created_at`) n’est pas `completed`, bloquer explore/persist même s’il existe un `completed` plus ancien. **`POST …/scan`** : autorisé si le plus récent est `failed` (nouvelle tentative) ; refus seulement si `requested` ou `started` — **§2.2 W7**.*
+
 - **`ScanListItem`** (wallet, OpenAPI) : **`scan_id`**, **`created_at`**, **`status`** (**lifecycle** seul — **pas** posture / verdict métier). **`target_address`** (ou équivalent) et **`chain_ids`** : renseignés selon le cas ; **`null`** / **`[]`** si non encore connus (**schéma** à figer).
 
 **Collection TLS — `GET …/tls/scans`**
@@ -146,11 +152,31 @@ Ce document pose un **modèle cible** cohérent : **collections au pluriel** uni
 
 - **Historique (listes)** : **`GET …/wallets/scans`** [+ **`?address`**, **`&chain_id`**] et **`GET …/tls/scans`** peuvent renvoyer plusieurs **`scan_id`** distincts pour une **même** cible (adresse / endpoint) si **plusieurs exécutions** ont produit **plusieurs lignes de résultat** (chacune avec son **`scan_id`**) — cf. point **5** ci‑dessus.
 
-- **Effacement** : **`DELETE …/wallets/scans/{scan_id}`** et **`DELETE …/tls/scans/{scan_id}`** (**owner**). **`204`** \| **`404`** \| **`409`** — **même sémantique** (**référence CPM** → **`409`** **`SCAN_REFERENCED_BY_POLICY`** — **§4.2**) pour tout **`scan_id`** référencé par une instance persistée. Flux : **`DELETE …/policies?id=…`** puis **`DELETE`** sur la route **où** vit l’exécution (**`…/wallets/scans`** ou **`…/tls/scans`**).
+- **CBOM par exécution (wallet, tranché)** : **`GET …/wallets/scans/{scan_id}/cbom`** — document **CBOM** (CycloneDX ou enveloppe documentée OpenAPI) **généré à la demande** depuis la ligne de résultat de **cet** **`scan_id`** ; **jamais** stocké en blob. **`404`** si scan absent / hors scope ; règles d’accès alignées sur le détail owner. Les anciennes routes **`GET /discovery/cbom/*`** restent **retirées** (**§8.7**). Symétrie TLS optionnelle : **`GET …/tls/scans/{scan_id}/cbom`**.
+
+- **Effacement** : **`DELETE …/wallets/scans/{scan_id}`** et **`DELETE …/tls/scans/{scan_id}`** (**owner**). **`204`** \| **`404`** \| **`409`** — **même sémantique** (**référence CPM** → **`409`** **`SCAN_REFERENCED_BY_POLICY`** — **§4.2**) pour tout **`scan_id`** référencé par une instance persistée. **Action utilisateur requise** : le client **doit d’abord** supprimer ou détacher les instances CPM (**`DELETE …/policies?id=…`**, éventuellement après **`GET …/policies?scan_id=…`** pour les lister), **puis** appeler **`DELETE …/wallets/scans/{scan_id}`** (ou TLS). **Pas** de suppression en cascade scan → policies.
 
 - **Idempotence `DELETE` (tranché)** — **wallets CAFE**, **`…/wallets/scans/{scan_id}`**, **`…/tls/scans/{scan_id}`**, **instances CPM** : **`204`** \| **`404`** (**§5.4.8**, **§5.4.9** ; scans — **§5.4.6**) ; **`409`** possible sur les **`DELETE`** scan (**§4.2**).
 
 - **Corrélation CPM** : le **`scan_id`** (**UUID**) est la clé de traçabilité **Option A** (CPM) ; il s’applique aux exécutions **wallet** et, lorsque le produit le prévoit, aux exécutions **TLS**. Tant qu’une **politique persistée** référence ce **`scan_id`**, le **`DELETE`** du scan correspondant → **`409`** (**§4.4**).
+
+**Couplage wallet ↔ CPM (tranché — familles wallet / `binding=discovery`)**
+
+| # | Règle | Discovery | CPM |
+|---|--------|-----------|-----|
+| **W7** | **CPM** : pas de nouvelle policy / explore tant que le **dernier scan** (plus récent par **`created_at`**) n’est pas **`completed`**. **`POST …/scan`** : l’utilisateur peut **relancer** des scans (nouvelle ligne) tant que le dernier n’est pas **`completed`** — **refus** seulement si un scan est **en cours** (`requested` / `started`) | **`POST …/scan`** → **`409`** (ex. **`SCAN_IN_PROGRESS`**) si la ligne la plus récente est **`requested`** ou **`started`** ; **pas** de **`409`** si elle est **`failed`** (nouvelle tentative autorisée). **`GET …/wallets/scans?address=&latest=true`** : dernier **`completed`** (peut être **`total: 1`** même si un **`failed`** plus récent existe) | **`POST …/policies`** / **explore** → **`400`** (ex. **`LATEST_SCAN_NOT_COMPLETED`**) si la ligne la plus récente n’est pas **`completed`** (`failed` ou en cours inclus) |
+| **W1** | **Pas de nouveau scan** si une **CPM persistée** existe déjà pour la **`target_address`** (en plus de **W7**) | **`POST …/scan`** → **`409`** (ex. **`CPM_EXISTS_FOR_WALLET_TARGET`**) | Lookup owner-scoped (**§4.4**) |
+| **W2** | **CPM uniquement sur le dernier scan `completed`** de la cible | **`GET …/wallets/scans?address=&latest=true`** (dernier **`completed`** seulement) | **`400`** si **`scan_id`** ≠ celui de **`latest=true`** |
+| **W3** | **DELETE scan** : **action utilisateur** — d’abord **supprimer la CPM**, puis **`DELETE …/wallets/scans/{scan_id}`** | **`409`** **`SCAN_REFERENCED_BY_POLICY`** tant qu’une policy référence ce **`scan_id`** ; **`204`** une fois les policies retirées | **`DELETE …/policies?id=`** **sans** effet sur les scans (**W4**) ; **`GET …/policies?scan_id=`** pour lister avant DELETE scan |
+| **W4** | **Suppression CPM** sans effet sur les scans | Inchangé | **`DELETE …/policies?id=`** seul |
+| **W5** | **Historique** par adresse | **`GET …/wallets/scans?address=`** | Lecture ; policies par **`scan_id`** |
+| **W6** | **CBOM par scan** | **`GET …/wallets/scans/{scan_id}/cbom`** (**à la demande**) | Hors scope stockage CBOM |
+
+> **Ordre des gardes (wallet) :** **`POST …/scan`** : garde **en cours** (**W7**, `requested` / `started`) puis **W1** (pas de CPM existante). **CPM** : **W7** (dernier scan = **`completed`**) puis **W2** sur **`scan_id`**.
+
+> **Re-scan / retry :** si le dernier scan est **`failed`**, l’utilisateur lance un **nouveau** **`POST …/scan`** (nouvelle ligne, **point 5**) jusqu’à obtenir un **`completed`** — **sans** obligation de **`DELETE`** le scan **`failed`** au préalable. Pendant un scan **en cours** : pas de nouveau **`POST …/scan`** ni CPM. Après **`completed`** + **W1** OK, re-scan optionnel = encore une nouvelle ligne.
+
+> **Plans d’implémentation :** [`cafe-discovery/IMMUTABILITE_PR.md`](../../cafe-discovery/IMMUTABILITE_PR.md), [`workplans/IMMUTABILITE_PR.md`](./IMMUTABILITE_PR.md) (CPM), [`cafe-frontend/IMMUTABILITE.md`](../../cafe-frontend/IMMUTABILITE.md) — **découpage PR** ; **ce document** reste la **source de vérité** contrat.
 
 ### 2.3 Lecture du catalogue des crypto policies
 
@@ -171,7 +197,7 @@ User (JWT)
   ├── wallets/              → GET liste des wallet_id CAFE           (2.1)
   ├── wallets/{wallet_id}   → GET détail | DELETE effacement owner   (2.1, 4.1)
   ├── wallets/scans/        → GET liste wallet (synopsis) + ?address [& chain_id]  (2.2)
-  ├── wallets/scans/{scan_id} → GET détail | DELETE effacement wallet      (2.2, 4.2)
+  ├── wallets/scans/{scan_id} → GET détail | GET cbom | DELETE effacement wallet  (2.2, 4.2)
   ├── tls/scans/            → GET liste TLS (synopsis)                     (2.2)
   └── tls/scans/{scan_id}   → GET détail | DELETE effacement TLS           (2.2, 4.2)
 
@@ -218,9 +244,13 @@ La coordination release (frontend, scripts, intégrations) reste nécessaire, ma
 | Liste | **`GET …/wallets/scans`** — **`200`** + **`items`**, **`total`**, **`limit`**, **`offset`**. **`ScanListItem`** wallet : **§2.2** ; **`status`** = **lifecycle uniquement** (OpenAPI : *status is lifecycle metadata, not the crypto posture result*). **Tri par défaut** : **`created_at`** desc, puis **`scan_id`** desc (tie-breaker) — **§2.2**. |
 | Filtre **`address`** (multi-chaînes) | **`GET …/wallets/scans?address=0x…`** — **même enveloppe** ; **toutes chaînes** ; synopsis **`chain_ids`** quand applicable (**§2.2**). |
 | Filtre **`address`** + **`chain_id`** | **`GET …/wallets/scans?address=…&chain_id=…`** — **même enveloppe** ; raffinement mono-chaîne (**§2.2**). **`GET …/wallets/scans?chain_id=…`** **sans** **`address`** → **`400 Bad Request`** (**§2.2**). **Pas** de **`/wallets/scans/0x…`** (adresse **uniquement** en query). |
+| **Dernier scan `completed`** | **`GET …/wallets/scans?address=0x…&latest=true`** — dernier scan **`completed`** seulement (**§2.2 W2**). **`total: 0`** s’il n’existe **aucun** **`completed`** pour l’adresse (même si des lignes **`failed`** ou en cours existent). |
+| **Garde readiness (W7)** | **`POST …/scan`** : refus si le plus récent est **`requested`** / **`started`** (**`SCAN_IN_PROGRESS`**). **CPM** : refus si le plus récent n’est pas **`completed`** — **§2.2 W7**. |
 | Détail | **`GET …/wallets/scans/{scan_id}`** — **`scan_id`**, **`status`** (lifecycle), **`result`** métier wallet — **exemple JSON** ci‑dessous ; **404** si absent / hors scope. |
-| Lifecycle + immutabilité | **`scan_id`** alloué en **`requested`** (**§2.2**) ; **`result`** immutable après terminal. **Re-scan** = **nouveau résultat persisté** → **nouveau **`scan_id`** (celui de la **nouvelle** ligne). |
-| Effacement | **`DELETE …/wallets/scans/{scan_id}`** — **`204`** \| **`404`** \| **`409`** ; **`409`** si instance **`…/policies`** (**§0**) référence ce **`scan_id`**. **Idempotence** : second **`DELETE`** → **`404`** (**§5.4.6**). |
+| Lifecycle + immutabilité | **`scan_id`** alloué en **`requested`** (**§2.2**) ; **`result`** immutable après terminal. **Re-scan** = **nouvelle ligne** + **nouveau **`scan_id`**** **seulement** si **aucune** CPM persistée pour la **`target_address`** (**§2.2 W1**). |
+| **POST scan** (wallet) | **`POST …/scan`** avec **`address`** : **`409`** si CPM existante pour la cible (**W1**) ; sinon flux existant (**§8.3**). |
+| **CBOM** | **`GET …/wallets/scans/{scan_id}/cbom`** — CBOM généré **à la demande** ; **404** si scan absent ; terminal requis (schéma OpenAPI). |
+| Effacement | **`DELETE …/wallets/scans/{scan_id}`** — **`204`** \| **`404`** \| **`409`** ; **`409`** **`SCAN_REFERENCED_BY_POLICY`** si policy référence ce **`scan_id`**. **Parcours utilisateur** : **`GET …/policies?scan_id=`** → **`DELETE …/policies?id=`** → **`DELETE`** scan (**§2.2 W3**, rationale **§4.2**). **Idempotence** : second **`DELETE`** → **`404`** (**§5.4.6**). |
 | Auth | JWT ; **owner-scoped** (+ authz **`scan`** / AUTH‑02 où défini). |
 | Ancien `GET …/discovery/scans` (**`id`** = adresse) | **Supprimé** ; remplacé par la liste **synopsis** + **`scan_id`** + filtres **§2.2**. |
 
@@ -769,7 +799,9 @@ Les invariants suivants sont **acceptés** comme comportement produit :
 - **`explore`** **ne persiste rien**.
 - **`POST …/policies`** persiste une **instance finale**.
 - **`scan_id`** est **obligatoire** pour toute instance issue d’un flux **Discovery → CPM**.
-- **`GET …/policies?scan_id=...`** est **requis** pour résoudre les conflits **`SCAN_REFERENCED_BY_POLICY`**.
+- Tant que le **dernier scan** n’est pas **`completed`**, **aucune** nouvelle policy / **explore** (**§2.2 W7**). **`POST …/scan`** reste possible si le dernier est **`failed`** (retry) ; **interdit** seulement pendant **`requested`** / **`started`**.
+- **`scan_id`** pour **explore** / **persist** = **`scan_id`** du **`GET …/wallets/scans?address=&latest=true`** (dernier **`completed`** — **§2.2 W2**) ; sinon **`400`**.
+- **`GET …/policies?scan_id=...`** est **requis** pour le parcours utilisateur avant **`DELETE`** scan (**§2.2 W3**, **`SCAN_REFERENCED_BY_POLICY`**).
 - **`GET …/policies?id=...`** retourne une **instance unique**.
 - **`GET …/policies?scan_id=...`** retourne une **liste** **owner-scoped**.
 
@@ -801,7 +833,14 @@ Les **PRs** d’implémentation doivent couvrir au minimum :
 - **`DELETE`** idempotence → second **`DELETE`** → **`404`** ;
 - **`DELETE`** scan avec policy référente → **`409`** ;
 - **`GET …/policies?scan_id=...`** retourne les policies **owner-scoped** ;
-- re-scan **même cible** → **nouvelle** ligne de résultat → nouveau **`scan_id`** ;
+- re-scan **même cible** **sans** CPM persistée (**W1**) → **nouvelle** ligne → nouveau **`scan_id`** ;
+- **`POST …/scan`** avec CPM existante sur la cible → **`409`** ;
+- explore/persist avec **`scan_id`** non latest → **`400`** ;
+- **`GET …/wallets/scans?address=&latest=true`** → dernier **`completed`** ; peut être **`total: 1`** avec un **`failed`** plus récent dans l’historique ;
+- **`POST …/scan`** avec dernier scan **`requested`** / **`started`** → **`409`** **`SCAN_IN_PROGRESS`** ; avec dernier **`failed`** → **autorisé** (nouvelle ligne) ;
+- explore/persist avec dernier scan non **`completed`** (`failed` ou en cours) → **`400`** (**W7**) ; cas **`completed` A + `failed` B** (B plus récent) : CPM **400**, **`POST …/scan`** **OK** ;
+- **`GET …/wallets/scans/{scan_id}/cbom`** pour scan terminal owner ;
+- **`DELETE`** scan : **`409`** si policy référence ; **`204`** après **`DELETE`** policies ;
 - **`status`** **lifecycle-only** ;
 - séparation **`result`** wallet / **`result`** TLS ;
 - anciennes routes **supprimées** ou **non routées**.
