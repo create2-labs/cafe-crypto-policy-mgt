@@ -127,7 +127,7 @@ V1 baseline (**PR 12** API `CpmDataSource`, validation, EOA, persist) remains in
 | CPM explore | [#29](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/29) | Option A `policy_context` |
 | CPM persist / list | [#28](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/28) | `scan_id`, `binding`, `GET ?scan_id=` |
 | CPM assessment | [#33](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/33) | Wallet-only async; no client `policy_context` |
-| C1 smoke script | [#34](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/34) | `test-discovery-v1-wallet-scans-to-cpm.sh` |
+| C1 smoke script | [#34](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/34) | [`test-discovery-v1-wallet-scans-to-cpm.sh`](https://github.com/create2-labs/cafe-deploy/scripts/test-discovery-v1-wallet-scans-to-cpm.sh) |
 | C2 contract tests | [#35](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/35) | Golden A2 §3.1 |
 
 ---

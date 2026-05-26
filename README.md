@@ -22,7 +22,7 @@ CPM does not depend on Discovery’s database or internal domain structs. Inboun
 | `internal/api` | PR17 read-only HTTP APIs for policy inspection and decision exploration |
 | `internal/persistence` | Owner-scoped in-memory persistence (`OwnerScopedStore`) for drafts and persisted policy records exposed under `/api/v1/cpm/*` |
 | `docs/` | Integration narratives (e.g. [`docs/CPM_OPTION_A_INTEGRATED.md`](./docs/CPM_OPTION_A_INTEGRATED.md) — Option A v1 flow) |
-| `scripts/` | Operational helpers (e.g. [`test-discovery-v1-wallet-scans-to-cpm.sh`](./scripts/test-discovery-v1-wallet-scans-to-cpm.sh) — Option A v1 smoke) |
+| `scripts/` | Operational helpers (e.g. [`test-discovery-v1-wallet-scans-to-cpm.sh`](https://github.com/create2-labs/cafe-deploy/scripts/test-discovery-v1-wallet-scans-to-cpm.sh) — Option A v1 smoke) |
 | `internal/integration/nats` | NATS integration for inbound explicit assessment requests + outbound CPM event publication |
 
 ## Discovery → CPM contract (`cafe.discovery.wallet.observed` v0.1)
@@ -299,16 +299,6 @@ Audit hook:
 Canonical end-to-end narrative: [`docs/CPM_OPTION_A_INTEGRATED.md`](./docs/CPM_OPTION_A_INTEGRATED.md) (Discovery v1 list/detail → CPM explore with **`policy_context`** → persist). Maintainer field mapping: [Discovery `CPM_OPTION_A_DISCOVERY_V1_CONTRACT.md`](https://github.com/create2-labs/cafe-discovery/blob/main/docs/CPM_OPTION_A_DISCOVERY_V1_CONTRACT.md). Public summary: [cafe-documentation `docs/architecture/cpm-option-a-v1-flow.md`](https://github.com/create2-labs/cafe-documentation/blob/main/docs/architecture/cpm-option-a-v1-flow.md).
 
 **Historical:** `GET /discovery/wallet-policy-contexts` and CBOM polling scripts were removed; use v1 **`/discovery/v1/wallets/scans`** only.
-
-## Scripted Discovery → CPM smoke (Option A v1)
-
-[`scripts/test-discovery-v1-wallet-scans-to-cpm.sh`](./scripts/test-discovery-v1-wallet-scans-to-cpm.sh) signs in to Discovery, calls **`GET /discovery/v1/wallets/scans`** and **`GET …/wallets/scans/{scan_id}`**, builds **`policy_context`** from the v1 detail, runs **`POST /api/cpm/v1/policies/decisions/explore`**, and optionally **`POST /api/cpm/v1/policies`**. Help: `./scripts/test-discovery-v1-wallet-scans-to-cpm.sh --help`.
-
-- Defaults: **`DISCOVERY_BASE=http://localhost:8080`**, **`CPM_BASE=http://localhost:8082`** ( **`go run ./cmd/cafe-cpm`** on **`:8082`** by default).
-- Edge: set list path to **`/api/discovery/v1/wallets/scans`** and gateway hosts in `DISCOVERY_BASE` / `CPM_BASE`.
-- **`CURL_INSECURE=1`** for local self-signed TLS; **`SKIP_PERSIST=1`** to stop after explore.
-
-Cross-repo API guide: [`cafe-documentation/03-cafe-developer-guide.md`](https://github.com/create2-labs/cafe-documentation/blob/main/03-cafe-developer-guide.md).
 
 ## Run locally
 
