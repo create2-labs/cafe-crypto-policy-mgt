@@ -1,6 +1,6 @@
 # Scan immutability & CPM — PR plan (CPM)
 
-**Source de vérité :** [`WORKPLAN_API.md`](./WORKPLAN_API.md) — **§0**, **§2.2** (couplage **W1–W7**, query **`latest=true`**), **§4.4**, **§8.6**.
+**Source de vérité :** [`WORKPLAN_API.md`](./WORKPLAN_API.md) — **§0**, **§2.2** (couplage **W1–W8**, query **`latest=true`**), **§4.4**, **§8.6**.
 
 **All API paths in this document refer to the canonical public prefixes defined in WORKPLAN_API.md: `/api/discovery/v1` and `/api/cpm/v1`.**
 
@@ -29,8 +29,8 @@
 
 | Règle | Résolution Discovery | Exemple |
 |-------|----------------------|---------|
-| **W7** (CPM) | **Newest row** par `created_at` desc, `scan_id` desc — **pas** `latest=true` | `GET /api/discovery/v1/wallets/scans?address=0x…&limit=1` (tri par défaut) |
 | **W2** (CPM) | **Dernier scan `completed`** uniquement | `GET /api/discovery/v1/wallets/scans?address=0x…&latest=true` |
+| **W7** (CPM) | **Newest row** par `created_at` desc, `scan_id` desc — **pas** `latest=true` | `GET /api/discovery/v1/wallets/scans?address=0x…&limit=1` (tri par défaut) |
 
 - **Ne jamais** utiliser `latest=true` pour **W7**.
 - **Ne jamais** utiliser `limit=1` seul comme substitut de **W2** (la ligne la plus récente peut être `requested`, `started` ou `failed`).
@@ -41,12 +41,13 @@
 
 | ID | Règle | CPM |
 |----|--------|-----|
-| **W7** | Pas de **nouvelle CPM** tant que le **newest row** n’est pas **`completed`** | explore/persist → **400** `LATEST_SCAN_NOT_COMPLETED` |
-| **W1** | **Un contexte CPM actif max** : pas de scan si **policy** ou **draft** sur la cible | Lookup policies **+** drafts (**IMM-9b**) → Discovery **IMM-9** |
+| **W1** | **Un contexte CPM actif max** : pas de scan si **policy** ou **draft** sur la cible (après **W8**) | Lookup policies **+** drafts (**IMM-9b**) → Discovery **IMM-9** |
 | **W2** | CPM sur le dernier **`completed`** uniquement | **`GET …/wallets/scans?address=&latest=true`** (**IMM-10**) |
 | **W3–W6** | DELETE / historique / CBOM | Voir WORKPLAN |
+| **W7** | Pas d’explore/persist tant que le **newest row** n’est pas **`completed`** | explore/persist → **400** `LATEST_SCAN_NOT_COMPLETED` |
+| **W8** | **Rescan** : `POST …/scan` refusé seulement si scan **en cours** ; **OK** si newest **`failed`** (sous **W1**) — **indépendant de W7** | Implémenté côté **Discovery** (**IMM-4**, **IMM-9**) |
 
-> **Discovery POST** : `SCAN_IN_PROGRESS` → garde en cours ; puis **W1** (policy **ou** draft).
+> **Discovery POST** : **W8** (`SCAN_IN_PROGRESS` si en cours) ; puis **W1** (policy **ou** draft). **W7** ne s’applique **pas** à POST.
 
 ---
 
