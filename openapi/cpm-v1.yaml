@@ -13,10 +13,15 @@ info:
 
     **Discovery scans (correlation):** `cafe-discovery/openapi/discovery-v1.yaml` (PR1a); shared key **`scan_id`**.
 
-    **Internal (service mesh / Docker, not public ingress):** `POST /internal/policies/references/scan` — gated by env
-    **`CAFE_POLICY_REFERENCE_INTERNAL_SERVICE_TOKEN`** (Bearer). Request JSON **`{ "scan_id", "user_id", "tenant_id" }`**;
-    response **`{ "referenced": boolean, "count": number }`**. Authoritative check for Discovery scan delete (WORKPLAN_API_PR **PR5**/**PR6**);
-    the owner-scoped lookup must remain shared with **`GET …/policies?scan_id=`** (**PR7**).
+    **Internal (service mesh / Docker, not public ingress):** gated by env
+    **`CAFE_POLICY_REFERENCE_INTERNAL_SERVICE_TOKEN`** (Bearer).
+
+    - `POST /internal/policies/references/scan` — request **`{ "scan_id", "user_id", "tenant_id" }`**;
+      response **`{ "referenced": boolean, "count": number }`**. Discovery scan delete guard (WORKPLAN_API_PR **PR5**/**PR6**);
+      shared lookup with **`GET …/policies?scan_id=`** (**PR7**).
+    - `POST /internal/policies/references/wallet-target` — request **`{ "target_address", "user_id", "tenant_id" }`**
+      (`target_address` normalized like Discovery wallet scans); response
+      **`{ "exists": boolean, "policy_count": number, "draft_count": number }`**. Discovery **`POST …/scan`** W1 guard (**IMM-9b**).
 servers:
   - url: https://{host}/api/cpm/v1
     description: Canonical product base (§0.2).
