@@ -53,24 +53,15 @@
 
 ## Table de suivi (CPM)
 
-| PR plan | GitHub issue | Dépôt | Dépend de | Objectif |
+| PR plan | GitHub  | Dépôt | Dépend de | Objectif |
 |---------|--------------|-------|-----------|----------|
-| **IMM-9b** | [§ IMM-9b](#github-issue--imm-9b) | `cafe-crypto-policy-mgt` | PR7 | **W1** : lookup policy **+** draft par `target_address` normalisée |
+| **IMM-9b** | [#38](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/37) | `cafe-crypto-policy-mgt` | PR7 | **W1** : lookup policy **+** draft par `target_address` normalisée |
 | **IMM-10** | [§ IMM-10](#github-issue--imm-10) | `cafe-crypto-policy-mgt` | Discovery **IMM-4** | **W7** (newest row) + **W2** (`latest=true`) |
 
 ---
 
-## GitHub issue — IMM-9b
+##  IMM-9b
 
-### Title (copy as-is)
-
-```
-[CPM][IMM-9b] Internal lookup: active CPM context (policy or draft) for normalized wallet target_address
-```
-
-### Body (copy below the line)
-
----
 
 **Type:** Technical task (**WORKPLAN §2.2 W1**).
 
@@ -116,26 +107,11 @@ Platform draft removal for **W1** uses the canonical public API:
 - [ ] Wallet-only scope: TLS scans **out of** W1 lookup for current product flow.
 - [ ] Tests: policy → true; draft → true; false when both removed.
 
-### Tracking
-
-| Field | Value |
-|-------|--------|
-| Issue | — |
-| PR | — |
 
 ---
 
-## GitHub issue — IMM-10
+##  IMM-10
 
-### Title (copy as-is)
-
-```
-[CPM][IMM-10] Policy explore/persist: W7 newest row then W2 latest completed (wallet-only)
-```
-
-### Body (copy below the line)
-
----
 
 **Type:** Technical task (**WORKPLAN §2.2 W7**, **W2**).
 
