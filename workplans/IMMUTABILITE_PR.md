@@ -56,7 +56,7 @@
 | PR plan | GitHub  | Dépôt | Dépend de | Objectif |
 |---------|--------------|-------|-----------|----------|
 | **IMM-9b** | [#38](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/38) | `cafe-crypto-policy-mgt` | PR7 | **W1** : lookup policy **+** draft par `target_address` normalisée |
-| **IMM-10** | [#39](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/39) | `cafe-crypto-policy-mgt` | Discovery **IMM-4** | **W7** (newest row) + **W2** (`latest=true`) |
+| **IMM-10** | [#40](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/40) | `cafe-crypto-policy-mgt` | Discovery **IMM-4** | **W7** (newest row) + **W2** (`latest=true`) |
 
 ---
 
@@ -115,7 +115,7 @@ Platform draft removal for **W1** uses the canonical public API:
 
 **Type:** Technical task (**WORKPLAN §2.2 W7**, **W2**).
 
-**Tracking ID:** IMM-10
+**Status** : mergée dans [#40](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/40) 
 
 ### Summary
 
