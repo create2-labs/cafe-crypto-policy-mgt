@@ -2,7 +2,6 @@ package app
 
 import (
 	"encoding/json"
-	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/authz"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
 )
 
 func TestExtractScanIDsForAuthorization(t *testing.T) {
@@ -29,13 +29,15 @@ func TestExtractScanIDsForAuthorization(t *testing.T) {
 	}
 }
 
+type extractScanIDsCase struct {
+	name    string
+	body    string
+	want    []string
+	wantErr bool
+}
+
 func TestExtractScanIDsForAuthorizationVariants(t *testing.T) {
-	cases := []struct {
-		name    string
-		body    string
-		want    []string
-		wantErr bool
-	}{
+	cases := []extractScanIDsCase{
 		{name: "top-level scan_id", body: `{"scan_id":"scan-1"}`, want: []string{"scan-1"}},
 		{name: "draft scan_id only", body: `{"draft":{"scan_id":"scan-2"}}`, want: []string{"scan-2"}},
 		{name: "no scan id", body: `{"draft":{"name":"x"}}`, want: nil},
@@ -46,26 +48,31 @@ func TestExtractScanIDsForAuthorizationVariants(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, strings.NewReader(tc.body))
-			scanIDs, authErr, status := extractScanIDsForAuthorization(req)
-			if tc.wantErr {
-				if authErr.Code == "" || status != http.StatusBadRequest {
-					t.Fatalf("expected 400 with error, got code=%q status=%d ids=%#v", authErr.Code, status, scanIDs)
-				}
-				return
-			}
-			if authErr.Code != "" || status != http.StatusOK {
-				t.Fatalf("expected no error, got code=%q status=%d", authErr.Code, status)
-			}
-			if len(tc.want) != len(scanIDs) {
-				t.Fatalf("expected ids %#v, got %#v", tc.want, scanIDs)
-			}
-			for i := range tc.want {
-				if tc.want[i] != scanIDs[i] {
-					t.Fatalf("expected ids %#v, got %#v", tc.want, scanIDs)
-				}
-			}
+			assertExtractScanIDsForAuthorization(t, tc)
 		})
+	}
+}
+
+func assertExtractScanIDsForAuthorization(t *testing.T, tc extractScanIDsCase) {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, strings.NewReader(tc.body))
+	scanIDs, authErr, status := extractScanIDsForAuthorization(req)
+	if tc.wantErr {
+		if authErr.Code == "" || status != http.StatusBadRequest {
+			t.Fatalf("expected 400 with error, got code=%q status=%d ids=%#v", authErr.Code, status, scanIDs)
+		}
+		return
+	}
+	if authErr.Code != "" || status != http.StatusOK {
+		t.Fatalf("expected no error, got code=%q status=%d", authErr.Code, status)
+	}
+	if len(tc.want) != len(scanIDs) {
+		t.Fatalf("expected ids %#v, got %#v", tc.want, scanIDs)
+	}
+	for i := range tc.want {
+		if tc.want[i] != scanIDs[i] {
+			t.Fatalf("expected ids %#v, got %#v", tc.want, scanIDs)
+		}
 	}
 }
 
@@ -87,11 +94,8 @@ func TestExtractScanIDsForAuthorizationGETPolicies(t *testing.T) {
 	}
 }
 
-func TestAuthorizeScanAccessMappings(t *testing.T) {
-	principal := authz.Principal{UserID: "u1", Subject: "u1"}
-	var gotUserID atomic.Value
-	var gotTenantID atomic.Value
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func scanAuthzMappingHandler(gotUserID, gotTenantID *atomic.Value) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		gotUserID.Store(r.Header.Get("X-User-Id"))
 		gotTenantID.Store(r.Header.Get("X-Tenant-Id"))
 		switch {
@@ -110,34 +114,50 @@ func TestAuthorizeScanAccessMappings(t *testing.T) {
 		default:
 			w.WriteHeader(http.StatusInternalServerError)
 		}
-	}))
+	}
+}
+
+func TestAuthorizeScanAccessMappings(t *testing.T) {
+	var gotUserID, gotTenantID atomic.Value
+	server := httptest.NewServer(scanAuthzMappingHandler(&gotUserID, &gotTenantID))
 	defer server.Close()
 
 	cfg := authConfig{
 		ScanAuthorizationURL:        server.URL,
 		ScanAuthorizationTimeoutSec: 1,
 	}
-	principal.TenantID = "tenant-a"
-	if errPayload, status, _ := authorizeScanAccess(t.Context(), principal, "allow", cfg, "rid"); errPayload.Code != "" || status != http.StatusOK {
-		t.Fatalf("expected allow, got code=%q status=%d", errPayload.Code, status)
+	principal := authz.Principal{UserID: "u1", Subject: "u1", TenantID: "tenant-a"}
+	ctx := t.Context()
+
+	cases := []struct {
+		name       string
+		scanID     string
+		wantStatus int
+		wantCode   bool // true when errPayload.Code must be non-empty
+	}{
+		{name: "allow", scanID: "allow", wantStatus: http.StatusOK},
+		{name: "deny", scanID: "deny", wantStatus: http.StatusForbidden, wantCode: true},
+		{name: "notfound", scanID: "notfound", wantStatus: http.StatusForbidden, wantCode: true},
+		{name: "bad200", scanID: "bad200", wantStatus: http.StatusForbidden, wantCode: true},
+		{name: "unavailable", scanID: "unavailable", wantStatus: http.StatusServiceUnavailable, wantCode: true},
+		{name: "timeout", scanID: "timeout", wantStatus: http.StatusServiceUnavailable, wantCode: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			errPayload, status, _ := authorizeScanAccess(ctx, principal, tc.scanID, cfg, "rid")
+			if status != tc.wantStatus {
+				t.Fatalf("status = %d, want %d code=%q", status, tc.wantStatus, errPayload.Code)
+			}
+			if tc.wantCode && errPayload.Code == "" {
+				t.Fatalf("expected non-empty error code, got status=%d", status)
+			}
+			if !tc.wantCode && errPayload.Code != "" {
+				t.Fatalf("expected no error code, got %q status=%d", errPayload.Code, status)
+			}
+		})
 	}
 	if gotUserID.Load() != "u1" || gotTenantID.Load() != "tenant-a" {
 		t.Fatalf("expected principal-derived headers, got user=%v tenant=%v", gotUserID.Load(), gotTenantID.Load())
-	}
-	if errPayload, status, _ := authorizeScanAccess(t.Context(), principal, "deny", cfg, "rid"); status != http.StatusForbidden || errPayload.Code == "" {
-		t.Fatalf("expected forbidden mapping, got code=%q status=%d", errPayload.Code, status)
-	}
-	if errPayload, status, _ := authorizeScanAccess(t.Context(), principal, "notfound", cfg, "rid"); status != http.StatusForbidden || errPayload.Code == "" {
-		t.Fatalf("expected notfound->forbidden mapping, got code=%q status=%d", errPayload.Code, status)
-	}
-	if errPayload, status, _ := authorizeScanAccess(t.Context(), principal, "bad200", cfg, "rid"); status != http.StatusForbidden || errPayload.Code == "" {
-		t.Fatalf("expected explicit allowed=false to map forbidden, got code=%q status=%d", errPayload.Code, status)
-	}
-	if errPayload, status, _ := authorizeScanAccess(t.Context(), principal, "unavailable", cfg, "rid"); status != http.StatusServiceUnavailable || errPayload.Code == "" {
-		t.Fatalf("expected unavailable mapping, got code=%q status=%d", errPayload.Code, status)
-	}
-	if errPayload, status, _ := authorizeScanAccess(t.Context(), principal, "timeout", cfg, "rid"); status != http.StatusServiceUnavailable || errPayload.Code == "" {
-		t.Fatalf("expected timeout mapping, got code=%q status=%d", errPayload.Code, status)
 	}
 }
 
@@ -188,5 +208,118 @@ func TestWithAuthenticationAllowsRequestWhenScanAuthzAllowed(t *testing.T) {
 	}
 	if !called {
 		t.Fatalf("expected next handler to be called")
+	}
+}
+
+func TestWithAuthentication_IMM10_W7RejectsWhenNewestIsFailed(t *testing.T) {
+	introspect := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"accepted":true}`))
+	}))
+	defer introspect.Close()
+	authzServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"allowed":true}`))
+	}))
+	defer authzServer.Close()
+	discovery := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/discovery/v1/wallets/scans/"):
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"scan_id":"705c9704-9428-45e0-882d-fae4cb9d2a0b","status":"completed","result":{"target_address":"0xabc"}}`))
+		case r.URL.Path == "/api/discovery/v1/wallets/scans" && r.URL.Query().Get("limit") == "1":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"items":[{"scan_id":"scan-newest","status":"failed"}],"total":1,"limit":1,"offset":0}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer discovery.Close()
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+	handler, err := withAuthentication(next, authConfig{
+		Required:                    true,
+		SessionValidationURL:        introspect.URL,
+		SessionValidationTimeoutSec: 1,
+		ScanAuthorizationURL:        authzServer.URL,
+		ScanAuthorizationTimeoutSec: 1,
+		DiscoveryHTTPBaseURL:        discovery.URL,
+		DiscoveryHTTPTimeoutSec:     1,
+		ClockSkewSec:                30,
+	})
+	if err != nil {
+		t.Fatalf("withAuthentication: %v", err)
+	}
+	token, err := makeTokenEnvelope(map[string]any{
+		"user_id": "u1",
+		"email":   "u@example.com",
+		"exp":     time.Now().Add(time.Hour).Unix(),
+	}, []string{"EdDSA", "ML-DSA-65"})
+	if err != nil {
+		t.Fatalf("make token: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, strings.NewReader(`{"scan_id":"705c9704-9428-45e0-882d-fae4cb9d2a0b","policy_context":{"scan_id":"705c9704-9428-45e0-882d-fae4cb9d2a0b","wallet_type":"EOA","current_pq_posture":"classical_only","chain_ids":[1],"scanned_at":"2026-01-01T00:00:00Z"},"selection_request":{"target_posture":"hybrid","target_chain_ids":[1],"require_multichain":false,"allow_new_wallet":false,"address_continuity_required":true,"key_rotation_required":true,"recovery_required":true,"minimum_maturity":1,"approval_mode":"manual"}}`))
+	req.Header.Set("Authorization", "Bearer "+token)
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusBadRequest || !strings.Contains(res.Body.String(), "LATEST_SCAN_NOT_COMPLETED") {
+		t.Fatalf("want 400 LATEST_SCAN_NOT_COMPLETED, got %d body=%s", res.Code, res.Body.String())
+	}
+}
+
+func TestWithAuthentication_IMM10_W2RejectsHistoricalScanID(t *testing.T) {
+	introspect := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"accepted":true}`))
+	}))
+	defer introspect.Close()
+	authzServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"allowed":true}`))
+	}))
+	defer authzServer.Close()
+	discovery := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/discovery/v1/wallets/scans/"):
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"scan_id":"705c9704-9428-45e0-882d-fae4cb9d2a0b","status":"completed","result":{"target_address":"0xabc"}}`))
+		case r.URL.Path == "/api/discovery/v1/wallets/scans" && r.URL.Query().Get("limit") == "1":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"items":[{"scan_id":"scan-newest","status":"completed"}],"total":1,"limit":1,"offset":0}`))
+		case r.URL.Path == "/api/discovery/v1/wallets/scans" && r.URL.Query().Get("latest") == "true":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"items":[{"scan_id":"11111111-1111-4111-8111-111111111111","status":"completed"}],"total":1,"limit":1,"offset":0}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer discovery.Close()
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+	handler, err := withAuthentication(next, authConfig{
+		Required:                    true,
+		SessionValidationURL:        introspect.URL,
+		SessionValidationTimeoutSec: 1,
+		ScanAuthorizationURL:        authzServer.URL,
+		ScanAuthorizationTimeoutSec: 1,
+		DiscoveryHTTPBaseURL:        discovery.URL,
+		DiscoveryHTTPTimeoutSec:     1,
+		ClockSkewSec:                30,
+	})
+	if err != nil {
+		t.Fatalf("withAuthentication: %v", err)
+	}
+	token, err := makeTokenEnvelope(map[string]any{
+		"user_id": "u1",
+		"email":   "u@example.com",
+		"exp":     time.Now().Add(time.Hour).Unix(),
+	}, []string{"EdDSA", "ML-DSA-65"})
+	if err != nil {
+		t.Fatalf("make token: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.Policies, strings.NewReader(`{"id":"p1","scan_id":"705c9704-9428-45e0-882d-fae4cb9d2a0b","binding":"discovery","payload":{"mode":"strict"}}`))
+	req.Header.Set("Authorization", "Bearer "+token)
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusBadRequest || !strings.Contains(res.Body.String(), "SCAN_ID_NOT_LATEST_FOR_TARGET") {
+		t.Fatalf("want 400 SCAN_ID_NOT_LATEST_FOR_TARGET, got %d body=%s", res.Code, res.Body.String())
 	}
 }
