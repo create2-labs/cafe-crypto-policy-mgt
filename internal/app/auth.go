@@ -285,7 +285,7 @@ func fetchWalletScanList(ctx context.Context, cfg authConfig, authorization, req
 		timeout = 5
 	}
 	base := strings.TrimSuffix(strings.TrimSpace(cfg.DiscoveryHTTPBaseURL), "/")
-	u, err := url.Parse(base + "/api/discovery/v1/wallets/scans")
+	u, err := url.Parse(base + "/discovery/v1/wallets/scans")
 	if err != nil {
 		return walletScanListEnvelope{}, err
 	}
