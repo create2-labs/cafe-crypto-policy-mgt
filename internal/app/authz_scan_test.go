@@ -227,7 +227,7 @@ func TestWithAuthentication_IMM10_W7RejectsWhenNewestIsFailed(t *testing.T) {
 		case strings.HasPrefix(r.URL.Path, "/discovery/v1/wallets/scans/"):
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"scan_id":"705c9704-9428-45e0-882d-fae4cb9d2a0b","status":"completed","result":{"target_address":"0xabc"}}`))
-		case r.URL.Path == "/api/discovery/v1/wallets/scans" && r.URL.Query().Get("limit") == "1":
+		case r.URL.Path == "/discovery/v1/wallets/scans" && r.URL.Query().Get("limit") == "1":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"items":[{"scan_id":"scan-newest","status":"failed"}],"total":1,"limit":1,"offset":0}`))
 		default:
@@ -282,10 +282,10 @@ func TestWithAuthentication_IMM10_W2RejectsHistoricalScanID(t *testing.T) {
 		case strings.HasPrefix(r.URL.Path, "/discovery/v1/wallets/scans/"):
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"scan_id":"705c9704-9428-45e0-882d-fae4cb9d2a0b","status":"completed","result":{"target_address":"0xabc"}}`))
-		case r.URL.Path == "/api/discovery/v1/wallets/scans" && r.URL.Query().Get("limit") == "1":
+		case r.URL.Path == "/discovery/v1/wallets/scans" && r.URL.Query().Get("limit") == "1":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"items":[{"scan_id":"scan-newest","status":"completed"}],"total":1,"limit":1,"offset":0}`))
-		case r.URL.Path == "/api/discovery/v1/wallets/scans" && r.URL.Query().Get("latest") == "true":
+		case r.URL.Path == "/discovery/v1/wallets/scans" && r.URL.Query().Get("latest") == "true":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"items":[{"scan_id":"11111111-1111-4111-8111-111111111111","status":"completed"}],"total":1,"limit":1,"offset":0}`))
 		default:
