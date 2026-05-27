@@ -55,7 +55,7 @@
 
 | PR plan | GitHub  | Dépôt | Dépend de | Objectif |
 |---------|--------------|-------|-----------|----------|
-| **IMM-9b** | [#38](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/37) | `cafe-crypto-policy-mgt` | PR7 | **W1** : lookup policy **+** draft par `target_address` normalisée |
+| **IMM-9b** | [#38](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/38) | `cafe-crypto-policy-mgt` | PR7 | **W1** : lookup policy **+** draft par `target_address` normalisée |
 | **IMM-10** | [§ IMM-10](#github-issue--imm-10) | `cafe-crypto-policy-mgt` | Discovery **IMM-4** | **W7** (newest row) + **W2** (`latest=true`) |
 
 ---
