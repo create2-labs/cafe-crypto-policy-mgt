@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -145,9 +146,199 @@ func withAuthentication(next http.Handler, cfg authConfig) (http.Handler, error)
 			}
 			obs.recordDecision(r, requestID, authCategoryScanAuth, "allowed", authCodeOK, "scan_access_allowed", principal.UserID, principal.TenantID)
 		}
+		if immErr, immStatus := enforceScanImmutabilityGuards(r.Context(), r, cfg, requestID); immErr != nil {
+			writeJSON(w, immStatus, map[string]any{
+				"error":   immErr.code,
+				"message": immErr.message,
+			})
+			return
+		}
 		obs.recordDecision(r, requestID, authCategoryAuthn, "allowed", authCodeOK, "session_validated", principal.UserID, principal.TenantID)
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalContextKey{}, principal)))
 	}), nil
+}
+
+type immutabilityGuardError struct {
+	code    string
+	message string
+}
+
+func enforceScanImmutabilityGuards(ctx context.Context, r *http.Request, cfg authConfig, requestID string) (*immutabilityGuardError, int) {
+	if r == nil {
+		return nil, http.StatusOK
+	}
+	if !isImmutabilityGuardRoute(r) {
+		return nil, http.StatusOK
+	}
+	if strings.TrimSpace(cfg.DiscoveryHTTPBaseURL) == "" {
+		return nil, http.StatusOK
+	}
+	scanIDs, scanErr, status := extractScanIDsForAuthorization(r)
+	if scanErr.Code != "" || len(scanIDs) == 0 {
+		return nil, status
+	}
+	requestedScanID, err := NormalizeDiscoveryScanID(scanIDs[0])
+	if err != nil {
+		return nil, http.StatusOK
+	}
+	authz := r.Header.Get("Authorization")
+	targetAddress, derr := fetchWalletTargetAddressForScan(ctx, cfg, authz, requestID, requestedScanID)
+	if derr != nil {
+		return &immutabilityGuardError{
+			code:    "DISCOVERY_UPSTREAM_UNAVAILABLE",
+			message: derr.Error(),
+		}, http.StatusServiceUnavailable
+	}
+	if targetAddress == "" {
+		return &immutabilityGuardError{
+			code:    "SCAN_ID_NOT_WALLET_TARGET",
+			message: "scan_id is not a wallet target",
+		}, http.StatusBadRequest
+	}
+	newestScan, gerr := fetchWalletNewestScanByAddress(ctx, cfg, authz, requestID, targetAddress)
+	if gerr != nil {
+		return &immutabilityGuardError{
+			code:    "DISCOVERY_UPSTREAM_UNAVAILABLE",
+			message: gerr.Error(),
+		}, http.StatusServiceUnavailable
+	}
+	if strings.ToLower(strings.TrimSpace(newestScan.Status)) != "completed" {
+		return &immutabilityGuardError{
+			code:    "LATEST_SCAN_NOT_COMPLETED",
+			message: "latest scan row is not completed",
+		}, http.StatusBadRequest
+	}
+	latestCompletedScanID, lerr := fetchWalletLatestCompletedScanID(ctx, cfg, authz, requestID, targetAddress)
+	if lerr != nil {
+		return &immutabilityGuardError{
+			code:    "DISCOVERY_UPSTREAM_UNAVAILABLE",
+			message: lerr.Error(),
+		}, http.StatusServiceUnavailable
+	}
+	if latestCompletedScanID == "" || latestCompletedScanID != requestedScanID {
+		return &immutabilityGuardError{
+			code:    "SCAN_ID_NOT_LATEST_FOR_TARGET",
+			message: "scan_id is not latest completed for target",
+		}, http.StatusBadRequest
+	}
+	return nil, http.StatusOK
+}
+
+func isImmutabilityGuardRoute(r *http.Request) bool {
+	if r.Method != http.MethodPost {
+		return false
+	}
+	return r.URL.Path == cpmroutes.PoliciesDecisionsExplore || r.URL.Path == cpmroutes.Policies
+}
+
+type walletScanListItem struct {
+	ScanID string `json:"scan_id"`
+	Status string `json:"status"`
+}
+
+type walletScanListEnvelope struct {
+	Items []walletScanListItem `json:"items"`
+	Total int                  `json:"total"`
+	Limit int                  `json:"limit"`
+}
+
+func fetchWalletTargetAddressForScan(ctx context.Context, cfg authConfig, authorization, requestID, scanID string) (string, error) {
+	detailJSON, st, err := fetchDiscoveryWalletScanDetail(ctx, cfg, authorization, requestID, scanID)
+	if err != nil {
+		return "", err
+	}
+	if st != http.StatusOK {
+		return "", fmt.Errorf("discovery wallet scan detail returned %d", st)
+	}
+	return targetAddressFromWalletScanDetailJSON(detailJSON)
+}
+
+func fetchWalletNewestScanByAddress(ctx context.Context, cfg authConfig, authorization, requestID, targetAddress string) (walletScanListItem, error) {
+	list, err := fetchWalletScanList(ctx, cfg, authorization, requestID, targetAddress, map[string]string{
+		"limit": "1",
+	})
+	if err != nil {
+		return walletScanListItem{}, err
+	}
+	if len(list.Items) == 0 {
+		return walletScanListItem{}, fmt.Errorf("no wallet scans found for target")
+	}
+	return list.Items[0], nil
+}
+
+func fetchWalletLatestCompletedScanID(ctx context.Context, cfg authConfig, authorization, requestID, targetAddress string) (string, error) {
+	list, err := fetchWalletScanList(ctx, cfg, authorization, requestID, targetAddress, map[string]string{
+		"latest": "true",
+	})
+	if err != nil {
+		return "", err
+	}
+	if len(list.Items) == 0 {
+		return "", nil
+	}
+	return strings.TrimSpace(list.Items[0].ScanID), nil
+}
+
+func fetchWalletScanList(ctx context.Context, cfg authConfig, authorization, requestID, targetAddress string, extra map[string]string) (walletScanListEnvelope, error) {
+	timeout := cfg.DiscoveryHTTPTimeoutSec
+	if timeout <= 0 {
+		timeout = 5
+	}
+	base := strings.TrimSuffix(strings.TrimSpace(cfg.DiscoveryHTTPBaseURL), "/")
+	u, err := url.Parse(base + "/api/discovery/v1/wallets/scans")
+	if err != nil {
+		return walletScanListEnvelope{}, err
+	}
+	q := u.Query()
+	q.Set("address", strings.TrimSpace(targetAddress))
+	for k, v := range extra {
+		q.Set(k, v)
+	}
+	u.RawQuery = q.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
+	if err != nil {
+		return walletScanListEnvelope{}, err
+	}
+	if strings.TrimSpace(authorization) != "" {
+		req.Header.Set("Authorization", authorization)
+	}
+	if requestID != "" {
+		req.Header.Set("X-Request-Id", requestID)
+	}
+	client := &http.Client{Timeout: time.Duration(timeout) * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return walletScanListEnvelope{}, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return walletScanListEnvelope{}, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return walletScanListEnvelope{}, fmt.Errorf("discovery wallet scans list returned %d", resp.StatusCode)
+	}
+	var envelope walletScanListEnvelope
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return walletScanListEnvelope{}, err
+	}
+	if envelope.Total == 0 && len(envelope.Items) == 1 {
+		envelope.Total = 1
+	}
+	if envelope.Limit == 0 && qHasLimit(extra) {
+		if parsedLimit, perr := strconv.Atoi(extra["limit"]); perr == nil {
+			envelope.Limit = parsedLimit
+		}
+	}
+	return envelope, nil
+}
+
+func qHasLimit(extra map[string]string) bool {
+	if extra == nil {
+		return false
+	}
+	_, ok := extra["limit"]
+	return ok
 }
 
 func validateRouteInventory(routes []routeSpec) error {
