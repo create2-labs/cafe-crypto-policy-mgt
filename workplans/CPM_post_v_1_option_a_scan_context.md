@@ -171,15 +171,15 @@ CPM consumes policy contexts, not raw scan rows.
 A possible short-term Discovery backend endpoint:
 
 ```http
-GET /api/discovery/wallet-policy-contexts
+GET /apila façade policy-context historique
 ```
 
 Alternative names:
 
 ```http
-GET /api/scans/wallet-policy-contexts
+GET /api/scans/façade policy-context (retirée)
 GET /api/policy-contexts/wallets
-GET /api/cpm/wallet-policy-contexts
+GET /api/cpm/façade policy-context (retirée)
 ```
 
 The endpoint should return only contexts owned by the authenticated user.
@@ -210,7 +210,7 @@ Example response:
 For deep links and validation:
 
 ```http
-GET /api/discovery/wallet-policy-contexts/{scanId}
+GET /apila façade policy-context historique/{scanId}
 ```
 
 This endpoint should return:
@@ -442,13 +442,13 @@ The user id must come from the authenticated request context, not from query par
 Bad pattern:
 
 ```http
-GET /wallet-policy-contexts?userId=...
+GET /façade policy-context (retirée)?userId=...
 ```
 
 Preferred pattern:
 
 ```http
-GET /wallet-policy-contexts
+GET /façade policy-context (retirée)
 Authorization: session/JWT/cookie according to existing app conventions
 ```
 

@@ -1,6 +1,10 @@
 # Document de travail — remise à plat des API
 
+> **English:** Normative HTTP contract (this file, French). Product behavior summary: [CAFE functional specifications](https://github.com/create2-labs/cafe-documentation/blob/main/functional-specifications.md). Integration guide: [CAFE developer guide](https://github.com/create2-labs/cafe-documentation/blob/main/03-cafe-developer-guide.md).
+
 **Statut :** proposition — **aucune implémentation** tant que ce document n’est pas **explicitement accepté** (sign-off produit / archi / sécurité).
+
+**Politique documentation :** seuls les chemins publics **§0** (Discovery **`/api/discovery/v1`**, CPM **`/api/cpm/v1`**) sont cités. Les surfaces HTTP hors v1 ne sont pas listées dans la doc produit ni ici sous forme de littéraux de routes.
 
 **Périmètre du document :** définir les **surfaces HTTP** attendues, la **sémantique** des ressources, et les **arbitrages** à valider avant acceptation — **§5** consolide les **décisions finales** ; **§8** est la **checklist de sign-off** avant OpenAPI / code ; le reste du texte peut encore signaler des **points à confirmer** par section lorsqu’ils ne sont pas couverts par **§5**. Il ne modifie pas le code ni les contrats déployés.
 
@@ -26,7 +30,7 @@
 | **GET**, **DELETE** | `/api/discovery/v1/wallets/scans/{scan_id}` |
 | **GET** | `/api/discovery/v1/tls/scans` — scans **TLS** (endpoints) ; pagination — **§2.2**, **§5.4.3** |
 | **GET**, **DELETE** | `/api/discovery/v1/tls/scans/{scan_id}` |
-| **POST** | `/api/discovery/v1/scan` — corps **`{ "address": "0x…" }`** **ou** **`{ "url": "https://…" }`** (mutuellement exclusif) ; même logique métier que **`POST /discovery/scan`** aujourd’hui (**§2.2**) |
+| **POST** | `/api/discovery/v1/scan` — corps **`{ "address": "0x…" }`** **ou** **`{ "url": "https://…" }`** (mutuellement exclusif) ; même logique métier que **`POST /discovery/v1/scan`** aujourd’hui (**§2.2**) |
 
 **Routage (impl.) :** enregistrer **`…/wallets/scans`** et **`…/wallets/scans/{scan_id}`** **avant** **`…/wallets/{wallet_id}`** pour que le segment littéral **`scans`** ne soit pas capturé comme un **`{wallet_id}`**.
 
@@ -45,26 +49,17 @@ Si le service CPM est publié sous **`/api/cpm/v1`** (le segment **`cpm`** n’a
 
 **Remarque :** pas de chemin du type **`/api/cpm/v1/cpm/policies`**. Les **réponses d’erreur** référencent les **instances** persistées comme **`…/policies`** sous ce préfixe (ex. **`409`** scan — **§4.2**).
 
-**Contrat produit CPM :** la **cible** à documenter dans **OpenAPI** et à viser côté clients est **§0.2**. Ce qui suit en **§0.3** décrit uniquement un **chemin de transition** (ingress / déploiement / fenêtre de coupure) ; ce n’est **pas** un engagement de **compatibilité produit** à long terme (pas de promesse implicite de maintenir **deux** familles d’URL en parallèle au-delà de la migration). **Dès que la bascule vers §0.2 est terminée** (ingress, clients, OpenAPI publié aligné **§0.2**), **§0.3 doit disparaître** : les chemins **`/api/v1/policies/…`**, **`/api/v1/cpm/policies`**, **`/api/v1/cpm/drafts`** sont **retirés** de l’edge (**plus** servis, **plus** documentés comme surface supportée).
+**Contrat produit CPM :** la **cible** à documenter dans **OpenAPI** et à viser côté clients est **§0.2** uniquement. La transition ingress/clients est **clôturée** (voir **§0.3**).
 
-### 0.3 CPM — variante **rollout** (ingress / déploiement — **pas** contrat produit pérenne)
+### 0.3 CPM — transition (clôturée)
 
-Tableau **descriptif** de ce que **ingress / edge** ou le **déploiement courant** expose **tant que** la bascule vers **§0.2** n’est pas terminée :
-
-| Verbe(s) | Chemin |
-|----------|--------|
-| **GET** | `/api/v1/policies/catalog`, **`/api/v1/policies/templates`**, **`/api/v1/policies/instances`** |
-| **POST** | `/api/v1/policies/decisions/explore` |
-| **POST**, **GET**, **DELETE** | `/api/v1/cpm/policies` (query **`id`**) |
-| **POST**, **GET**, **DELETE** | `/api/v1/cpm/drafts` (**`DELETE`** avec query **`id`**) |
-
-**Règle :** **§0.3** sert à **coordonner** la coupure (nginx, clients, publications OpenAPI le temps du passage) ; la **référence** reste **§0.2**. Ne pas traiter **§0.3** comme une **deuxième surface officielle** à pérenniser au-delà de la transition. **Fin de migration = suppression effective de §0.3** (retrait ingress + mise à jour des artefacts qui mentionnaient encore ces URLs) ; ce document pourra alors **supprimer le tableau §0.3** ou le réduire à une note d’**historique** hors contrat.
+La bascule vers **§0.2** est **terminée**. Les alias edge de transition ne sont **plus** servis ni documentés.
 
 ---
 
 ## 1. Contexte
 
-Aujourd’hui, **`GET /discovery/scans`** renvoie une liste paginée où chaque entrée **`id`** est une **adresse wallet**, pas un identifiant de **`scan_result`**. Conceptuellement, l’URL **`/scans`** suggère une collection d’**exécutions de scan**, ce qui entre en tension avec ce comportement.
+Aujourd’hui, **la liste wallet historique** renvoie une liste paginée où chaque entrée **`id`** est une **adresse wallet**, pas un identifiant de **`scan_result`**. Conceptuellement, l’URL **`/scans`** suggère une collection d’**exécutions de scan**, ce qui entre en tension avec ce comportement.
 
 **Constat :** lorsqu’on **redemande un scan** pour un wallet déjà scanné, le **`scan_id` (UUID)** peut **changer** au lieu d’**ajouter** une nouvelle exécution en collection. Un tel comportement **n’est pas un historique** : la collection **`/scans`** ne peut pas documenter plusieurs tentatives dans le temps si l’identifiant « glisse ».
 
@@ -95,7 +90,7 @@ Ce document pose un **modèle cible** cohérent : **collections au pluriel** uni
 
 ### 2.2 Scans Discovery — deux collections **`…/wallets/scans`** (wallet) et **`…/tls/scans`** (TLS)
 
-**Principe retenu :** **deux endpoints de liste** (comme aujourd’hui **`GET /discovery/scans`** vs **`GET /discovery/tls/scans`**), pour **séparer** clairement les exécutions **wallet / EVM** et les exécutions **TLS** ; la cible **uniformise** les chemins : **`…/wallets/scans`** **miroir** de **`…/tls/scans`**. **Pas** de liste unique fusionnée. Le **`POST …/scan`** avec **`address`** **ou** **`url`** reste **un seul** point de **déclenchement** (**§0.1**).
+**Principe retenu :** **deux endpoints de liste** (comme aujourd’hui **la liste wallet historique** vs **la liste TLS historique**), pour **séparer** clairement les exécutions **wallet / EVM** et les exécutions **TLS** ; la cible **uniformise** les chemins : **`…/wallets/scans`** **miroir** de **`…/tls/scans`**. **Pas** de liste unique fusionnée. Le **`POST …/scan`** avec **`address`** **ou** **`url`** reste **un seul** point de **déclenchement** (**§0.1**).
 
 **Collection wallet — `GET …/wallets/scans`**, **`GET …/wallets/scans?address=0x…`**, **`GET …/wallets/scans?address=…&chain_id=…`**
 
@@ -152,7 +147,7 @@ Ce document pose un **modèle cible** cohérent : **collections au pluriel** uni
 
 - **Historique (listes)** : **`GET …/wallets/scans`** [+ **`?address`**, **`&chain_id`**] et **`GET …/tls/scans`** peuvent renvoyer plusieurs **`scan_id`** distincts pour une **même** cible (adresse / endpoint) si **plusieurs exécutions** ont produit **plusieurs lignes de résultat** (chacune avec son **`scan_id`**) — cf. point **5** ci‑dessus.
 
-- **CBOM par exécution (wallet, tranché)** : **`GET …/wallets/scans/{scan_id}/cbom`** — document **CBOM** (CycloneDX ou enveloppe documentée OpenAPI) **généré à la demande** depuis la ligne de résultat de **cet** **`scan_id`** ; **jamais** stocké en blob. **`404`** si scan absent / hors scope ; règles d’accès alignées sur le détail owner. Les anciennes routes **`GET /discovery/cbom/*`** restent **retirées** (**§8.7**). Symétrie TLS optionnelle : **`GET …/tls/scans/{scan_id}/cbom`**.
+- **CBOM par exécution (wallet, tranché)** : **`GET …/wallets/scans/{scan_id}/cbom`** — document **CBOM** (CycloneDX ou enveloppe documentée OpenAPI) **généré à la demande** depuis la ligne de résultat de **cet** **`scan_id`** ; **jamais** stocké en blob. **`404`** si scan absent / hors scope ; règles d’accès alignées sur le détail owner. Les routes hors contrat §0 **CBOM historique** restent **retirées** (**§8.7**). Symétrie TLS optionnelle : **`GET …/tls/scans/{scan_id}/cbom`**.
 
 - **Effacement** : **`DELETE …/wallets/scans/{scan_id}`** et **`DELETE …/tls/scans/{scan_id}`** (**owner**). **`204`** \| **`404`** \| **`409`** — **même sémantique** (**référence CPM** → **`409`** **`SCAN_REFERENCED_BY_POLICY`** — **§4.2**) pour tout **`scan_id`** référencé par une instance persistée. **Action utilisateur requise** : le client **doit d’abord** supprimer ou détacher les instances CPM (**`DELETE …/policies?id=…`**, éventuellement après **`GET …/policies?scan_id=…`** pour les lister), **puis** appeler **`DELETE …/wallets/scans/{scan_id}`** (ou TLS). **Pas** de suppression en cascade scan → policies.
 
@@ -185,11 +180,11 @@ Ce document pose un **modèle cible** cohérent : **collections au pluriel** uni
 
 ### 2.3 Lecture du catalogue des crypto policies
 
-- **Chemins canoniques** : **§0.2** (cible **`/api/cpm/v1/policies/catalog|templates|instances`**) ou **§0.3** (rollout **`/api/v1/policies/...`**). JWT requis (**`RouteClassAuthenticated`**). Implémentation actuelle : `internal/api/read_api.go`.
+- **Chemins canoniques** : **§0.2** (cible **`/api/cpm/v1/policies/catalog|templates|instances`**) ou **§0.3** (rollout **alias policies de transition**). JWT requis (**`RouteClassAuthenticated`**). Implémentation actuelle : `internal/api/read_api.go`.
 
 ### 2.4 Instances de crypto policy persistées 
 
-- **Chemins canoniques** : **`POST` \| `GET` \| `DELETE`** sur la ressource **instances** — **§0.2** (`/api/cpm/v1/policies`) ou **§0.3** (`/api/v1/cpm/policies`) ; **brouillons** **`…/drafts`** (**§0.2** / **§0.3**). JWT + scope propriétaire (`cafe-crypto-policy-mgt`, `internal/app/owner_routes.go`).
+- **Chemins canoniques** : **`POST` \| `GET` \| `DELETE`** sur la ressource **instances** — **§0.2** (`/api/cpm/v1/policies`) ou **§0.3** (`alias CPM de transition policies`) ; **brouillons** **`…/drafts`** (**§0.2** / **§0.3**). JWT + scope propriétaire (`cafe-crypto-policy-mgt`, `internal/app/owner_routes.go`).
 - **`DELETE …/policies?id=…`** (suffixe après préfixe **§0**) : **`204`** si l’instance existait et est supprimée ; **`404`** si inconnue / hors scope / **déjà supprimée** (**idempotence** — **§5.4.9**). **Même query **`id`** que **`GET`**. Pas de **`409`** sur cette route dans ce plan.
 - **`DELETE …/drafts?id=…`** : **`204`** si le brouillon existait et est supprimé ; **`404`** si inconnu / hors scope / **déjà supprimé** (**idempotence** — **§5.4.9**). **Même query **`id`** que **`GET …/drafts?id=…`**. Supprime le brouillon plateforme pour satisfaire **W1** et débloquer **`POST …/scan`** (parcours **§2.2**). Ne supprime **pas** le scan Discovery référencé.
 - Le corps d’écriture **`POST`** inclut **`id`**, **`scan_id`** (liaison **`scan_result`** Discovery / **Option A** CPM lorsque applicable), **`payload`** — affiner uniquement les **règles métier** (ex. **`scan_id` obligatoire** pour certains flux) et l’AUTH scan (AUTH-02).
@@ -259,7 +254,7 @@ La coordination release (frontend, scripts, intégrations) reste nécessaire, ma
 | **CBOM** | **`GET …/wallets/scans/{scan_id}/cbom`** — CBOM généré **à la demande** ; **404** si scan absent ; terminal requis (schéma OpenAPI). |
 | Effacement | **`DELETE …/wallets/scans/{scan_id}`** — **`204`** \| **`404`** \| **`409`** ; **`409`** **`SCAN_REFERENCED_BY_POLICY`** si policy référence ce **`scan_id`**. **Parcours utilisateur** : **`GET …/policies?scan_id=`** → **`DELETE …/policies?id=`** → **`DELETE`** scan (**§2.2 W3**, rationale **§4.2**). **Idempotence** : second **`DELETE`** → **`404`** (**§5.4.6**). |
 | Auth | JWT ; **owner-scoped** (+ authz **`scan`** / AUTH‑02 où défini). |
-| Ancien `GET …/discovery/scans` (**`id`** = adresse) | **Supprimé** ; remplacé par la liste **synopsis** + **`scan_id`** + filtres **§2.2**. |
+| Ancien `liste wallet historique (hors v1)` (**`id`** = adresse) | **Supprimé** ; remplacé par la liste **synopsis** + **`scan_id`** + filtres **§2.2**. |
 
 **Exemple indicatif — `GET …/wallets/scans`** (même schéma avec **`?address`**, **`&chain_id`**) :
 
@@ -287,7 +282,7 @@ La coordination release (frontend, scripts, intégrations) reste nécessaire, ma
 | Liste | **`GET …/tls/scans`** — **même enveloppe** pagination ; **`TLSListItem`** — **§2.2** ; **`status`** = lifecycle seul. **Pas** de **`address`** / **`chain_id`**. **Même tri par défaut** que **`…/wallets/scans`** — **§2.2**. |
 | Détail | **`GET …/tls/scans/{scan_id}`** — DTO avec **`result`** métier TLS (schéma **distinct** du wallet en OpenAPI). |
 | Effacement | **`DELETE …/tls/scans/{scan_id}`** — **`204`** \| **`404`** \| **`409`** ; corps **`SCAN_REFERENCED_BY_POLICY`** identique **§4.2** (bloc JSON sous **`DELETE …/wallets/scans/{scan_id}`**). |
-| Ancien `GET …/discovery/tls/scans` (**`id`** = URL) | **Supprimé** ; remplacé par synopsis + **`scan_id`** + **`GET|DELETE …/tls/scans/{scan_id}`**. |
+| Ancien `liste TLS historique (hors v1)` (**`id`** = URL) | **Supprimé** ; remplacé par synopsis + **`scan_id`** + **`GET|DELETE …/tls/scans/{scan_id}`**. |
 
 **Exemple indicatif — `GET …/tls/scans`** :
 
@@ -342,7 +337,7 @@ La coordination release (frontend, scripts, intégrations) reste nécessaire, ma
 |--------|---------------------|
 | Rôle | **Référentiel** fichier (catalogue + **templates** + **instances de référence**). |
 | Chemins cible | **`GET /api/cpm/v1/policies/catalog`**, **`templates`**, **`instances`** (**§0.2**). |
-| Chemins rollout | **`GET /api/v1/policies/catalog`**, **`templates`**, **`instances`** (**§0.3**). |
+| Chemins rollout | **`GET /api/cpm/v1/policies/catalog`**, **`templates`**, **`instances`** (**§0.3**). |
 | Exploration | **`POST …/policies/decisions/explore`** — **§0.2** ou **§0.3** selon déploiement. |
 | Auth | **JWT** requis ; détail **AUTH** = matrices existantes. |
 
@@ -350,7 +345,7 @@ La coordination release (frontend, scripts, intégrations) reste nécessaire, ma
 
 | Élément | Décision de travail |
 |--------|---------------------|
-| Rôle | **`POST` \| `GET` \| `DELETE …/policies`** (instances, query **`id`** pour **GET**/**DELETE**) ; **`POST` \| `GET` \| `DELETE …/drafts`** (brouillons, query **`id`** pour **GET**/**DELETE**). Préfixes **§0.2** (`/api/cpm/v1/`) ou **§0.3** (`/api/v1/cpm/`). |
+| Rôle | **`POST` \| `GET` \| `DELETE …/policies`** (instances, query **`id`** pour **GET**/**DELETE**) ; **`POST` \| `GET` \| `DELETE …/drafts`** (brouillons, query **`id`** pour **GET**/**DELETE**). Préfixes **§0.2** (`/api/cpm/v1/`) ou **§0.3** (`alias CPM de transition `). |
 | Corps **`POST`** | **`{ id, scan_id?, payload }`** — règles **`scan_id`** / **AUTH-02** : **§2.4**, OpenAPI. |
 | **`DELETE …/policies?id=…`** | **`204`** \| **`404`** uniquement (**idempotence** **§5.4.9**) ; **pas** de **`409`**. Ne supprime **pas** le **`scan_result`** Discovery (**§2.4**). |
 | **`DELETE …/drafts?id=…`** | **`204`** \| **`404`** uniquement (**idempotence** **§5.4.9**) ; ne supprime **pas** le scan Discovery. Débloque **W1** pour **`POST …/scan`** après suppression du brouillon plateforme (**§2.2**). |
@@ -437,12 +432,12 @@ Toute route, réponse ou donnée persistée correspondant à **l’ancien modèl
 
 Cela inclut notamment :
 
-- l’ancien **`GET /discovery/scans`** où **`id`** représente une **adresse** ;
-- l’ancien **`GET /discovery/tls/scans`** où **`id`** représente une **URL** ;
+- l’ancien **la liste wallet historique** où **`id`** représente une **adresse** ;
+- l’ancien **la liste TLS historique** où **`id`** représente une **URL** ;
 - toute route de détail **ambiguë** où une adresse ou une URL pourrait être interprétée comme identifiant de scan ;
-- **`GET /discovery/wallet-policy-contexts`** si les nouvelles routes **`wallets/scans`**, **`wallets/scans/{scan_id}`** et CPM **`policies?scan_id=`** couvrent le besoin frontend.
+- **la façade policy-context historique** si les nouvelles routes **`wallets/scans`**, **`wallets/scans/{scan_id}`** et CPM **`policies?scan_id=`** couvrent le besoin frontend.
 
-**Décision :** après coupure, les **anciennes routes** ne sont **plus** servies par l’**edge**.
+**Décision :** après coupure, les **routes hors contrat §0** ne sont **plus** servies par l’**edge**.
 
 Comportement recommandé :
 
@@ -675,10 +670,10 @@ La variante **§0.3** reste **uniquement** un mécanisme de **transition ingress
 
 | Aujourd’hui (indicatif) | Lecture utile |
 |-------------------------|---------------|
-| `GET /discovery/scans` (actuel) | **À supprimer** à la bascule. Remplacement : **`GET …/wallets/scans`** (+ synopsis **`scan_id`**) + **`?address=`** [, **`chain_id`**] + **`GET` / `DELETE …/wallets/scans/{scan_id}`**. **Pas** d’**adresse** en path sous **`wallets/scans`**. Liste CAFE : **`GET …/wallets`** — **§0.1**, **§2.1**. |
-| `GET /discovery/tls/scans` (actuel) | **À supprimer** à la bascule. Remplacement : **`GET …/tls/scans`** + **`GET` / `DELETE …/tls/scans/{scan_id}`** (**§0.1**, **§4.2.2**). |
-| `GET /discovery/wallet-policy-contexts` | Si **`wallets/scans`** + filtres **`address`** / **`chain_id`** + **`GET …/wallets/scans/{scan_id}`** rendent cette façade redondante, **supprimer** ; sinon trancher au sign-off. |
-| CPM catalogue (**§0.3**) ; cible **§0.2** | **Rollout** : **`GET /api/v1/policies/*`**. **Cible** : **`GET /api/cpm/v1/policies/*`**. Évolution = contrat ou contenu fichier ; migration de préfixe = **§0**. |
+| la liste wallet historique (actuel) | **À supprimer** à la bascule. Remplacement : **`GET …/wallets/scans`** (+ synopsis **`scan_id`**) + **`?address=`** [, **`chain_id`**] + **`GET` / `DELETE …/wallets/scans/{scan_id}`**. **Pas** d’**adresse** en path sous **`wallets/scans`**. Liste CAFE : **`GET …/wallets`** — **§0.1**, **§2.1**. |
+| la liste TLS historique (actuel) | **À supprimer** à la bascule. Remplacement : **`GET …/tls/scans`** + **`GET` / `DELETE …/tls/scans/{scan_id}`** (**§0.1**, **§4.2.2**). |
+| la façade policy-context historique | Si **`wallets/scans`** + filtres **`address`** / **`chain_id`** + **`GET …/wallets/scans/{scan_id}`** rendent cette façade redondante, **supprimer** ; sinon trancher au sign-off. |
+| CPM catalogue (**§0.3**) ; cible **§0.2** | **Rollout** : **`GET /api/cpm/v1/policies/*`**. **Cible** : **`GET /api/cpm/v1/policies/*`**. Évolution = contrat ou contenu fichier ; migration de préfixe = **§0**. |
 | CPM instances (**§0.3**) ; cible **§0.2** | **`POST`**, **`GET`** existants sur **`…/cpm/policies`** ; **ajouter** **`DELETE`** **`?id=…`** (owner) si absent (**§2.4**, **§4.4**). **Cible** : **`/api/cpm/v1/policies`**. |
 
 ---
@@ -686,7 +681,7 @@ La variante **§0.3** reste **uniquement** un mécanisme de **transition ingress
 ## 7. Non-objectifs de ce document
 
 - Implémenter des handlers, migrations DB, ou PRs.
-- Définir une **politique de dépréciation** ou **conserver les anciennes routes** après bascule (hors périmètre : à la livraison, **suppression** des entrées évincées).
+- Définir une **politique de dépréciation** ou **conserver les routes hors contrat §0** après bascule (hors périmètre : à la livraison, **suppression** des entrées évincées).
 - Spécifier les schémas JSON finaux **champ par champ** (détail d’annexe après sign-off — l’**inventaire des types** OpenAPI est en **§8.3**).
 - Remplacer `CPM_OPTION_A_PR_PLAN.md` : ce document est **complémentaire** (chemins publics **§0** : Discovery **§0.1** — **`…/wallets`**, **`…/wallets/scans`**, **`…/tls/scans`**, **`POST …/scan`** ; CPM **§0.2** ou **§0.3** selon rollout).
 
@@ -834,12 +829,12 @@ Les invariants suivants sont **acceptés** comme comportement produit :
 
 Les routes suivantes sont **retirées** à la bascule :
 
-- ancien **`GET /discovery/scans`** avec **`id` = adresse** ;
-- ancien **`GET /discovery/tls/scans`** avec **`id` = URL** ;
+- ancien **la liste wallet historique** avec **`id` = adresse** ;
+- ancien **la liste TLS historique** avec **`id` = URL** ;
 - toute route de détail **ambiguë** par adresse ou URL ;
-- **`GET /discovery/wallet-policy-contexts`** si **confirmé** redondant après **`wallets/scans`**, **`wallets/scans/{scan_id}`** et **`policies?scan_id=`** (sinon : décision explicite au sign-off — **§6**).
+- **la façade policy-context historique** si **confirmé** redondant après **`wallets/scans`**, **`wallets/scans/{scan_id}`** et **`policies?scan_id=`** (sinon : décision explicite au sign-off — **§6**).
 
-Les **anciennes routes** doivent être retirées :
+Les **routes hors contrat §0** doivent être retirées :
 
 - du **code** ;
 - de l’**edge** / nginx ;
@@ -872,13 +867,13 @@ Les **PRs** d’implémentation doivent couvrir au minimum :
 - **`DELETE`** scan : **`409`** si policy référence ; **`204`** après **`DELETE`** policies ;
 - **`status`** **lifecycle-only** ;
 - séparation **`result`** wallet / **`result`** TLS ;
-- anciennes routes **supprimées** ou **non routées**.
+- routes hors contrat §0 **supprimées** ou **non routées**.
 
 ### 8.9 Propriétaires de surfaces
 
 - **Discovery** possède : wallets ; wallet scans ; TLS scans ; **`POST /scan`** ; lifecycle scan ; ownership des **scan results**.
 - **CPM** possède : catalogue ; **`decisions/explore`** ; policies persistées ; drafts ; référence à **`scan_id`** ; refus de suppression scan via **`SCAN_REFERENCED_BY_POLICY`**.
-- **`cafe-deploy` / edge** possède : exposition des **préfixes publics** ; migration **§0.3** → **§0.2** ; suppression des **anciennes routes**.
+- **`cafe-deploy` / edge** possède : exposition des **préfixes publics** ; migration **§0.3** → **§0.2** ; suppression des **routes hors contrat §0**.
 
 ### 8.10 Sign-off
 
@@ -888,7 +883,7 @@ Le document peut passer en phase **OpenAPI / PRs** lorsque les **validations** s
 - **architecture** : ressources, invariants et responsabilités validés ;
 - **sécurité** : **JWT** + **owner-scope**, non-divulgation **cross-user**, matrices **AUTH-02 / `scan_id`** où applicable, erreurs validées ;
 - **frontend** : listes, détails, **`explore`**, **`policies?scan_id`** et suppressions validés ;
-- **déploiement** : edge cible et retrait des anciennes routes validés.
+- **déploiement** : edge cible et retrait des routes hors contrat §0 validés.
 
 ---
 

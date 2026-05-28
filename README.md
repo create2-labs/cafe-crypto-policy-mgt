@@ -20,7 +20,7 @@ CPM does not depend on Discovery’s database or internal domain structs. Inboun
 | `internal/domain/vocabulary` | Exported strings for account kind, algorithms, PQ posture, subject type |
 | `internal/domain/policy` | Policy domain contracts (`PolicySelectionRequest`, `PolicyGraphCatalog`, `CryptoPolicyTemplate`, `CryptoPolicyInstance`, `CryptoPolicyValidationResult`, `CryptoPolicyAssessmentResult`, `PolicyCompatibilityResult` + `PolicyCompatibilityEvaluator`, and PR13 `PolicyDecision` models/evaluator) |
 | `internal/api` | PR17 read-only HTTP APIs for policy inspection and decision exploration |
-| `internal/persistence` | Owner-scoped in-memory persistence (`OwnerScopedStore`) for drafts and persisted policy records exposed under `/api/v1/cpm/*` |
+| `internal/persistence` | Owner-scoped in-memory persistence (`OwnerScopedStore`) for drafts and persisted policy records exposed under `/api/cpm/v1/*` |
 | `docs/` | Integration narratives (e.g. [`docs/CPM_OPTION_A_INTEGRATED.md`](./docs/CPM_OPTION_A_INTEGRATED.md) — Option A v1 flow) |
 | `scripts/` | Operational helpers (e.g. [`test-discovery-v1-wallet-scans-to-cpm.sh`](https://github.com/create2-labs/cafe-deploy/scripts/test-discovery-v1-wallet-scans-to-cpm.sh) — Option A v1 smoke) |
 | `internal/integration/nats` | NATS integration for inbound explicit assessment requests + outbound CPM event publication |
@@ -157,12 +157,12 @@ Environment variables:
 
 Endpoints:
 
-- `GET /api/v1/policies/catalog`
-- `GET /api/v1/policies/templates`
-- `GET /api/v1/policies/instances`
-- `POST /api/v1/policies/decisions/explore`
+- `GET /api/cpm/v1/policies/catalog`
+- `GET /api/cpm/v1/policies/templates`
+- `GET /api/cpm/v1/policies/instances`
+- `POST /api/cpm/v1/policies/decisions/explore`
 
-`POST /api/v1/policies/decisions/explore` accepts:
+`POST /api/cpm/v1/policies/decisions/explore` accepts:
 
 - `policy_context` (wallet scan context: `scan_id`, `wallet_address`, `wallet_type`, `chain_ids`, `current_algorithm`, `current_pq_posture`, `scanned_at`, `status` — converted server-side into the evaluator’s normalized payload)
 - `selection_request` (`PolicySelectionRequest`)
@@ -222,17 +222,17 @@ Public route:
 
 Authenticated business routes:
 
-- `GET /api/v1/policies/catalog`
-- `GET /api/v1/policies/templates`
-- `GET /api/v1/policies/instances`
-- `POST /api/v1/policies/decisions/explore`
+- `GET /api/cpm/v1/policies/catalog`
+- `GET /api/cpm/v1/policies/templates`
+- `GET /api/cpm/v1/policies/instances`
+- `POST /api/cpm/v1/policies/decisions/explore`
 
 Additional authenticated routes (owner-scoped draft / policy payloads):
 
-- `POST /api/v1/cpm/drafts` — upsert `{ "id", "scan_id?", "payload" }` (`owner_user_id` / `tenant_id` rejected from client)
-- `GET /api/v1/cpm/drafts?id=...`
-- `POST /api/v1/cpm/policies` — upsert `{ "id", "scan_id?", "payload" }`
-- `GET /api/v1/cpm/policies?id=...`
+- `POST /api/cpm/v1/drafts` — upsert `{ "id", "scan_id?", "payload" }` (`owner_user_id` / `tenant_id` rejected from client)
+- `GET /api/cpm/v1/drafts?id=...`
+- `POST /api/cpm/v1/policies` — upsert `{ "id", "scan_id?", "payload" }`
+- `GET /api/cpm/v1/policies?id=...`
 
 ## AUTH-03 owner-scoped persistence foundation
 
@@ -296,9 +296,9 @@ Audit hook:
 
 **Option A** is the post-V1 path where CPM uses **real wallet scans** from the authenticated **Discovery backend** (not mock `scan_id` placeholders or direct DB access). See [`workplans/CPM_post_v_1_option_a_scan_context.md`](./workplans/CPM_post_v_1_option_a_scan_context.md) for product intent, Option A vs Option B, and data-flow constraints.
 
-Canonical end-to-end narrative: [`docs/CPM_OPTION_A_INTEGRATED.md`](./docs/CPM_OPTION_A_INTEGRATED.md) (Discovery v1 list/detail → CPM explore with **`policy_context`** → persist). Maintainer field mapping: [Discovery `CPM_OPTION_A_DISCOVERY_V1_CONTRACT.md`](https://github.com/create2-labs/cafe-discovery/blob/main/docs/CPM_OPTION_A_DISCOVERY_V1_CONTRACT.md). Public summary: [cafe-documentation `docs/architecture/cpm-option-a-v1-flow.md`](https://github.com/create2-labs/cafe-documentation/blob/main/docs/architecture/cpm-option-a-v1-flow.md).
+Canonical end-to-end narrative: [`docs/CPM_OPTION_A_INTEGRATED.md`](./docs/CPM_OPTION_A_INTEGRATED.md) (Discovery v1 list/detail → CPM explore with **`policy_context`** → persist). Maintainer field mapping: [Discovery `CPM_OPTION_A_DISCOVERY_V1_CONTRACT.md`](https://github.com/create2-labs/cafe-discovery/blob/main/docs/CPM_OPTION_A_DISCOVERY_V1_CONTRACT.md). Public summary: [cafe-documentation `docs/architecture/cpm-option-a-v1-flow.md`](https://github.com/create2-labs/cafe-documentation/blob/main/docs/architecture/cpm-option-a-v1-flow.md). Product and technical specs (English): [functional-specifications.md](https://github.com/create2-labs/cafe-documentation/blob/main/functional-specifications.md), [technical-specifications.md](https://github.com/create2-labs/cafe-documentation/blob/main/technical-specifications.md).
 
-**Historical:** `GET /discovery/wallet-policy-contexts` and CBOM polling scripts were removed; use v1 **`/discovery/v1/wallets/scans`** only.
+Integrators use Discovery **`/discovery/v1/wallets/scans`** (edge: **`/api/discovery/v1/wallets/scans`**) and CPM **`/api/cpm/v1/...`** only.
 
 ## Run locally
 

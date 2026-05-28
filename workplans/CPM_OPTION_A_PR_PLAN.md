@@ -27,7 +27,7 @@ Deliver **Option A** (réconciliée avec la cohérence API **v1**): les scans wa
 Hard rules from product/architecture (alignées `WORKPLAN_API_PR.md`):
 
 - **Backend / contrats d’abord** — la surface canonique Discovery est **`/discovery/v1`** (edge **`/api/discovery/v1/...`** après strip **`/api`**).
-- **Ne pas réintroduire** l’ancienne façade **`GET /discovery/wallet-policy-contexts`** : **retirée** avec **PR11a** [#54](https://github.com/create2-labs/cafe-discovery/pull/54).
+- **Ne pas réintroduire** l’ancienne façade **la façade policy-context historique** : **retirée** avec **PR11a** [#54](https://github.com/create2-labs/cafe-discovery/pull/54).
 - **Do not** claim Discovery is DB-free today; Persistence Service remains the **target** authoritative scan-data owner—Discovery backend still has DB access in the interim.
 - **Respect AUTH-██** already merged (principal, scan binding, fail-closed behavior where configured).
 - **Scripts smoke CPM (Option A) — v1 uniquement (#34) :** un seul parcours bash actif — **`test-discovery-v1-wallet-scans-to-cpm.sh`** (liste + détail **v1** → explore → persist). **Aucun** mode legacy dans les scripts : pas de **`LEGACY_SCAN_AND_CBOM_FLOW`**, pas de polling CBOM, pas de **`test-discovery-wallet-contexts-to-cpm.sh`** ni **`test-wallet-scan-and-cpm-policy.sh`**. *(Distinct des routes Discovery historiques encore montées côté serveur — voir **WORKPLAN_API_PR** ; le plan Option A ne les réintroduit pas dans les scripts ni la doc active.)*
@@ -60,7 +60,7 @@ Synthèse à jour des **jalons mergés** documentés dans le workplan API et le 
 - **Contrat canonique :** **`openapi/discovery-v1.yaml`** (**PR1a** [#49](https://github.com/create2-labs/cafe-discovery/pull/49)).
 - **Liste + détail scans wallet :** **`GET /discovery/v1/wallets/scans`**, **`GET /discovery/v1/wallets/scans/{scan_id}`** — **PR4** [#52](https://github.com/create2-labs/cafe-discovery/pull/52).
 - **Doc Option A mainteneur (v1 ↔ CPM) :** référence **`docs/CPM_OPTION_A_DISCOVERY_V1_CONTRACT.md`** — **A2** [#60](https://github.com/create2-labs/cafe-discovery/pull/60) (complète **PR12b** [#59](https://github.com/create2-labs/cafe-discovery/pull/59) README).
-- **Historique :** une façade **`GET /discovery/wallet-policy-contexts`** avait existé (ex. PR [#48](https://github.com/create2-labs/cafe-discovery/pull/48)) ; elle a été **retirée** avec le nettoyage routes legacy — **PR11a** [#54](https://github.com/create2-labs/cafe-discovery/pull/54). Toute nouvelle doc ou client Option A doit utiliser **v1**.
+- **Historique :** une façade **la façade policy-context historique** avait existé (ex. PR [#48](https://github.com/create2-labs/cafe-discovery/pull/48)) ; elle a été **retirée** avec le nettoyage routes legacy — **PR11a** [#54](https://github.com/create2-labs/cafe-discovery/pull/54). Toute nouvelle doc ou client Option A doit utiliser **v1**.
 - **Services internes :** le code peut encore réutiliser ou factoriser une logique du type *wallet policy context* **en interne** tant qu’elle n’expose pas une route publique parallèle au contrat v1 — cf. note **PR4** dans `WORKPLAN_API_PR.md` (*aligner le service `wallet_policy_context` si encore utilisé*).
 
 ### cafe-crypto-policy-mgt
@@ -69,7 +69,7 @@ Synthèse à jour des **jalons mergés** documentés dans le workplan API et le 
 - **Policies owner + `scan_id` :** **`GET /api/cpm/v1/policies?scan_id=`**, persist **`POST /api/cpm/v1/policies`** avec règles **`binding`** — **PR7** [#28](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/28) ; pour **`binding=discovery`** (défaut), un **`scan_id`** UUID valide est **requis** (`owner_routes.go` / tests).
 - **Assessment async :** **`POST /api/cpm/v1/policies/assessment/request`** — **PR13g** [#33](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/33) — **sans** `policy_context` client.
 - **OpenAPI :** **`openapi/cpm-v1.yaml`** — **PR1b** [#26](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/26).
-- **Scripts :** **`scripts/test-discovery-v1-wallet-scans-to-cpm.sh`** — smoke Option A v1 uniquement (sign-in → list/detail → explore → persist optionnel) ; **#34** mergé. Suppression des scripts legacy CBOM / `wallet-policy-contexts`. CI : **`bash -n`** sur le smoke script (`.github/workflows/ci.yml`).
+- **Scripts :** **`scripts/test-discovery-v1-wallet-scans-to-cpm.sh`** — smoke Option A v1 uniquement (sign-in → list/detail → explore → persist optionnel) ; **#34** mergé. Suppression des scripts legacy CBOM / `façade policy-context (retirée)`. CI : **`bash -n`** sur le smoke script (`.github/workflows/ci.yml`).
 - **Tests contrat Option A :** **`internal/contract`** + **`internal/app/option_a_contract_test.go`** — **C2** [#35](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/35) (golden mapping A2 §3.1, explore/persist/assessment, formes Discovery v1 via fixtures).
 
 ### cafe-frontend
@@ -144,12 +144,12 @@ Remplir **Statut**, **N° PR**, **Lien**, **Assigné**, **Notes** au fil des tra
 
 | # | PR | Dépôt (repo) | Branche | Objectif (résumé) | Statut | N° PR | Lien | Assigné | Notes |
 |---:|----|--------------|---------|-------------------|--------|-------|------|---------|-------|
-| 1 | A1 | cafe-discovery | — | **Surface canonique liste/détail wallet v1** (remplace l’ancienne façade contexts) | mergé | 49,52,54 | `WORKPLAN_API_PR` **PR1a, PR4, PR11a** | | **#48** contexts **retiré** par **#54** ; pas de réouverture de `wallet-policy-contexts`. |
+| 1 | A1 | cafe-discovery | — | **Surface canonique liste/détail wallet v1** (remplace l’ancienne façade contexts) | mergé | 49,52,54 | `WORKPLAN_API_PR` **PR1a, PR4, PR11a** | | **#48** contexts **retiré** par **#54** ; pas de réouverture de `façade policy-context (retirée)`. |
 | 2 | A2 | cafe-discovery (+ liens CPM) | `option-a/a2-discovery-cpm-v1-contract-docs` | Doc **mainteneur** : v1 scans wallet vs CPM explore/assessment/policies ; URLs edge | mergé | 60 | [#60](https://github.com/create2-labs/cafe-discovery/pull/60) | | Doc : `docs/CPM_OPTION_A_DISCOVERY_V1_CONTRACT.md` ; **PR12b** [#59](https://github.com/create2-labs/cafe-discovery/pull/59) jalons README antérieurs. |
 | 3 | B1 | cafe-crypto-policy-mgt | — | **Explore** + `policy_context` aligné détail v1 | mergé | 29 | [#29](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/29) | | Suite : durcissements optionnels + doc seulement si écart. |
 | 4 | B2 | cafe-crypto-policy-mgt | — | **Policies** + **GET ?scan_id=** + règles persist **binding** | mergé | 28 | [#28](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/28) | | Voir aussi **PR5/6** Discovery↔CPM référence scan. |
 | 5 | C1 | cafe-crypto-policy-mgt | `option-a/c1-option-a-script` | Script smoke : sign-in → **v1** list/detail → explore → persist | mergé | 34 | [#34](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/34) | | `test-discovery-v1-wallet-scans-to-cpm.sh` ; plus de scripts CBOM / contexts legacy. |
-| 6 | C2 | cafe-crypto-policy-mgt (+ discovery si besoin) | `option-a/c2-contract-api-tests` | Tests contrat **v1** + CPM (complément **go test** existants) | mergé | 35 | [#35](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/35) | | `internal/contract` ; golden A2 §3.1 ; pas de garde-fou shell `wallet-policy-contexts` (volontairement hors scope). |
+| 6 | C2 | cafe-crypto-policy-mgt (+ discovery si besoin) | `option-a/c2-contract-api-tests` | Tests contrat **v1** + CPM (complément **go test** existants) | mergé | 35 | [#35](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/35) | | `internal/contract` ; golden A2 §3.1 ; pas de garde-fou shell `façade policy-context (retirée)` (volontairement hors scope). |
 | 7 | F1 | cafe-frontend | `option-a/f1-discovery-v1-wallet-scan-data-source` | Data source **liste + détail** scans wallet v1 | mergé | 58 | [#58](https://github.com/create2-labs/cafe-frontend/pull/58) | | `src/discovery/walletScanV1DataSource.ts` ; post **PR 12** ; pas de couplage CPM dans le client HTTP Discovery. |
 | 8 | F2 | cafe-frontend | `option-a/f2-frontend-cpm-scan-context` | Composable **`useCpmScanContext`** (sélection `scan_id`) | mergé | 59 | [#59](https://github.com/create2-labs/cafe-frontend/pull/59) | | `useCpmScanContext` + `cpmScanContext` ; sync **`?scanId=`**. |
 | 9 | F3 | cafe-frontend | `option-a/f3-frontend-cpm-scan-selector` | UI sélecteur de scan CPM (données v1) | mergé | 60 | [#60](https://github.com/create2-labs/cafe-frontend/pull/60) | | `CpmScanSelector` + `cpmScanSelectorDisplay` ; page CPM. |
@@ -159,11 +159,11 @@ Remplir **Statut**, **N° PR**, **Lien**, **Assigné**, **Notes** au fil des tra
 
 ---
 
-## PR A1 — Discovery **v1 wallet scans** (surface canonique ; historique `wallet-policy-contexts`)
+## PR A1 — Discovery **v1 wallet scans** (surface canonique ; historique `façade policy-context (retirée)`)
 
 **Statut : mergé** selon **`WORKPLAN_API_PR.md`** — liste + détail sous **`/discovery/v1/wallets/scans`** (**PR4** [#52](https://github.com/create2-labs/cafe-discovery/pull/52)) ; contrat OpenAPI **PR1a** [#49](https://github.com/create2-labs/cafe-discovery/pull/49).
 
-**Historique (ne pas réimplémenter comme route publique nominale) :** une exposition **`GET /discovery/wallet-policy-contexts`** avait été livrée (**ex. PR [#48](https://github.com/create2-labs/cafe-discovery/pull/48)**) puis **retirée** au profit des APIs **v1** — **PR11a** [#54](https://github.com/create2-labs/cafe-discovery/pull/54). Tout client, script ou doc Option A doit s'appuyer sur **`openapi/discovery-v1.yaml`**, pas sur l'ancienne façade.
+**Historique (ne pas réimplémenter comme route publique nominale) :** une exposition **la façade policy-context historique** avait été livrée (**ex. PR [#48](https://github.com/create2-labs/cafe-discovery/pull/48)**) puis **retirée** au profit des APIs **v1** — **PR11a** [#54](https://github.com/create2-labs/cafe-discovery/pull/54). Tout client, script ou doc Option A doit s'appuyer sur **`openapi/discovery-v1.yaml`**, pas sur l'ancienne façade.
 
 ### 1. Goal (canonique aujourd'hui)
 
@@ -187,7 +187,7 @@ Fournir pagination, filtres et **détail** par **`scan_id`** conformes **§0.1**
 
 ### 5. Explicit non-goals
 
-- Réintroduire **`GET …/wallet-policy-contexts`** comme surface publique nominale.
+- Réintroduire **`GET …/façade policy-context (retirée)`** comme surface publique nominale.
 
 ### 6. Références PR Git
 
@@ -197,7 +197,7 @@ Voir **`WORKPLAN_API_PR.md`** — **PR1a**, **PR4**, **PR11a**.
 
 ```markdown
 ## Summary
-Option A relies on Discovery **v1** wallet scan list + detail (PR4 #52), not wallet-policy-contexts (removed PR11a #54).
+Option A relies on Discovery **v1** wallet scan list + detail (PR4 #52), not façade policy-context (retirée) (removed PR11a #54).
 
 ## References
 WORKPLAN_API_PR.md § PR4, PR11a ; openapi/discovery-v1.yaml
@@ -229,7 +229,7 @@ avec **URLs directes vs edge** (`/api/discovery/v1`, `/api/cpm/v1`). Croiser **`
 
 ### 3. Acceptance criteria
 
-- **Aucune** mention de **`/discovery/wallet-policy-contexts`** comme chemin actif **sans** la qualifier *historique / retiré*.
+- **Aucune** mention de **la façade policy-context historique** comme chemin actif **sans** la qualifier *historique / retiré*.
 - Pagination : champs **`items`** alignés OpenAPI (**pas** `{ contexts }` historique).
 - **Table de correspondence normative §3.1** (obligatoire dans la livrable doc A2 — figer avant **F1/F4**) : pour **chaque** champ de l’objet **`policy_context`** accepté par CPM (**`explore`**, synchrone), une ligne indiquant : **(a)** clef/path côté DTO **`GET /discovery/v1/wallets/scans/{scan_id}`** (référence **`openapi/discovery-v1.yaml`** ou schémas générés), **(b)** clef/path côté **`policy_context`**, **(c)** règle (copie 1:1, renommage, dérivation, défaut/absence), **(d)** type + **liste fermée des valeurs / enums** où applicable.
 - Révision croisée avec le code **`cafe-crypto-policy-mgt/internal/api/explore_policy_context.go`** (validation stricte) : la doc doit **coller aux validateurs**, pas inventer des alias silencieux.
@@ -343,7 +343,7 @@ Voir chapitres **PR5**, **PR6**, **PR7** dans **`WORKPLAN_API_PR.md`**.
 
 ### 1. Goal
 
-**Livré :** script bash unique **`test-discovery-v1-wallet-scans-to-cpm.sh`** — sign-in Discovery → **`GET /discovery/v1/wallets/scans`** → **`GET …/wallets/scans/{scan_id}`** → **`POST /api/cpm/v1/policies/decisions/explore`** → **`POST /api/cpm/v1/policies`** (optionnel **`SKIP_PERSIST=1`**). **Ne plus** appeler **`/discovery/wallet-policy-contexts`** (retiré **PR11a**). **Pas** de parcours CBOM / scan polling legacy dans les scripts actifs.
+**Livré :** script bash unique **`test-discovery-v1-wallet-scans-to-cpm.sh`** — sign-in Discovery → **`GET /discovery/v1/wallets/scans`** → **`GET …/wallets/scans/{scan_id}`** → **`POST /api/cpm/v1/policies/decisions/explore`** → **`POST /api/cpm/v1/policies`** (optionnel **`SKIP_PERSIST=1`**). **Ne plus** appeler **la façade policy-context historique** (retiré **PR11a**). **Pas** de parcours CBOM / scan polling legacy dans les scripts actifs.
 
 ### 2. Scope (livré)
 
@@ -356,7 +356,7 @@ Voir chapitres **PR5**, **PR6**, **PR7** dans **`WORKPLAN_API_PR.md`**.
 - **Help** documente edge **`/api/discovery/v1/wallets/scans`**, **`/api/cpm/v1/...`**
 - **`CURL_REDIRECT`** default **`0`** ; pas d’impression JWT/mot de passe
 - Ambiguïté multi-scan sans **`SCAN_ID`** → échec explicite documenté
-- Aucune sous-chaîne route legacy **`wallet-policy-contexts`** dans **`scripts/**/*.sh`** (vérification manuelle ; garde-fou shell automatisé **non** retenu post-**#35**)
+- Aucune sous-chaîne route legacy **`façade policy-context (retirée)`** dans **`scripts/**/*.sh`** (vérification manuelle ; garde-fou shell automatisé **non** retenu post-**#35**)
 
 ### 4. Tests
 
@@ -425,7 +425,7 @@ Compléter la couverture **CI-friendly** alignée **`openapi/discovery-v1.yaml`*
 **Régression façade retirée (C1 — non automatisée en #35)**
 
 - **#35** n’a **pas** ajouté de script **`assert-scripts-use-discovery-wallet-scans-v1-only.sh`** ni de test Go l’appelant (décision produit : smoke C1 + revue manuelle suffisants).  
-- **`*.md`** (documentation / workplans) restent **exclus** d’un éventuel grep scripts ; mentions historiques **`wallet-policy-contexts`** autorisées en doc.
+- **`*.md`** (documentation / workplans) restent **exclus** d’un éventuel grep scripts ; mentions historiques **`façade policy-context (retirée)`** autorisées en doc.
 
 **Golden mapping (couplé A2)**
 
@@ -455,7 +455,7 @@ Client typé **authentifié** : **`listWalletScans({ limit?, offset?, … })`** 
 
 - Types alignés **A2** / OpenAPI ; erreurs structurées ; **pas** d’appel CPM dans ce client
 
-### 4–8. Mettre à jour titres / messages : **v1**, pas *wallet-policy-contexts*
+### 4–8. Mettre à jour titres / messages : **v1**, pas *façade policy-context (retirée)*
 
 ---
 
@@ -498,10 +498,10 @@ Sélecteur alimenté **uniquement** par **F1** (DTO v1 liste + résumé depuis d
 
 ### 3. Acceptance criteria
 
-- Utiliser **`/api/discovery/v1/wallets/scans`** (edge) — **pas** d’ancien **`wallet-policy-contexts`**
+- Utiliser **`/api/discovery/v1/wallets/scans`** (edge) — **pas** d’ancien **`façade policy-context (retirée)`**
 - États : vide (**lancer un scan wallet**), erreur auth/réseau, liste
 
-### 4–8. Templates : remplacer références *wallet-policy-contexts*
+### 4–8. Templates : remplacer références *façade policy-context (retirée)*
 
 ---
 
@@ -571,14 +571,14 @@ Narratif **Option A réconcilié** : **`WORKPLAN_API_PR.md`** comme chaîne merg
 - **`cafe-crypto-policy-mgt/docs/CPM_OPTION_A_INTEGRATED.md`** — narratif intégré, mermaid, matrice URL, C1, jalons mergés
 - **`cafe-crypto-policy-mgt/README.md`** — section Option A + smoke v1 (retrait doc legacy CBOM / `wallet-scan-and-cpm-policy.sh`)
 - **`cafe-documentation/docs/architecture/cpm-option-a-v1-flow.md`** — résumé public + liens
-- **`cafe-documentation/README.md`**, **`03-cafe-developer-guide.md`** — Option A `policy_context`, route historique `wallet-policy-contexts`
+- **`cafe-documentation/README.md`**, **`03-cafe-developer-guide.md`** — Option A `policy_context`, route historique `façade policy-context (retirée)`
 - Liens **`WORKPLAN_API.md`**, **`CPM_FRONTEND_PR_PLAN_V1.md`**, A2 Discovery
 
 ### 3. Acceptance criteria (rappel)
 
 - Schéma : scan → DB Discovery (PS cible long terme) → **v1 list/detail** → UI → **explore** → **persist**
 - Table URL **direct / edge** ; scripts **C1** documentés (`test-discovery-v1-wallet-scans-to-cpm.sh`)
-- **Pas** de présentation de `wallet-policy-contexts` comme route active sans note *historique*
+- **Pas** de présentation de `façade policy-context (retirée)` comme route active sans note *historique*
 
 ### 4. Tests
 
@@ -606,7 +606,7 @@ Revue doc uniquement ; `bash -n scripts/test-discovery-v1-wallet-scans-to-cpm.sh
 
 ## Acceptance
 - Flow diagram scan → Discovery DB (PS target) → v1 list/detail → UI → explore → persist.
-- URL matrix direct/edge; C1 smoke script; historical `wallet-policy-contexts` noted as removed (PR11a).
+- URL matrix direct/edge; C1 smoke script; historical `façade policy-context (retirée)` noted as removed (PR11a).
 
 ## References
 PR11a #54, CPM PR8 #29, PR7 #28, PR13g #33, Discovery A2 #60, frontend F1–F5 #58–62.
@@ -654,7 +654,7 @@ cd cafe-frontend && npm run typecheck && npm run lint
 
 ```bash
 # (Optionnel) Interdiction route morte dans les scripts shell actifs — revue manuelle (non automatisé en C2 #35)
-grep -R "wallet-policy-contexts" cafe-crypto-policy-mgt/scripts --include='*.sh' -n || true
+grep -R "façade policy-context (retirée)" cafe-crypto-policy-mgt/scripts --include='*.sh' -n || true
 ```
 
 ---
@@ -662,14 +662,14 @@ grep -R "wallet-policy-contexts" cafe-crypto-policy-mgt/scripts --include='*.sh'
 ## Global non-goals (entire initiative)
 
 - Big-bang refactor of Persistence Service ingestion or ripping DB out of Discovery prematurely.
-- **Réintroduire** la route **`GET /discovery/wallet-policy-contexts`** comme contrat nominal (voir **PR11a** **`WORKPLAN_API_PR.md`**).
+- **Réintroduire** la route **la façade policy-context historique** comme contrat nominal (voir **PR11a** **`WORKPLAN_API_PR.md`**).
 - **Ne pas** contredire **`WORKPLAN_API_PR.md`** sur les bases publiques : **`/api/discovery/v1`**, **`/api/cpm/v1`**.
 - Frontend calling Persistence Service or SQL directly.
 
-**Note CBOM / historique :** le serveur Discovery **`GET /discovery/cbom/*`** a été **retiré** (**PR13c** [#57](https://github.com/create2-labs/cafe-discovery/pull/57)) ; l’UI **nominal** passe par détail **v1** (**PR13b** sur `main`). Reliquats scripts/README sont suivis sous **WORKPLAN** (ex. **`cafe.sh --cboms`**).
+**Note CBOM / historique :** le serveur Discovery **CBOM historique** a été **retiré** (**PR13c** [#57](https://github.com/create2-labs/cafe-discovery/pull/57)) ; l’UI **nominal** passe par détail **v1** (**PR13b** sur `main`). Reliquats scripts/README sont suivis sous **WORKPLAN** (ex. **`cafe.sh --cboms`**).
 
 ---
 
-_Révision document : aligné sur [`WORKPLAN_API_PR.md`](./WORKPLAN_API_PR.md) et [`CPM_FRONTEND_PR_PLAN_V1.md`](./CPM_FRONTEND_PR_PLAN_V1.md) ; jalons **A1, A2, B1, B2, C1 (#34), C2 (#35), F1 (#58), F2 (#59), F3 (#60), F4 (#61), F5 (#62 cafe-frontend), D1 (#36)** marqués **mergé** ; séquence Option A du plan **closée** ; la surface `wallet-policy-contexts` est **historique** ; le contrat nominal est **Discovery v1** `wallets/scans` + **CPM** `/api/cpm/v1`._
+_Révision document : aligné sur [`WORKPLAN_API_PR.md`](./WORKPLAN_API_PR.md) et [`CPM_FRONTEND_PR_PLAN_V1.md`](./CPM_FRONTEND_PR_PLAN_V1.md) ; jalons **A1, A2, B1, B2, C1 (#34), C2 (#35), F1 (#58), F2 (#59), F3 (#60), F4 (#61), F5 (#62 cafe-frontend), D1 (#36)** marqués **mergé** ; séquence Option A du plan **closée** ; la surface `façade policy-context (retirée)` est **historique** ; le contrat nominal est **Discovery v1** `wallets/scans` + **CPM** `/api/cpm/v1`._
 
 _End of PR plan._

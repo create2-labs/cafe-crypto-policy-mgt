@@ -17,7 +17,7 @@ End-to-end product and integration story for **Option A** (reconciled with **v1*
 | Discovery OpenAPI | [`cafe-discovery/openapi/discovery-v1.yaml`](https://github.com/create2-labs/cafe-discovery/blob/main/openapi/discovery-v1.yaml) |
 | CPM OpenAPI | [`openapi/cpm-v1.yaml`](../openapi/cpm-v1.yaml) |
 
-**Historical (removed public route):** `GET /discovery/wallet-policy-contexts` was an interim façade ([Discovery #48](https://github.com/create2-labs/cafe-discovery/pull/48)) and was **removed** in favor of v1 list/detail ([Discovery #54](https://github.com/create2-labs/cafe-discovery/pull/54) — **PR11a**). Do not document or implement it as an active integration path.
+**Historical (removed public route):** la façade policy-context historique was an interim façade ([Discovery #48](https://github.com/create2-labs/cafe-discovery/pull/48)) and was **removed** in favor of v1 list/detail ([Discovery #54](https://github.com/create2-labs/cafe-discovery/pull/54) — **PR11a**). Do not document or implement it as an active integration path.
 
 ---
 
@@ -145,7 +145,7 @@ SKIP_PERSIST=1 ./scripts/test-discovery-v1-wallet-scans-to-cpm.sh
 
 - **Flow:** sign-in → `GET /discovery/v1/wallets/scans` → `GET …/wallets/scans/{scan_id}` → `POST /api/cpm/v1/policies/decisions/explore` → optional `POST /api/cpm/v1/policies`.
 - **Edge:** set `DISCOVERY_V1_WALLET_SCANS_LIST_PATH=/api/discovery/v1/wallets/scans` and point `DISCOVERY_BASE` / `CPM_BASE` at the gateway host (see script `--help`).
-- **Removed scripts (do not restore):** `test-discovery-wallet-contexts-to-cpm.sh`, `test-wallet-scan-and-cpm-policy.sh` (CBOM polling / `wallet-policy-contexts`).
+- **Removed scripts (do not restore):** `test-discovery-wallet-contexts-to-cpm.sh`, `test-wallet-scan-and-cpm-policy.sh` (CBOM polling / `façade policy-context (retirée)`).
 - **CI:** `bash -n scripts/test-discovery-v1-wallet-scans-to-cpm.sh` in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
 
 ---
@@ -162,14 +162,14 @@ bash -n cafe-crypto-policy-mgt/scripts/test-discovery-v1-wallet-scans-to-cpm.sh
 Optional regression check (scripts only; `*.md` may mention historical paths):
 
 ```bash
-grep -R "wallet-policy-contexts" cafe-crypto-policy-mgt/scripts --include='*.sh' -n || true
+grep -R "façade policy-context (retirée)" cafe-crypto-policy-mgt/scripts --include='*.sh' -n || true
 ```
 
 ---
 
 ## 8. Non-goals (Option A initiative)
 
-- Reintroducing `GET /discovery/wallet-policy-contexts` as a nominal public API.
+- Reintroducing la façade policy-context historique as a nominal public API.
 - Frontend or CPM direct access to Persistence Service / Discovery SQL.
 - Big-bang removal of Discovery DB before PS ingestion is ready.
 - Playwright E2E for this path (F5 uses Vitest + mocked HTTP).

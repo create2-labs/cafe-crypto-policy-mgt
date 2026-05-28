@@ -1,5 +1,7 @@
 # Scan immutability & CPM — PR plan (CPM)
 
+> **English product summary:** [CAFE functional specifications](https://github.com/create2-labs/cafe-documentation/blob/main/functional-specifications.md) and [technical specifications](https://github.com/create2-labs/cafe-documentation/blob/main/technical-specifications.md).
+
 **Source de vérité :** [`WORKPLAN_API.md`](./WORKPLAN_API.md) — **§0**, **§2.2** (couplage **W1–W8**, query **`latest=true`**), **§4.4**, **§8.6**.
 
 **All API paths in this document refer to the canonical public prefixes defined in WORKPLAN_API.md: `/api/discovery/v1` and `/api/cpm/v1`.**
