@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -163,6 +164,11 @@ type immutabilityGuardError struct {
 	message string
 }
 
+var (
+	errDiscoveryScanNotFound  = errors.New("discovery scan not found")
+	errDiscoveryScanNotWallet = errors.New("discovery scan is not wallet")
+)
+
 func enforceScanImmutabilityGuards(ctx context.Context, r *http.Request, cfg authConfig, requestID string) (*immutabilityGuardError, int) {
 	if r == nil {
 		return nil, http.StatusOK
@@ -184,6 +190,13 @@ func enforceScanImmutabilityGuards(ctx context.Context, r *http.Request, cfg aut
 	authz := r.Header.Get("Authorization")
 	targetAddress, derr := fetchWalletTargetAddressForScan(ctx, cfg, authz, requestID, requestedScanID)
 	if derr != nil {
+		switch {
+		case errors.Is(derr, errDiscoveryScanNotFound), errors.Is(derr, errDiscoveryScanNotWallet):
+			return &immutabilityGuardError{
+				code:    "not_found",
+				message: "scan not found",
+			}, http.StatusNotFound
+		}
 		return &immutabilityGuardError{
 			code:    "DISCOVERY_UPSTREAM_UNAVAILABLE",
 			message: derr.Error(),
@@ -246,6 +259,9 @@ func fetchWalletTargetAddressForScan(ctx context.Context, cfg authConfig, author
 	detailJSON, st, err := fetchDiscoveryWalletScanDetail(ctx, cfg, authorization, requestID, scanID)
 	if err != nil {
 		return "", err
+	}
+	if st == http.StatusNotFound {
+		return "", errDiscoveryScanNotFound
 	}
 	if st != http.StatusOK {
 		return "", fmt.Errorf("discovery wallet scan detail returned %d", st)

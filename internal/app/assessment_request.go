@@ -282,6 +282,7 @@ func fetchDiscoveryWalletScanDetail(ctx context.Context, authCfg authConfig, aut
 
 func targetAddressFromWalletScanDetailJSON(detail []byte) (string, error) {
 	var wrap struct {
+		ScanFamily string `json:"scan_family"`
 		Result struct {
 			TargetAddress string `json:"target_address"`
 		} `json:"result"`
@@ -289,9 +290,12 @@ func targetAddressFromWalletScanDetailJSON(detail []byte) (string, error) {
 	if err := json.Unmarshal(detail, &wrap); err != nil {
 		return "", err
 	}
+	if strings.EqualFold(strings.TrimSpace(wrap.ScanFamily), "tls") {
+		return "", errDiscoveryScanNotWallet
+	}
 	addr := strings.TrimSpace(wrap.Result.TargetAddress)
 	if addr == "" {
-		return "", fmt.Errorf("target_address is required in wallet scan result")
+		return "", errDiscoveryScanNotWallet
 	}
 	return addr, nil
 }
