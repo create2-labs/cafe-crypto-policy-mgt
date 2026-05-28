@@ -323,3 +323,105 @@ func TestWithAuthentication_IMM10_W2RejectsHistoricalScanID(t *testing.T) {
 		t.Fatalf("want 400 SCAN_ID_NOT_LATEST_FOR_TARGET, got %d body=%s", res.Code, res.Body.String())
 	}
 }
+
+func TestWithAuthentication_IMM10_ExploreRejectsTLSScanIDAsNotFound(t *testing.T) {
+	introspect := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"accepted":true}`))
+	}))
+	defer introspect.Close()
+	authzServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"allowed":true}`))
+	}))
+	defer authzServer.Close()
+	discovery := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/discovery/v1/wallets/scans/") {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"scan_id":"705c9704-9428-45e0-882d-fae4cb9d2a0b","scan_family":"tls","status":"completed","result":{"target_address":"https://example.com"}}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer discovery.Close()
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+	handler, err := withAuthentication(next, authConfig{
+		Required:                    true,
+		SessionValidationURL:        introspect.URL,
+		SessionValidationTimeoutSec: 1,
+		ScanAuthorizationURL:        authzServer.URL,
+		ScanAuthorizationTimeoutSec: 1,
+		DiscoveryHTTPBaseURL:        discovery.URL,
+		DiscoveryHTTPTimeoutSec:     1,
+		ClockSkewSec:                30,
+	})
+	if err != nil {
+		t.Fatalf("withAuthentication: %v", err)
+	}
+	token, err := makeTokenEnvelope(map[string]any{
+		"user_id": "u1",
+		"email":   "u@example.com",
+		"exp":     time.Now().Add(time.Hour).Unix(),
+	}, []string{"EdDSA", "ML-DSA-65"})
+	if err != nil {
+		t.Fatalf("make token: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, strings.NewReader(`{"scan_id":"705c9704-9428-45e0-882d-fae4cb9d2a0b","policy_context":{"scan_id":"705c9704-9428-45e0-882d-fae4cb9d2a0b","wallet_type":"EOA","current_pq_posture":"classical_only","chain_ids":[1],"scanned_at":"2026-01-01T00:00:00Z"},"selection_request":{"target_posture":"hybrid","target_chain_ids":[1],"require_multichain":false,"allow_new_wallet":false,"address_continuity_required":true,"key_rotation_required":true,"recovery_required":true,"minimum_maturity":1,"approval_mode":"manual"}}`))
+	req.Header.Set("Authorization", "Bearer "+token)
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusNotFound || !strings.Contains(res.Body.String(), `"error":"not_found"`) {
+		t.Fatalf("want 404 not_found, got %d body=%s", res.Code, res.Body.String())
+	}
+}
+
+func TestWithAuthentication_IMM10_PersistRejectsTLSScanIDAsNotFound(t *testing.T) {
+	introspect := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"accepted":true}`))
+	}))
+	defer introspect.Close()
+	authzServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"allowed":true}`))
+	}))
+	defer authzServer.Close()
+	discovery := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/discovery/v1/wallets/scans/") {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"scan_id":"705c9704-9428-45e0-882d-fae4cb9d2a0b","scan_family":"tls","status":"completed","result":{"target_address":"https://example.com"}}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer discovery.Close()
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+	handler, err := withAuthentication(next, authConfig{
+		Required:                    true,
+		SessionValidationURL:        introspect.URL,
+		SessionValidationTimeoutSec: 1,
+		ScanAuthorizationURL:        authzServer.URL,
+		ScanAuthorizationTimeoutSec: 1,
+		DiscoveryHTTPBaseURL:        discovery.URL,
+		DiscoveryHTTPTimeoutSec:     1,
+		ClockSkewSec:                30,
+	})
+	if err != nil {
+		t.Fatalf("withAuthentication: %v", err)
+	}
+	token, err := makeTokenEnvelope(map[string]any{
+		"user_id": "u1",
+		"email":   "u@example.com",
+		"exp":     time.Now().Add(time.Hour).Unix(),
+	}, []string{"EdDSA", "ML-DSA-65"})
+	if err != nil {
+		t.Fatalf("make token: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.Policies, strings.NewReader(`{"id":"p1","scan_id":"705c9704-9428-45e0-882d-fae4cb9d2a0b","binding":"discovery","payload":{"mode":"strict"}}`))
+	req.Header.Set("Authorization", "Bearer "+token)
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusNotFound || !strings.Contains(res.Body.String(), `"error":"not_found"`) {
+		t.Fatalf("want 404 not_found, got %d body=%s", res.Code, res.Body.String())
+	}
+}
