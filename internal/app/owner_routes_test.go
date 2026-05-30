@@ -202,6 +202,58 @@ func TestDELETEPolicy204And404(t *testing.T) {
 	}
 }
 
+func TestDELETEDraft204And404(t *testing.T) {
+	h := newAuthedTestHandler(t)
+	tokA := mustToken(t, "owner-a")
+	tokB := mustToken(t, "owner-b")
+	create := httptest.NewRequest(http.MethodPost, cpmroutes.Drafts, strings.NewReader(`{"id":"draft-del","payload":{"name":"x"}}`))
+	create.Header.Set("Authorization", "Bearer "+tokA)
+	create.Header.Set("Content-Type", "application/json")
+	cr := httptest.NewRecorder()
+	h.ServeHTTP(cr, create)
+	if cr.Code != http.StatusOK {
+		t.Fatalf("create: expected 200, got %d body=%s", cr.Code, cr.Body.String())
+	}
+	del := httptest.NewRequest(http.MethodDelete, cpmroutes.Drafts+"?id=draft-del", nil)
+	del.Header.Set("Authorization", "Bearer "+tokA)
+	dr := httptest.NewRecorder()
+	h.ServeHTTP(dr, del)
+	if dr.Code != http.StatusNoContent {
+		t.Fatalf("delete: expected 204, got %d", dr.Code)
+	}
+	del404 := httptest.NewRequest(http.MethodDelete, cpmroutes.Drafts+"?id=draft-del", nil)
+	del404.Header.Set("Authorization", "Bearer "+tokA)
+	d404 := httptest.NewRecorder()
+	h.ServeHTTP(d404, del404)
+	if d404.Code != http.StatusNotFound {
+		t.Fatalf("second delete: expected 404, got %d body=%s", d404.Code, d404.Body.String())
+	}
+	delOther := httptest.NewRequest(http.MethodDelete, cpmroutes.Drafts+"?id=ghost-draft", nil)
+	delOther.Header.Set("Authorization", "Bearer "+tokB)
+	do := httptest.NewRecorder()
+	h.ServeHTTP(do, delOther)
+	if do.Code != http.StatusNotFound {
+		t.Fatalf("delete missing as other user: expected 404, got %d", do.Code)
+	}
+
+	tokC := mustToken(t, "owner-c")
+	createC := httptest.NewRequest(http.MethodPost, cpmroutes.Drafts, strings.NewReader(`{"id":"draft-owned-by-c","payload":{"y":1}}`))
+	createC.Header.Set("Authorization", "Bearer "+tokC)
+	createC.Header.Set("Content-Type", "application/json")
+	cc := httptest.NewRecorder()
+	h.ServeHTTP(cc, createC)
+	if cc.Code != http.StatusOK {
+		t.Fatalf("create C: %d %s", cc.Code, cc.Body.String())
+	}
+	delCross := httptest.NewRequest(http.MethodDelete, cpmroutes.Drafts+"?id=draft-owned-by-c", nil)
+	delCross.Header.Set("Authorization", "Bearer "+tokA)
+	dx := httptest.NewRecorder()
+	h.ServeHTTP(dx, delCross)
+	if dx.Code != http.StatusNotFound {
+		t.Fatalf("delete other owner's draft: expected 404, got %d body=%s", dx.Code, dx.Body.String())
+	}
+}
+
 func newAuthedTestHandler(t *testing.T) http.Handler {
 	t.Helper()
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
