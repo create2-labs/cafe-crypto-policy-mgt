@@ -26,26 +26,26 @@ func registerPolicyReferenceInternalRoute(mux *http.ServeMux, store *persistence
 		const maxBody = 1 << 16
 		body, err := io.ReadAll(io.LimitReader(r.Body, maxBody+1))
 		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "could not read request body"})
+			writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: "could not read request body"})
 			return
 		}
 		if len(body) > maxBody {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "request body too large"})
+			writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: "request body too large"})
 			return
 		}
 		var req policyScanReferenceRequest
 		if err := json.Unmarshal(body, &req); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+			writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: "invalid request body"})
 			return
 		}
 		scanID, err := NormalizeDiscoveryScanID(req.ScanID)
 		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "scan_id must be a valid UUID"})
+			writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: "scan_id must be a valid UUID"})
 			return
 		}
 		userID := strings.TrimSpace(req.UserID)
 		if userID == "" {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "user_id is required"})
+			writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: "user_id is required"})
 			return
 		}
 		principal := authz.Principal{
@@ -54,16 +54,16 @@ func registerPolicyReferenceInternalRoute(mux *http.ServeMux, store *persistence
 			TenantID: strings.TrimSpace(req.TenantID),
 		}
 		if err := principal.Validate(); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid principal"})
+			writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: "invalid principal"})
 			return
 		}
 		list, err := store.ListPersistedPoliciesForScan(principal, scanID)
 		if err != nil {
 			if errors.Is(err, persistence.ErrPrincipalRequired) {
-				writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+				writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: err.Error()})
 				return
 			}
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal server error"})
+			writeJSON(w, http.StatusInternalServerError, map[string]any{jsonKeyError: errMsgInternalServerError})
 			return
 		}
 		count := len(list)
