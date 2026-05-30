@@ -68,6 +68,9 @@ func TestOwnerScopedStoreRequiresPrincipal(t *testing.T) {
 	if _, err := store.CountPersistedPoliciesForScan(invalid, "550e8400-e29b-41d4-a716-446655440000"); !errors.Is(err, ErrPrincipalRequired) {
 		t.Fatalf("expected principal required for CountPersistedPoliciesForScan, got %v", err)
 	}
+	if err := store.DeleteDraft(invalid, "draft-x"); !errors.Is(err, ErrPrincipalRequired) {
+		t.Fatalf("expected principal required for DeleteDraft, got %v", err)
+	}
 }
 
 func TestOwnerScopedStoreCountPoliciesForScan(t *testing.T) {
@@ -80,48 +83,53 @@ func TestOwnerScopedStoreCountPoliciesForScan(t *testing.T) {
 		t.Fatal("expected error for empty scan_id")
 	}
 
-	if n, err := store.CountPersistedPoliciesForScan(userA, scan1); err != nil || n != 0 {
-		t.Fatalf("expected count 0, got n=%d err=%v", n, err)
-	}
-	if _, err := store.SavePolicy(userA, "p1", scan1, map[string]any{"k": 1}); err != nil {
-		t.Fatalf("SavePolicy: %v", err)
-	}
-	if _, err := store.SavePolicy(userA, "p2", scan1, map[string]any{"k": 2}); err != nil {
-		t.Fatalf("SavePolicy: %v", err)
-	}
-	if _, err := store.SavePolicy(userA, "p3", scan2, map[string]any{"k": 3}); err != nil {
-		t.Fatalf("SavePolicy: %v", err)
-	}
+	assertPolicyCountForScan(t, store, userA, scan1, 0)
+	mustSavePolicy(t, store, userA, "p1", scan1, map[string]any{"k": 1})
+	mustSavePolicy(t, store, userA, "p2", scan1, map[string]any{"k": 2})
+	mustSavePolicy(t, store, userA, "p3", scan2, map[string]any{"k": 3})
 
-	n, err := store.CountPersistedPoliciesForScan(userA, scan1)
-	if err != nil || n != 2 {
-		t.Fatalf("expected count 2 for scan1, got n=%d err=%v", n, err)
-	}
-	n, err = store.CountPersistedPoliciesForScan(userA, scan2)
-	if err != nil || n != 1 {
-		t.Fatalf("expected count 1 for scan2, got n=%d err=%v", n, err)
-	}
+	assertPolicyCountForScan(t, store, userA, scan1, 2)
+	assertPolicyCountForScan(t, store, userA, scan2, 1)
 
 	userB := authz.Principal{UserID: "user-b", Subject: "user-b", TenantID: "t1"}
-	if n, err := store.CountPersistedPoliciesForScan(userB, scan1); err != nil || n != 0 {
-		t.Fatalf("expected other owner count 0, got n=%d err=%v", n, err)
-	}
+	assertPolicyCountForScan(t, store, userB, scan1, 0)
 
 	userA2 := authz.Principal{UserID: "user-a", Subject: "user-a", TenantID: "t2"}
-	if _, err := store.SavePolicy(userA2, "p-other-tenant", scan1, nil); err != nil {
-		t.Fatalf("SavePolicy other tenant: %v", err)
-	}
-	if n, err := store.CountPersistedPoliciesForScan(userA, scan1); err != nil || n != 2 {
-		t.Fatalf("expected tenant isolation: count 2 for userA t1, got %d", n)
-	}
+	mustSavePolicy(t, store, userA2, "p-other-tenant", scan1, nil)
+	assertPolicyCountForScan(t, store, userA, scan1, 2)
 
-	list, err := store.ListPersistedPoliciesForScan(userA, scan1)
-	if err != nil || len(list) != 2 {
-		t.Fatalf("ListPersistedPoliciesForScan: want len 2, got %d err=%v", len(list), err)
+	list := mustListPoliciesForScan(t, store, userA, scan1)
+	if len(list) != 2 {
+		t.Fatalf("ListPersistedPoliciesForScan: want len 2, got %d", len(list))
 	}
-	if n, err := store.CountPersistedPoliciesForScan(userA, scan1); err != nil || n != len(list) {
-		t.Fatalf("count vs list: n=%d len=%d err=%v", n, len(list), err)
+	assertPolicyCountForScan(t, store, userA, scan1, len(list))
+}
+
+func mustSavePolicy(t *testing.T, store *OwnerScopedStore, p authz.Principal, id, scanID string, payload map[string]any) {
+	t.Helper()
+	if _, err := store.SavePolicy(p, id, scanID, payload); err != nil {
+		t.Fatalf("SavePolicy %q: %v", id, err)
 	}
+}
+
+func assertPolicyCountForScan(t *testing.T, store *OwnerScopedStore, p authz.Principal, scanID string, want int) {
+	t.Helper()
+	n, err := store.CountPersistedPoliciesForScan(p, scanID)
+	if err != nil {
+		t.Fatalf("CountPersistedPoliciesForScan(%q): %v", scanID, err)
+	}
+	if n != want {
+		t.Fatalf("CountPersistedPoliciesForScan(%q): want %d, got %d", scanID, want, n)
+	}
+}
+
+func mustListPoliciesForScan(t *testing.T, store *OwnerScopedStore, p authz.Principal, scanID string) []PolicyRecord {
+	t.Helper()
+	list, err := store.ListPersistedPoliciesForScan(p, scanID)
+	if err != nil {
+		t.Fatalf("ListPersistedPoliciesForScan(%q): %v", scanID, err)
+	}
+	return list
 }
 
 func TestOwnerScopedStoreDeletePolicy(t *testing.T) {
@@ -144,6 +152,30 @@ func TestOwnerScopedStoreDeletePolicy(t *testing.T) {
 		t.Fatalf("SavePolicy: %v", err)
 	}
 	if err := store.DeletePolicy(userB, "p-x"); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("delete other owner: want ErrForbidden, got %v", err)
+	}
+}
+
+func TestOwnerScopedStoreDeleteDraft(t *testing.T) {
+	store := NewOwnerScopedStore()
+	userA := authz.Principal{UserID: "user-a", Subject: "user-a", TenantID: "t1"}
+	if _, err := store.SaveDraft(userA, "d-del", "33333333-3333-3333-3333-333333333333", map[string]any{"k": 1}); err != nil {
+		t.Fatalf("SaveDraft: %v", err)
+	}
+	if err := store.DeleteDraft(userA, "d-del"); err != nil {
+		t.Fatalf("DeleteDraft: %v", err)
+	}
+	if err := store.DeleteDraft(userA, "d-del"); !errors.Is(err, ErrDraftNotFound) {
+		t.Fatalf("second delete: want ErrDraftNotFound, got %v", err)
+	}
+	userB := authz.Principal{UserID: "user-b", Subject: "user-b", TenantID: "t1"}
+	if err := store.DeleteDraft(userB, "missing"); !errors.Is(err, ErrDraftNotFound) {
+		t.Fatalf("delete missing: want ErrDraftNotFound, got %v", err)
+	}
+	if _, err := store.SaveDraft(userA, "d-x", "44444444-4444-4444-4444-444444444444", nil); err != nil {
+		t.Fatalf("SaveDraft: %v", err)
+	}
+	if err := store.DeleteDraft(userB, "d-x"); !errors.Is(err, ErrForbidden) {
 		t.Fatalf("delete other owner: want ErrForbidden, got %v", err)
 	}
 }

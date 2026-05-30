@@ -95,6 +95,25 @@ func (s *OwnerScopedStore) GetDraft(principal authz.Principal, id string) (Draft
 	return record, nil
 }
 
+// DeleteDraft removes a platform draft by id for principal. ErrDraftNotFound if missing;
+// ErrForbidden if owned by another principal (callers may map to 404).
+func (s *OwnerScopedStore) DeleteDraft(principal authz.Principal, id string) error {
+	if err := principal.Validate(); err != nil {
+		return ErrPrincipalRequired
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	record, ok := s.drafts[id]
+	if !ok {
+		return ErrDraftNotFound
+	}
+	if !sameOwner(record.OwnerUserID, record.TenantID, principal.UserID, principal.TenantID) {
+		return ErrForbidden
+	}
+	delete(s.drafts, id)
+	return nil
+}
+
 func (s *OwnerScopedStore) SavePolicy(principal authz.Principal, id string, scanID string, payload map[string]any) (PolicyRecord, error) {
 	if err := principal.Validate(); err != nil {
 		return PolicyRecord{}, ErrPrincipalRequired

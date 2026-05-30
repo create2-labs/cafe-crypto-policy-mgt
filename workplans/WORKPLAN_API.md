@@ -178,6 +178,70 @@ Ce document pose un **modèle cible** cohérent : **collections au pluriel** uni
 
 > **Plans d’implémentation :** [`cafe-discovery/IMMUTABILITE_PR.md`](../../cafe-discovery/IMMUTABILITE_PR.md), [`workplans/IMMUTABILITE_PR.md`](./IMMUTABILITE_PR.md) (CPM), [`cafe-frontend/IMMUTABILITE.md`](../../cafe-frontend/IMMUTABILITE.md) — **découpage PR** ; **ce document** reste la **source de vérité** contrat.
 
+### 2.2.1 Plans — usage, garde-fous et CBOM (**P1**, **G1–G4**)
+
+**Décision produit :** les limites de plan (**`WalletScanLimit`**, **`EndpointScanLimit`**) comparent l’usage au nombre de scans **`completed` success** comptabilisés pour l’utilisateur. **Discovery** est propriétaire (**`GET /plans/usage`**, gardes **`POST …/scan`**, persistance **`scan.completed`**).
+
+#### P1 — Comptage et monotonicité
+
+| Règle | Détail |
+|--------|--------|
+| **Consommation** | **`wallet_scans_used`** / **`endpoint_scans_used`** = succès persistés (ledger **`scan_usage_events`**, une entrée par **`scan_id`**) |
+| **Monotonicité** | **Ne diminuent jamais** via **`DELETE …/scans/{scan_id}`**, **`DELETE …/policies`**, **`DELETE …/drafts`** |
+| **Visibilité UX** | **`GET /plans/usage`** expose aussi **`_*_visible`** (succès non effacés) et **`_*_deleted_by_user`** (`used - visible`) |
+| **Non comptés** | **`failed`**, **`requested`/`started`**, rejet **`PLAN_LIMIT_EXCEEDED`** à la complétion |
+
+#### G1 — Garde POST : places plausibles
+
+Autoriser **`POST …/scan`** (wallet ou TLS) seulement si :
+
+```text
+successful + in_flight < limit
+```
+
+(où **`limit`** = limite plan ; plan illimité → pas de check G1).
+
+- **`successful`** : ledger / succès terminal **`completed`**
+- **`in_flight`** : exécutions owner **`requested` \| `started`** non terminales
+
+Sinon → **`403`** (forme d’erreur plan existante).
+
+#### G2 — Cap parallélisme global
+
+Même en dessous du plafond G1 :
+
+```text
+in_flight < min(limit, 3)
+```
+
+Si **`limit = 0`** (illimité) → **`in_flight < 3`**.
+
+Sinon → **`403`**.
+
+#### G3 — Commit atomique à la complétion (anti-bypass)
+
+À réception **`scan.completed`**, **avant** d’écrire un résultat riche :
+
+1. Transaction : **`try_acquire_success_slot(user, kind)`** (atomique : `successful < limit`).
+2. **Si slot acquis** : persister **`completed` success** + payload **`result`** complet + event ledger.
+3. **Sinon** : persister **`failed`** avec **`PLAN_LIMIT_EXCEEDED`** :
+   - **Conserver** **`address`** / **`url`** (métadonnées cible) ;
+   - **Ne pas** persister de **`result`** exploitable (pas de réseaux, posture, exposition clé, etc.) — empêche le contournement du quota par lecture du détail scan.
+
+Les échecs **`failed`** « métier » (scanner) et les rejets quota **ne consomment pas** le plan.
+
+#### G4 — CBOM (**W6**)
+
+**`GET …/wallets/scans/{scan_id}/cbom`** (et TLS) → **404** si le scan n’est pas **`completed` success** owner. Pas de CBOM pour in-flight, **`failed`**, stub quota.
+
+#### Implémentation
+
+Série **IMM-6b-1…8** — [`cafe-discovery/IMMUTABILITE_PR.md`](../../cafe-discovery/IMMUTABILITE_PR.md). **Ne pas** dériver **`_*_used`** du nombre de lignes visibles (**soft delete**).
+
+**UX frontend :** [`cafe-frontend/IMMUTABILITE.md`](../../cafe-frontend/IMMUTABILITE.md) — **P1**, **W6**, **FE-IMM-0**.
+
+**Exception (hors parcours courant) :** suppression de **compte** / RGPD — peut purger ledger et scans.
+
 ### 2.3 Lecture du catalogue des crypto policies
 
 - **Chemins canoniques** : **§0.2** (cible **`/api/cpm/v1/policies/catalog|templates|instances`**) ou **§0.3** (rollout **alias policies de transition**). JWT requis (**`RouteClassAuthenticated`**). Implémentation actuelle : `internal/api/read_api.go`.
@@ -251,7 +315,7 @@ La coordination release (frontend, scripts, intégrations) reste nécessaire, ma
 | Détail | **`GET …/wallets/scans/{scan_id}`** — **`scan_id`**, **`status`** (lifecycle), **`result`** métier wallet — **exemple JSON** ci‑dessous ; **404** si absent / hors scope. |
 | Lifecycle + immutabilité | **`scan_id`** alloué en **`requested`** (**§2.2**) ; **`result`** immutable après terminal. **Re-scan** = **nouvelle ligne** + **nouveau **`scan_id`**** **seulement** si **aucune** policy **ni** **draft** CPM pour la **`target_address`** (**§2.2 W1**). |
 | **POST scan** (wallet) | **`POST …/scan`** avec **`address`** : **`409`** si policy **ou** **draft** pour la cible (**W1**) ; sinon flux existant (**§8.3**). |
-| **CBOM** | **`GET …/wallets/scans/{scan_id}/cbom`** — CBOM généré **à la demande** ; **404** si scan absent ; terminal requis (schéma OpenAPI). |
+| **CBOM** | **`GET …/wallets/scans/{scan_id}/cbom`** — **404** sauf scan **`completed` success** (**G4**, **IMM-6b-7**). |
 | Effacement | **`DELETE …/wallets/scans/{scan_id}`** — **`204`** \| **`404`** \| **`409`** ; **`409`** **`SCAN_REFERENCED_BY_POLICY`** si policy référence ce **`scan_id`**. **Parcours utilisateur** : **`GET …/policies?scan_id=`** → **`DELETE …/policies?id=`** → **`DELETE`** scan (**§2.2 W3**, rationale **§4.2**). **Idempotence** : second **`DELETE`** → **`404`** (**§5.4.6**). |
 | Auth | JWT ; **owner-scoped** (+ authz **`scan`** / AUTH‑02 où défini). |
 | Ancien `liste wallet historique (hors v1)` (**`id`** = adresse) | **Supprimé** ; remplacé par la liste **synopsis** + **`scan_id`** + filtres **§2.2**. |

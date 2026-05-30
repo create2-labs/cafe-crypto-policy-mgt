@@ -30,9 +30,9 @@ Items deferred; not blocking current IMM work unless noted.
 
 **Context:** **WORKPLAN_API.md** §2.4 / §4.4 and **IMMUTABILITE** W1 require platform draft removal to unblock `POST /api/discovery/v1/scan` after a draft blocks rescan. IMM-9b already **counts** drafts in `CountActiveWalletCPMContext` (409 path works). **`owner_routes.go`** exposes `POST` and `GET` on `/api/cpm/v1/drafts` only — no `DELETE` handler yet.
 
-**Gap:** Users can be blocked by a draft (`CPM_EXISTS_FOR_WALLET_TARGET`) but cannot unblock via the public API until this route exists (UI / `cafe-deploy/scripts/test-discovery-imm9-wallet-scan-w1-cpm-block.sh` step 5 skips rescan-after-delete when DELETE is not routed).
+**Plan (PR sequence):** **IMM-W1-1…3** in [`workplans/IMMUTABILITE_PR.md`](./workplans/IMMUTABILITE_PR.md) — store `DeleteDraft` → HTTP route → tests + deploy smoke step 5.
 
-**Improvement:** Add `DELETE …/drafts?id=…` → **204** | **404** (idempotent), owner-scoped, same auth as other owner routes; document in `openapi/cpm-v1.yaml`.
+**Gap:** Users can be blocked by a draft (`CPM_EXISTS_FOR_WALLET_TARGET`) but cannot unblock via the public API until **IMM-W1-2** ships.
 
 **Acceptance:** After draft save, DELETE clears W1 for that `target_address`; Discovery IMM-9 smoke script completes step 5 with **200** on rescan.
 
