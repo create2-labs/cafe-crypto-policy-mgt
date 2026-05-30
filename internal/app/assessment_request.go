@@ -19,6 +19,7 @@ import (
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/api"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/policy"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/walletobserved"
 )
 
 func registerPoliciesAssessmentRequestRoute(mux *http.ServeMux, authCfg authConfig) {
@@ -35,150 +36,253 @@ func handlePoliciesAssessmentRequest(w http.ResponseWriter, r *http.Request, aut
 	requestID := obs.ensureRequestID(w, r)
 	principal, ok := principalFromContext(r.Context())
 	if !ok {
-		obs.recordDecision(r, requestID, authCategoryOwner, "denied", authCodePrincipalRequired, "principal_missing", "", "")
-		obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, "authentication required", map[string]any{"reason": "principal_missing"})
+		obs.recordDecision(r, requestID, authCategoryOwner, authOutcomeDenied, authCodePrincipalRequired, authReasonPrincipalMissing, "", "")
+		obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, errMsgAuthenticationRequired, reasonDetails(authReasonPrincipalMissing))
 		return
 	}
-
-	if authCfg.AssessmentNATSPublish == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
-			"error":   "assessment_transport_unavailable",
-			"message": "policy assessment request publishing is not configured",
-		})
-		return
-	}
-	if strings.TrimSpace(authCfg.DiscoveryHTTPBaseURL) == "" {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
-			"error":   "discovery_upstream_unavailable",
-			"message": "Discovery HTTP base URL is not configured",
-		})
+	if !assessmentRequestPreconditions(w, authCfg) {
 		return
 	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_request", "message": "could not read body"})
+		writeJSON(w, http.StatusBadRequest, apiErrorJSON("invalid_request", "could not read body"))
 		return
 	}
 	defer func() { _ = r.Body.Close() }()
 
+	parsed, ok := parseAssessmentRequestBody(w, body)
+	if !ok {
+		return
+	}
+
+	if scanAuthErr, status := authorizeScanReadForAssessment(r.Context(), principal, parsed.normScanID, authCfg, requestID); scanAuthErr.Code != "" {
+		writeJSON(w, status, apiErrorWithDetails(scanAuthErr.Code, scanAuthErr.Message, scanAuthErr.Details))
+		return
+	}
+
+	source, ok := fetchWalletScanAssessmentSource(w, r.Context(), authCfg, r.Header.Get("Authorization"), requestID, parsed.normScanID)
+	if !ok {
+		return
+	}
+
+	publishPolicyAssessmentRequest(w, r.Context(), authCfg, parsed, source)
+}
+
+type parsedAssessmentRequest struct {
+	normScanID      string
+	selection       policy.PolicySelectionRequest
+	clientRequestID string
+}
+
+type walletScanAssessmentSource struct {
+	payload         walletobserved.Payload
+	walletSubjectID string
+}
+
+func assessmentRequestPreconditions(w http.ResponseWriter, authCfg authConfig) bool {
+	if authCfg.AssessmentNATSPublish == nil {
+		writeJSON(w, http.StatusServiceUnavailable, apiErrorJSON(
+			"assessment_transport_unavailable",
+			"policy assessment request publishing is not configured",
+		))
+		return false
+	}
+	if strings.TrimSpace(authCfg.DiscoveryHTTPBaseURL) == "" {
+		writeJSON(w, http.StatusServiceUnavailable, apiErrorJSON(
+			"discovery_upstream_unavailable",
+			"Discovery HTTP base URL is not configured",
+		))
+		return false
+	}
+	return true
+}
+
+func parseAssessmentRequestBody(w http.ResponseWriter, body []byte) (parsedAssessmentRequest, bool) {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(body, &raw); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_json", "message": err.Error()})
-		return
+		writeJSON(w, http.StatusBadRequest, apiErrorJSON("invalid_json", err.Error()))
+		return parsedAssessmentRequest{}, false
 	}
 	if _, has := raw["policy_context"]; has {
 		writeJSON(w, http.StatusBadRequest, map[string]any{
-			"error":   "policy_context_forbidden",
-			"message": "policy_context must not be present on this route; use Discovery wallet scan detail only",
+			jsonKeyError:   "policy_context_forbidden",
+			jsonKeyMessage: "policy_context must not be present on this route; use Discovery wallet scan detail only",
 		})
-		return
+		return parsedAssessmentRequest{}, false
 	}
 	for k := range raw {
 		switch k {
-		case "scan_id", "selection_request", "client_request_id":
+		case jsonFieldScanID, jsonFieldSelectionRequest, "client_request_id":
 		default:
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "unknown_field", "message": "unknown field " + k})
-			return
+			writeJSON(w, http.StatusBadRequest, apiErrorJSON("unknown_field", "unknown field "+k))
+			return parsedAssessmentRequest{}, false
 		}
 	}
 
-	scanRaw, ok := raw["scan_id"]
+	scanRaw, ok := raw[jsonFieldScanID]
 	if !ok {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "scan_id_required", "message": "scan_id is required"})
-		return
+		writeJSON(w, http.StatusBadRequest, apiErrorJSON("scan_id_required", "scan_id is required"))
+		return parsedAssessmentRequest{}, false
 	}
 	var scanID string
 	if err := json.Unmarshal(scanRaw, &scanID); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "scan_id_invalid", "message": err.Error()})
-		return
+		writeJSON(w, http.StatusBadRequest, apiErrorJSON("scan_id_invalid", err.Error()))
+		return parsedAssessmentRequest{}, false
 	}
 	normScanID, err := NormalizeDiscoveryScanID(scanID)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "scan_id_invalid", "message": err.Error()})
-		return
+		writeJSON(w, http.StatusBadRequest, apiErrorJSON("scan_id_invalid", err.Error()))
+		return parsedAssessmentRequest{}, false
 	}
 
-	selRaw, ok := raw["selection_request"]
+	selRaw, ok := raw[jsonFieldSelectionRequest]
 	if !ok {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "selection_request_required", "message": "selection_request is required"})
-		return
+		writeJSON(w, http.StatusBadRequest, apiErrorJSON("selection_request_required", "selection_request is required"))
+		return parsedAssessmentRequest{}, false
 	}
-	decSel := json.NewDecoder(bytes.NewReader(selRaw))
-	decSel.DisallowUnknownFields()
-	var sel policy.PolicySelectionRequest
-	if err := decSel.Decode(&sel); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "selection_request_invalid", "message": err.Error()})
-		return
-	}
-	if decSel.More() {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "selection_request_invalid", "message": "multiple JSON values"})
-		return
-	}
-	sel.Normalize()
-	if err := sel.Validate(); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "selection_request_invalid", "message": err.Error()})
-		return
+	sel, ok := decodeAssessmentSelectionRequest(w, selRaw)
+	if !ok {
+		return parsedAssessmentRequest{}, false
 	}
 
 	var clientRequestID string
 	if v, ok := raw["client_request_id"]; ok {
 		_ = json.Unmarshal(v, &clientRequestID)
 	}
+	return parsedAssessmentRequest{
+		normScanID:      normScanID,
+		selection:       sel,
+		clientRequestID: clientRequestID,
+	}, true
+}
 
-	if scanAuthErr, status := authorizeScanReadForAssessment(r.Context(), principal, normScanID, authCfg, requestID); scanAuthErr.Code != "" {
-		writeJSON(w, status, map[string]any{"error": scanAuthErr.Code, "message": scanAuthErr.Message, "details": scanAuthErr.Details})
-		return
+func decodeAssessmentSelectionRequest(w http.ResponseWriter, selRaw json.RawMessage) (policy.PolicySelectionRequest, bool) {
+	decSel := json.NewDecoder(bytes.NewReader(selRaw))
+	decSel.DisallowUnknownFields()
+	var sel policy.PolicySelectionRequest
+	if err := decSel.Decode(&sel); err != nil {
+		writeJSON(w, http.StatusBadRequest, apiErrorJSON(errCodeSelectionRequestInvalid, err.Error()))
+		return policy.PolicySelectionRequest{}, false
 	}
+	if decSel.More() {
+		writeJSON(w, http.StatusBadRequest, apiErrorJSON(errCodeSelectionRequestInvalid, "multiple JSON values"))
+		return policy.PolicySelectionRequest{}, false
+	}
+	sel.Normalize()
+	if err := sel.Validate(); err != nil {
+		writeJSON(w, http.StatusBadRequest, apiErrorJSON(errCodeSelectionRequestInvalid, err.Error()))
+		return policy.PolicySelectionRequest{}, false
+	}
+	return sel, true
+}
 
-	detailJSON, st, err := fetchDiscoveryWalletScanDetail(r.Context(), authCfg, r.Header.Get("Authorization"), requestID, normScanID)
+func fetchWalletScanAssessmentSource(
+	w http.ResponseWriter,
+	ctx context.Context,
+	authCfg authConfig,
+	authorization, requestID, normScanID string,
+) (walletScanAssessmentSource, bool) {
+	detailJSON, st, err := fetchDiscoveryWalletScanDetail(ctx, authCfg, authorization, requestID, normScanID)
 	if err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "discovery_unavailable", "message": err.Error()})
-		return
+		writeJSON(w, http.StatusServiceUnavailable, apiErrorJSON(errCodeDiscoveryUnavailable, err.Error()))
+		return walletScanAssessmentSource{}, false
 	}
+	if !writeDiscoveryScanDetailStatusOK(w, st) {
+		return walletScanAssessmentSource{}, false
+	}
+	return parseWalletScanAssessmentSource(w, detailJSON)
+}
+
+func writeDiscoveryScanDetailStatusOK(w http.ResponseWriter, st int) bool {
 	switch st {
 	case http.StatusNotFound:
-		writeJSON(w, http.StatusNotFound, map[string]any{"error": "not_found", "message": "scan not found"})
-		return
+		writeJSON(w, http.StatusNotFound, apiErrorJSON(errCodeNotFound, errMsgScanNotFound))
+		return false
 	case http.StatusUnauthorized, http.StatusForbidden:
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "discovery_unavailable", "message": "Discovery rejected the session for scan detail"})
-		return
+		writeJSON(w, http.StatusServiceUnavailable, apiErrorJSON(errCodeDiscoveryUnavailable, "Discovery rejected the session for scan detail"))
+		return false
+	case http.StatusOK:
+		return true
 	default:
 		if st >= 500 {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "discovery_unavailable", "message": fmt.Sprintf("Discovery returned %d", st)})
-			return
+			writeJSON(w, http.StatusServiceUnavailable, apiErrorJSON(errCodeDiscoveryUnavailable, fmt.Sprintf("Discovery returned %d", st)))
+			return false
 		}
-		if st != http.StatusOK {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "discovery_unavailable", "message": fmt.Sprintf("unexpected Discovery status %d", st)})
-			return
-		}
+		writeJSON(w, http.StatusServiceUnavailable, apiErrorJSON(errCodeDiscoveryUnavailable, fmt.Sprintf("unexpected Discovery status %d", st)))
+		return false
 	}
+}
 
+func parseWalletScanAssessmentSource(w http.ResponseWriter, detailJSON []byte) (walletScanAssessmentSource, bool) {
 	pl, err := api.ObservationPayloadFromDiscoveryWalletScanDetail(detailJSON)
 	if err != nil {
 		switch {
 		case errors.Is(err, api.ErrWalletScanDetailTLS), errors.Is(err, api.ErrWalletScanDetailNoResult):
-			writeJSON(w, http.StatusNotFound, map[string]any{"error": "not_found", "message": "scan not found"})
-			return
+			writeJSON(w, http.StatusNotFound, apiErrorJSON(errCodeNotFound, errMsgScanNotFound))
 		default:
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "wallet_scan_detail_invalid", "message": err.Error()})
-			return
+			writeJSON(w, http.StatusBadRequest, apiErrorJSON("wallet_scan_detail_invalid", err.Error()))
 		}
+		return walletScanAssessmentSource{}, false
 	}
-
 	walletAddr, werr := targetAddressFromWalletScanDetailJSON(detailJSON)
 	if werr != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "wallet_scan_detail_invalid", "message": werr.Error()})
+		writeJSON(w, http.StatusBadRequest, apiErrorJSON("wallet_scan_detail_invalid", werr.Error()))
+		return walletScanAssessmentSource{}, false
+	}
+	return walletScanAssessmentSource{
+		payload:         pl,
+		walletSubjectID: normalizeWalletSubjectForAssessment(walletAddr),
+	}, true
+}
+
+func publishPolicyAssessmentRequest(
+	w http.ResponseWriter,
+	ctx context.Context,
+	authCfg authConfig,
+	parsed parsedAssessmentRequest,
+	source walletScanAssessmentSource,
+) {
+	now := time.Now().UTC()
+	observation, ok := buildWalletObservedEvent(w, parsed.normScanID, source, now)
+	if !ok {
 		return
 	}
-	walletSubjectID := normalizeWalletSubjectForAssessment(walletAddr)
+	selWire, ok := wireAssessmentSelectionRequest(w, parsed.selection)
+	if !ok {
+		return
+	}
+	cmd, ok := buildPolicyAssessmentCommand(w, parsed, source, observation, selWire, now)
+	if !ok {
+		return
+	}
+	payload, err := json.Marshal(cmd)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, apiErrorJSON(errCodeInternalError, err.Error()))
+		return
+	}
+	if err := authCfg.AssessmentNATSPublish(ctx, cafenatsv01.NATSSubjectPolicyAssessmentRequestedV01, payload); err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, apiErrorJSON("publish_failed", err.Error()))
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"event_id":          cmd.EventID,
+		"correlation_id":    cmd.CorrelationID,
+		"client_request_id": strings.TrimSpace(parsed.clientRequestID),
+	})
+}
 
+func buildWalletObservedEvent(
+	w http.ResponseWriter,
+	normScanID string,
+	source walletScanAssessmentSource,
+	now time.Time,
+) (walletv01.Event, bool) {
 	obsEventID, err := newAssessmentEventID()
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal_error", "message": "could not allocate event id"})
-		return
+		writeJSON(w, http.StatusInternalServerError, apiErrorJSON(errCodeInternalError, "could not allocate event id"))
+		return walletv01.Event{}, false
 	}
-	now := time.Now().UTC()
 	observation := walletv01.Event{
 		EventID:       obsEventID + "_obs",
 		EventType:     walletv01.EventTypeWalletObserved,
@@ -189,66 +293,65 @@ func handlePoliciesAssessmentRequest(w http.ResponseWriter, r *http.Request, aut
 		Producer:      walletv01.ProducerCafeDiscovery,
 		Subject: walletv01.Subject{
 			Type: string(walletv01.SubjectTypeWallet),
-			ID:   walletSubjectID,
+			ID:   source.walletSubjectID,
 		},
-		Payload: pl,
+		Payload: source.payload,
 	}
 	if err := observation.Validate(); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "observation_invalid", "message": err.Error()})
-		return
+		writeJSON(w, http.StatusBadRequest, apiErrorJSON("observation_invalid", err.Error()))
+		return walletv01.Event{}, false
 	}
+	return observation, true
+}
 
-	cmdEventID, err := newAssessmentEventID()
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal_error", "message": "could not allocate event id"})
-		return
-	}
+func wireAssessmentSelectionRequest(w http.ResponseWriter, sel policy.PolicySelectionRequest) (cafenatsv01.PolicySelectionRequestWire, bool) {
 	selWire := policySelectionRequestToWire(sel)
 	selWire.Normalize()
 	if err := selWire.Validate(); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "selection_request_invalid", "message": err.Error()})
-		return
+		writeJSON(w, http.StatusBadRequest, apiErrorJSON(errCodeSelectionRequestInvalid, err.Error()))
+		return cafenatsv01.PolicySelectionRequestWire{}, false
 	}
+	return selWire, true
+}
 
+func buildPolicyAssessmentCommand(
+	w http.ResponseWriter,
+	parsed parsedAssessmentRequest,
+	source walletScanAssessmentSource,
+	observation walletv01.Event,
+	selWire cafenatsv01.PolicySelectionRequestWire,
+	now time.Time,
+) (cafenatsv01.PolicyAssessmentRequested, bool) {
+	cmdEventID, err := newAssessmentEventID()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, apiErrorJSON(errCodeInternalError, "could not allocate event id"))
+		return cafenatsv01.PolicyAssessmentRequested{}, false
+	}
 	cmd := cafenatsv01.PolicyAssessmentRequested{
 		EnvelopeV01: cafenatsv01.EnvelopeV01{
 			EventID:       cmdEventID,
 			EventType:     cafenatsv01.EventTypePolicyAssessmentRequested,
 			EventVersion:  cafenatsv01.EventVersionV01,
 			OccurredAt:    now,
-			CorrelationID: normScanID,
+			CorrelationID: parsed.normScanID,
 			CausationID:   "cpm_post_policies_assessment_request",
 			Producer:      cafenatsv01.ProducerCafeCryptoBackend,
 		},
 		Subject: cafenatsv01.SubjectRef{
 			Type: cafenatsv01.SubjectTypeWallet,
-			ID:   walletSubjectID,
+			ID:   source.walletSubjectID,
 		},
 		Payload: cafenatsv01.PolicyAssessmentRequestedPayload{
 			Observation:      observation,
 			SelectionRequest: selWire,
-			ClientRequestID:  strings.TrimSpace(clientRequestID),
+			ClientRequestID:  strings.TrimSpace(parsed.clientRequestID),
 		},
 	}
 	if err := cmd.Validate(); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "assessment_command_invalid", "message": err.Error()})
-		return
+		writeJSON(w, http.StatusBadRequest, apiErrorJSON("assessment_command_invalid", err.Error()))
+		return cafenatsv01.PolicyAssessmentRequested{}, false
 	}
-	payload, err := json.Marshal(cmd)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal_error", "message": err.Error()})
-		return
-	}
-	if err := authCfg.AssessmentNATSPublish(r.Context(), cafenatsv01.NATSSubjectPolicyAssessmentRequestedV01, payload); err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "publish_failed", "message": err.Error()})
-		return
-	}
-
-	writeJSON(w, http.StatusAccepted, map[string]any{
-		"event_id":         cmd.EventID,
-		"correlation_id":   cmd.CorrelationID,
-		"client_request_id": strings.TrimSpace(clientRequestID),
-	})
+	return cmd, true
 }
 
 func fetchDiscoveryWalletScanDetail(ctx context.Context, authCfg authConfig, authorization string, requestID, scanID string) ([]byte, int, error) {

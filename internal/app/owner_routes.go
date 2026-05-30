@@ -11,6 +11,11 @@ import (
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/persistence"
 )
 
+const (
+	ownerDraftsPath   = "/drafts"
+	ownerPoliciesPath = "/policies"
+)
+
 type ownerScopedUpsertRequest struct {
 	ID          string         `json:"id"`
 	ScanID      string         `json:"scan_id"`
@@ -28,19 +33,22 @@ func registerOwnerScopedRoutes(mux *http.ServeMux, store *persistence.OwnerScope
 }
 
 func registerOwnerScopedRoutesForPrefix(mux *http.ServeMux, base string, store *persistence.OwnerScopedStore, obs *authObservability) {
-	mux.HandleFunc("POST "+base+"/drafts", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST "+base+ownerDraftsPath, func(w http.ResponseWriter, r *http.Request) {
 		handleOwnerPOSTDrafts(w, r, store, obs)
 	})
-	mux.HandleFunc("GET "+base+"/drafts", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET "+base+ownerDraftsPath, func(w http.ResponseWriter, r *http.Request) {
 		handleOwnerGETDrafts(w, r, store, obs)
 	})
-	mux.HandleFunc("POST "+base+"/policies", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("DELETE "+base+ownerDraftsPath, func(w http.ResponseWriter, r *http.Request) {
+		handleOwnerDELETEDrafts(w, r, store, obs)
+	})
+	mux.HandleFunc("POST "+base+ownerPoliciesPath, func(w http.ResponseWriter, r *http.Request) {
 		handleOwnerPOSTPolicies(w, r, store, obs)
 	})
-	mux.HandleFunc("GET "+base+"/policies", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET "+base+ownerPoliciesPath, func(w http.ResponseWriter, r *http.Request) {
 		handleOwnerGETPolicies(w, r, store, obs)
 	})
-	mux.HandleFunc("DELETE "+base+"/policies", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("DELETE "+base+ownerPoliciesPath, func(w http.ResponseWriter, r *http.Request) {
 		handleOwnerDELETEPolicies(w, r, store, obs)
 	})
 }
@@ -49,13 +57,13 @@ func handleOwnerPOSTDrafts(w http.ResponseWriter, r *http.Request, store *persis
 	requestID := obs.ensureRequestID(w, r)
 	principal, ok := principalFromContext(r.Context())
 	if !ok {
-		obs.recordDecision(r, requestID, authCategoryOwner, "denied", authCodePrincipalRequired, "principal_missing", "", "")
-		obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, "authentication required", map[string]any{"reason": "principal_missing"})
+		obs.recordDecision(r, requestID, authCategoryOwner, authOutcomeDenied, authCodePrincipalRequired, authReasonPrincipalMissing, "", "")
+		obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, errMsgAuthenticationRequired, reasonDetails(authReasonPrincipalMissing))
 		return
 	}
 	req, err := decodeOwnerScopedUpsertRequest(r)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: err.Error()})
 		return
 	}
 	record, saveErr := store.SaveDraft(principal, req.ID, req.ScanID, req.Payload)
@@ -63,20 +71,20 @@ func handleOwnerPOSTDrafts(w http.ResponseWriter, r *http.Request, store *persis
 		mapPersistenceError(w, r, obs, principal, saveErr)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"item": record})
+	writeJSON(w, http.StatusOK, apiItemJSON(record))
 }
 
 func handleOwnerGETDrafts(w http.ResponseWriter, r *http.Request, store *persistence.OwnerScopedStore, obs *authObservability) {
 	requestID := obs.ensureRequestID(w, r)
 	principal, ok := principalFromContext(r.Context())
 	if !ok {
-		obs.recordDecision(r, requestID, authCategoryOwner, "denied", authCodePrincipalRequired, "principal_missing", "", "")
-		obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, "authentication required", map[string]any{"reason": "principal_missing"})
+		obs.recordDecision(r, requestID, authCategoryOwner, authOutcomeDenied, authCodePrincipalRequired, authReasonPrincipalMissing, "", "")
+		obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, errMsgAuthenticationRequired, reasonDetails(authReasonPrincipalMissing))
 		return
 	}
 	id := strings.TrimSpace(r.URL.Query().Get("id"))
 	if id == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "id is required"})
+		writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: errMsgIDRequired})
 		return
 	}
 	record, err := store.GetDraft(principal, id)
@@ -84,25 +92,52 @@ func handleOwnerGETDrafts(w http.ResponseWriter, r *http.Request, store *persist
 		mapPersistenceError(w, r, obs, principal, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"item": record})
+	writeJSON(w, http.StatusOK, apiItemJSON(record))
+}
+
+func handleOwnerDELETEDrafts(w http.ResponseWriter, r *http.Request, store *persistence.OwnerScopedStore, obs *authObservability) {
+	requestID := obs.ensureRequestID(w, r)
+	principal, ok := principalFromContext(r.Context())
+	if !ok {
+		obs.recordDecision(r, requestID, authCategoryOwner, authOutcomeDenied, authCodePrincipalRequired, authReasonPrincipalMissing, "", "")
+		obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, errMsgAuthenticationRequired, reasonDetails(authReasonPrincipalMissing))
+		return
+	}
+	id := strings.TrimSpace(r.URL.Query().Get("id"))
+	if id == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: errMsgIDRequired})
+		return
+	}
+	err := store.DeleteDraft(principal, id)
+	switch {
+	case err == nil:
+		w.WriteHeader(http.StatusNoContent)
+	case errors.Is(err, persistence.ErrDraftNotFound), errors.Is(err, persistence.ErrForbidden):
+		writeJSON(w, http.StatusNotFound, map[string]any{jsonKeyError: errMsgNotFound})
+	case errors.Is(err, persistence.ErrPrincipalRequired):
+		obs.recordDecision(r, requestID, authCategoryOwner, authOutcomeDenied, authCodePrincipalRequired, authReasonPrincipalMissing, "", "")
+		obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, errMsgAuthenticationRequired, reasonDetails(authReasonPrincipalMissing))
+	default:
+		writeJSON(w, http.StatusInternalServerError, map[string]any{jsonKeyError: errMsgInternalServerError})
+	}
 }
 
 func handleOwnerPOSTPolicies(w http.ResponseWriter, r *http.Request, store *persistence.OwnerScopedStore, obs *authObservability) {
 	requestID := obs.ensureRequestID(w, r)
 	principal, ok := principalFromContext(r.Context())
 	if !ok {
-		obs.recordDecision(r, requestID, authCategoryOwner, "denied", authCodePrincipalRequired, "principal_missing", "", "")
-		obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, "authentication required", map[string]any{"reason": "principal_missing"})
+		obs.recordDecision(r, requestID, authCategoryOwner, authOutcomeDenied, authCodePrincipalRequired, authReasonPrincipalMissing, "", "")
+		obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, errMsgAuthenticationRequired, reasonDetails(authReasonPrincipalMissing))
 		return
 	}
 	req, err := decodeOwnerScopedUpsertRequest(r)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: err.Error()})
 		return
 	}
 	scanIDToStore, err := validatePolicyPersistBinding(req)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: err.Error()})
 		return
 	}
 	record, saveErr := store.SavePolicy(principal, req.ID, scanIDToStore, req.Payload)
@@ -110,7 +145,7 @@ func handleOwnerPOSTPolicies(w http.ResponseWriter, r *http.Request, store *pers
 		mapPersistenceError(w, r, obs, principal, saveErr)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"item": record})
+	writeJSON(w, http.StatusOK, apiItemJSON(record))
 }
 
 func validatePolicyPersistBinding(req ownerScopedUpsertRequest) (scanIDToStore string, err error) {
@@ -144,18 +179,18 @@ func handleOwnerGETPolicies(w http.ResponseWriter, r *http.Request, store *persi
 	requestID := obs.ensureRequestID(w, r)
 	principal, ok := principalFromContext(r.Context())
 	if !ok {
-		obs.recordDecision(r, requestID, authCategoryOwner, "denied", authCodePrincipalRequired, "principal_missing", "", "")
-		obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, "authentication required", map[string]any{"reason": "principal_missing"})
+		obs.recordDecision(r, requestID, authCategoryOwner, authOutcomeDenied, authCodePrincipalRequired, authReasonPrincipalMissing, "", "")
+		obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, errMsgAuthenticationRequired, reasonDetails(authReasonPrincipalMissing))
 		return
 	}
 	id := strings.TrimSpace(r.URL.Query().Get("id"))
 	scanID := strings.TrimSpace(r.URL.Query().Get("scan_id"))
 	if id != "" && scanID != "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "id and scan_id are mutually exclusive"})
+		writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: "id and scan_id are mutually exclusive"})
 		return
 	}
 	if id == "" && scanID == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "exactly one of id or scan_id is required"})
+		writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: "exactly one of id or scan_id is required"})
 		return
 	}
 	if id != "" {
@@ -164,21 +199,21 @@ func handleOwnerGETPolicies(w http.ResponseWriter, r *http.Request, store *persi
 			mapPersistenceError(w, r, obs, principal, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"item": record})
+		writeJSON(w, http.StatusOK, apiItemJSON(record))
 		return
 	}
 	norm, err := NormalizeDiscoveryScanID(scanID)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "scan_id must be a valid UUID"})
+		writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: "scan_id must be a valid UUID"})
 		return
 	}
 	list, err := store.ListPersistedPoliciesForScan(principal, norm)
 	if err != nil {
 		if errors.Is(err, persistence.ErrPrincipalRequired) {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: err.Error()})
 			return
 		}
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal server error"})
+		writeJSON(w, http.StatusInternalServerError, map[string]any{jsonKeyError: errMsgInternalServerError})
 		return
 	}
 	total := len(list)
@@ -198,13 +233,13 @@ func handleOwnerDELETEPolicies(w http.ResponseWriter, r *http.Request, store *pe
 	requestID := obs.ensureRequestID(w, r)
 	principal, ok := principalFromContext(r.Context())
 	if !ok {
-		obs.recordDecision(r, requestID, authCategoryOwner, "denied", authCodePrincipalRequired, "principal_missing", "", "")
-		obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, "authentication required", map[string]any{"reason": "principal_missing"})
+		obs.recordDecision(r, requestID, authCategoryOwner, authOutcomeDenied, authCodePrincipalRequired, authReasonPrincipalMissing, "", "")
+		obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, errMsgAuthenticationRequired, reasonDetails(authReasonPrincipalMissing))
 		return
 	}
 	id := strings.TrimSpace(r.URL.Query().Get("id"))
 	if id == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "id is required"})
+		writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: errMsgIDRequired})
 		return
 	}
 	err := store.DeletePolicy(principal, id)
@@ -212,12 +247,12 @@ func handleOwnerDELETEPolicies(w http.ResponseWriter, r *http.Request, store *pe
 	case err == nil:
 		w.WriteHeader(http.StatusNoContent)
 	case errors.Is(err, persistence.ErrPolicyNotFound), errors.Is(err, persistence.ErrForbidden):
-		writeJSON(w, http.StatusNotFound, map[string]any{"error": "not found"})
+		writeJSON(w, http.StatusNotFound, map[string]any{jsonKeyError: errMsgNotFound})
 	case errors.Is(err, persistence.ErrPrincipalRequired):
-		obs.recordDecision(r, requestID, authCategoryOwner, "denied", authCodePrincipalRequired, "principal_missing", "", "")
-		obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, "authentication required", map[string]any{"reason": "principal_missing"})
+		obs.recordDecision(r, requestID, authCategoryOwner, authOutcomeDenied, authCodePrincipalRequired, authReasonPrincipalMissing, "", "")
+		obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, errMsgAuthenticationRequired, reasonDetails(authReasonPrincipalMissing))
 	default:
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal server error"})
+		writeJSON(w, http.StatusInternalServerError, map[string]any{jsonKeyError: errMsgInternalServerError})
 	}
 }
 
@@ -227,7 +262,7 @@ func decodeOwnerScopedUpsertRequest(r *http.Request) (ownerScopedUpsertRequest, 
 		return ownerScopedUpsertRequest{}, err
 	}
 	if strings.TrimSpace(req.ID) == "" {
-		return ownerScopedUpsertRequest{}, errors.New("id is required")
+		return ownerScopedUpsertRequest{}, errors.New(errMsgIDRequired)
 	}
 	if strings.TrimSpace(req.OwnerUserID) != "" || strings.TrimSpace(req.TenantID) != "" {
 		return ownerScopedUpsertRequest{}, errors.New("owner_user_id and tenant_id are server-managed")
@@ -239,10 +274,10 @@ func mapPersistenceError(w http.ResponseWriter, r *http.Request, obs *authObserv
 	requestID := obs.ensureRequestID(w, r)
 	switch {
 	case errors.Is(err, persistence.ErrForbidden):
-		obs.recordDecision(r, requestID, authCategoryOwner, "denied", authCodeOwnerForbidden, "owner_forbidden", principal.UserID, principal.TenantID)
+		obs.recordDecision(r, requestID, authCategoryOwner, authOutcomeDenied, authCodeOwnerForbidden, "owner_forbidden", principal.UserID, principal.TenantID)
 		obs.audit.RecordAuthEvent(authAuditEvent{
 			Category:  authCategoryOwner,
-			Outcome:   "denied",
+			Outcome:   authOutcomeDenied,
 			Code:      authCodeOwnerForbidden,
 			RequestID: requestID,
 			Route:     classifyRoute(r.Method, r.URL.Path),
@@ -250,14 +285,14 @@ func mapPersistenceError(w http.ResponseWriter, r *http.Request, obs *authObserv
 			UserID:    principal.UserID,
 			TenantID:  principal.TenantID,
 		})
-		obs.writeAuthError(w, r, http.StatusForbidden, authCodeOwnerForbidden, "owner access denied", map[string]any{"reason": "owner_forbidden"})
+		obs.writeAuthError(w, r, http.StatusForbidden, authCodeOwnerForbidden, "owner access denied", reasonDetails("owner_forbidden"))
 	case errors.Is(err, persistence.ErrDraftNotFound), errors.Is(err, persistence.ErrPolicyNotFound):
-		writeJSON(w, http.StatusNotFound, map[string]any{"error": "not found"})
+		writeJSON(w, http.StatusNotFound, map[string]any{jsonKeyError: errMsgNotFound})
 	case errors.Is(err, persistence.ErrPrincipalRequired):
-		obs.recordDecision(r, requestID, authCategoryOwner, "denied", authCodePrincipalRequired, "principal_missing", "", "")
-		obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, "authentication required", map[string]any{"reason": "principal_missing"})
+		obs.recordDecision(r, requestID, authCategoryOwner, authOutcomeDenied, authCodePrincipalRequired, authReasonPrincipalMissing, "", "")
+		obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, errMsgAuthenticationRequired, reasonDetails(authReasonPrincipalMissing))
 	default:
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal server error"})
+		writeJSON(w, http.StatusInternalServerError, map[string]any{jsonKeyError: errMsgInternalServerError})
 	}
 }
 

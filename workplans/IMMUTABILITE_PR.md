@@ -65,7 +65,7 @@
 | **IMM-9b** | [#38](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/38) | `cafe-crypto-policy-mgt` | PR7 | **W1** : lookup policy **+** draft par `target_address` normalisée |
 | **IMM-10** | [#40](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/40) | `cafe-crypto-policy-mgt` | Discovery **IMM-4** | **W7** (newest row) + **W2** (`latest=true`) |
 | **IMM-W1-1** | [#42](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/42)  | `cafe-crypto-policy-mgt` | IMM-9b | **`DeleteDraft`** sur `OwnerScopedStore` |
-| **IMM-W1-2** | — | `cafe-crypto-policy-mgt` | **IMM-W1-1** | Handler **`DELETE /api/cpm/v1/drafts?id=…`** + OpenAPI |
+| **IMM-W1-2** | [#43](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/43) | `cafe-crypto-policy-mgt` | **IMM-W1-1** | Handler **`DELETE /api/cpm/v1/drafts?id=…`** + OpenAPI |
 | **IMM-W1-3** | — | `cafe-crypto-policy-mgt` | **IMM-W1-2** | Tests routes + smoke deploy step 5 (rescan after delete draft) |
 
 ---
@@ -88,7 +88,7 @@
 
 ## IMM-W1-2 — Route HTTP `DELETE …/drafts?id=`
 
-- **Status:** à faire
+- **Status:** mergee dans [#43](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/43)
 - **Branch:** `cpm/imm-w1-delete-draft-route`
 - **Repository:** `cafe-crypto-policy-mgt`
 - **Objective:** **`DELETE /api/cpm/v1/drafts?id=…`** → **204** \| **404** (**WORKPLAN §2.4**, **§4.4**).

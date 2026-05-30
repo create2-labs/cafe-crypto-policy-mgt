@@ -135,10 +135,10 @@ func authErrorPayload(code string, message string, details map[string]any, reque
 		details = map[string]any{}
 	}
 	return map[string]any{
-		"code":       code,
-		"message":    message,
-		"details":    details,
-		"request_id": requestID,
+		jsonKeyCode:      code,
+		jsonKeyMessage:   message,
+		jsonKeyDetails:   details,
+		jsonKeyRequestID: requestID,
 	}
 }
 

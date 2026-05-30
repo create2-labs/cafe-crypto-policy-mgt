@@ -45,6 +45,7 @@ func AuthenticatedRoutes() []AuthenticatedRoute {
 		{Method: http.MethodPost, Path: PoliciesAssessmentRequest},
 		{Method: http.MethodPost, Path: Drafts},
 		{Method: http.MethodGet, Path: Drafts},
+		{Method: http.MethodDelete, Path: Drafts},
 		{Method: http.MethodPost, Path: Policies},
 		{Method: http.MethodGet, Path: Policies},
 		{Method: http.MethodDelete, Path: Policies},

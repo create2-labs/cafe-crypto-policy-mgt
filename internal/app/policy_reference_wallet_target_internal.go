@@ -25,26 +25,26 @@ func registerPolicyWalletTargetReferenceInternalRoute(mux *http.ServeMux, store 
 		const maxBody = 1 << 16
 		body, err := io.ReadAll(io.LimitReader(r.Body, maxBody+1))
 		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "could not read request body"})
+			writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: "could not read request body"})
 			return
 		}
 		if len(body) > maxBody {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "request body too large"})
+			writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: "request body too large"})
 			return
 		}
 		var req policyWalletTargetReferenceRequest
 		if err := json.Unmarshal(body, &req); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+			writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: "invalid request body"})
 			return
 		}
 		userID := strings.TrimSpace(req.UserID)
 		if userID == "" {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "user_id is required"})
+			writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: "user_id is required"})
 			return
 		}
 		norm, err := persistence.NormalizeWalletTargetAddress(req.TargetAddress)
 		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: err.Error()})
 			return
 		}
 		principal := authz.Principal{
@@ -53,16 +53,16 @@ func registerPolicyWalletTargetReferenceInternalRoute(mux *http.ServeMux, store 
 			TenantID: strings.TrimSpace(req.TenantID),
 		}
 		if err := principal.Validate(); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid principal"})
+			writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: "invalid principal"})
 			return
 		}
 		counts, err := store.CountActiveWalletCPMContext(principal, norm)
 		if err != nil {
 			if errors.Is(err, persistence.ErrPrincipalRequired) {
-				writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+				writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: err.Error()})
 				return
 			}
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal server error"})
+			writeJSON(w, http.StatusInternalServerError, map[string]any{jsonKeyError: errMsgInternalServerError})
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{

@@ -292,6 +292,27 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+    delete:
+      tags: [drafts]
+      summary: Delete platform draft by id
+      description: |
+        **204** if deleted; **404** if unknown / out of scope / already deleted (idempotent). Removes
+        the platform draft to satisfy **W1** and unblock **`POST /api/discovery/v1/scan`** (WORKPLAN_API.md
+        §2.2, §2.4). **Never** deletes the Discovery scan row referenced by the draft.
+      operationId: deleteDrafts
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Draft removed.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
 components:
   securitySchemes:
