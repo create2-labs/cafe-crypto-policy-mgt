@@ -64,15 +64,16 @@
 |---------|--------|-------|-----------|----------|
 | **IMM-9b** | [#38](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/38) | `cafe-crypto-policy-mgt` | PR7 | **W1** : lookup policy **+** draft par `target_address` normalisée |
 | **IMM-10** | [#40](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/40) | `cafe-crypto-policy-mgt` | Discovery **IMM-4** | **W7** (newest row) + **W2** (`latest=true`) |
-| **IMM-W1-1** | [#42](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/42)  | `cafe-crypto-policy-mgt` | IMM-9b | **`DeleteDraft`** sur `OwnerScopedStore` |
+| **IMM-W1-1** | [#41](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/41)  | `cafe-crypto-policy-mgt` | IMM-9b | **`DeleteDraft`** sur `OwnerScopedStore` |
+| **IMM-W1-2** | [#42](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/42) | `cafe-crypto-policy-mgt` | **IMM-W1-1** | Handler **`DELETE /api/cpm/v1/drafts?id=…`** + OpenAPI |
 | **IMM-W1-2** | [#43](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/43) | `cafe-crypto-policy-mgt` | **IMM-W1-1** | Handler **`DELETE /api/cpm/v1/drafts?id=…`** + OpenAPI |
-| **IMM-W1-3** | — | `cafe-crypto-policy-mgt` | **IMM-W1-2** | Tests routes + smoke deploy step 5 (rescan after delete draft) |
+| **IMM-W1-3** | [#44](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/44) | `cafe-crypto-policy-mgt` | **IMM-W1-2** | Tests routes + smoke deploy step 5 (rescan after delete draft) |
 
 ---
 
 ## IMM-W1-1 — `DeleteDraft` (store)
 
-- **Status:** mergee dans [#42](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/42) 
+- **Status:** mergee dans [#41](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/41) 
 - **Branch:** `cpm/imm-w1-delete-draft-store`
 - **Repository:** `cafe-crypto-policy-mgt`
 - **Objective:** Suppression owner-scoped d’un brouillon plateforme — miroir **`DeletePolicy`**.
@@ -88,7 +89,7 @@
 
 ## IMM-W1-2 — Route HTTP `DELETE …/drafts?id=`
 
-- **Status:** mergee dans [#43](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/43)
+- **Status:** mergee dans [#42](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/42)
 - **Branch:** `cpm/imm-w1-delete-draft-route`
 - **Repository:** `cafe-crypto-policy-mgt`
 - **Objective:** **`DELETE /api/cpm/v1/drafts?id=…`** → **204** \| **404** (**WORKPLAN §2.4**, **§4.4**).
@@ -105,7 +106,7 @@
 
 ## IMM-W1-3 — Tests intégration + smoke deploy
 
-- **Status:** à faire
+- **Status:** mergee dans [#43](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/43)
 - **Branch:** `cpm/imm-w1-delete-draft-smoke`
 - **Repository:** `cafe-crypto-policy-mgt` (+ script `cafe-deploy` si nécessaire)
 - **Objective:** Verrouiller le parcours **draft → DELETE draft → POST scan OK**.
