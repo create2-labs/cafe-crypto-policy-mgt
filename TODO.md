@@ -2,15 +2,43 @@
 
 Items deferred; not blocking current IMM work unless noted.
 
-## IMM-9b follow-up — Unify wallet address normalization
+## Livré (IMM-W1 — ne pas réimplémenter DELETE)
 
-**Context:** IMM-9b introduced `persistence.NormalizeWalletTargetAddress` (`internal/persistence/wallet_target.go`). NATS assessment code still uses a parallel `normalizeHexAddress` in `internal/integration/nats/assessment_consumer.go` (`normalizeWalletSubjectID`).
+**`DELETE /api/cpm/v1/drafts?id=…`** — série **IMM-W1-1…3** mergée ([#41](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/41)–[#44](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/44)) dans **`cafe-crypto-policy-mgt`** (pas dans Discovery).
 
-**Improvement:** Reuse `persistence.NormalizeWalletTargetAddress` from the NATS consumer (map `error` → `ok bool` at the call site if needed). One canonical normalization rule for CPM (0x prefix, lowercase, 20-byte hex).
+| Couche | Rôle |
+|--------|------|
+| **Discovery IMM-9** ([#76](https://github.com/create2-labs/cafe-discovery/pull/76)) | `POST /scan` → **409** `CPM_EXISTS_FOR_WALLET_TARGET` si policy/draft (lookup CPM **IMM-9b**) |
+| **CPM IMM-W1** | `OwnerScopedStore.DeleteDraft` + route **`DELETE /api/cpm/v1/drafts?id=…`** → **204** \| **404** |
 
-**Acceptance:** Existing NATS / assessment tests pass; no behaviour change for valid `wallet:0x…` subject IDs.
+**Validation smoke (stack locale :8080 / :8082) :**
 
-**Repos:** `cafe-crypto-policy-mgt` only.
+- `cafe-deploy/scripts/test-cpm-imm-w1-delete-draft.sh` — OK
+- `cafe-deploy/scripts/test-discovery-imm9-wallet-scan-w1-cpm-block.sh` — step 5 (DELETE draft → rescan **200**) — OK
+
+**Tests unitaires :** `go test ./internal/app/ ./internal/persistence/ -run DeleteDraft`
+
+---
+
+## IMM-9b follow-up — Unify wallet address normalization (2 PR)
+
+**Règle canonique (une seule) :** `persistence.NormalizeWalletTargetAddress` — `0x` + 42 car. hex minuscules. Helpers partagés dans `internal/persistence/wallet_target.go` :
+
+| Helper | Usage |
+|--------|--------|
+| `NormalizeWalletSubjectID` | NATS consumer — `wallet:0x…` ou hex nu ; invalide / non-wallet → pass-through |
+| `WalletSubjectIDFromAddress` | `POST …/policies/assessment/request` — adresse Discovery → `wallet:0x…` (erreur si invalide) |
+
+**Implémentation locale (branche à créer depuis `main`) :** code prêt sur le workspace ; à découper en **2 PR** :
+
+| PR | Branche suggérée | Fichiers | Titre suggéré |
+|----|------------------|----------|---------------|
+| **1** | `cpm/imm-9b-wallet-normalization-nats` | `wallet_target.go` (+ tests `NormalizeWalletSubjectID`), `assessment_consumer.go`, tests NATS existants | `cpm: unify wallet subject normalization (NATS, IMM-9b)` |
+| **2** | `cpm/imm-9b-wallet-normalization-assessment` (après merge PR1) | `assessment_request.go`, `assessment_request_test.go`, tests `WalletSubjectIDFromAddress` | `cpm: assessment request uses canonical wallet subject id` |
+
+**Acceptance :** `go test ./internal/persistence/ ./internal/integration/nats/ ./internal/app/ -run 'Assessment|WalletSubject|NormalizeWallet'` inchangé en comportement pour adresses valides.
+
+**Repos :** `cafe-crypto-policy-mgt` uniquement.
 
 ---
 
@@ -24,19 +52,7 @@ Items deferred; not blocking current IMM work unless noted.
 
 **Repos:** `cafe-crypto-policy-mgt` only.
 
----
-
-## W1 / workplan — Implement `DELETE /api/cpm/v1/drafts?id=…`
-
-**Context:** **WORKPLAN_API.md** §2.4 / §4.4 and **IMMUTABILITE** W1 require platform draft removal to unblock `POST /api/discovery/v1/scan` after a draft blocks rescan. IMM-9b already **counts** drafts in `CountActiveWalletCPMContext` (409 path works). **`owner_routes.go`** exposes `POST` and `GET` on `/api/cpm/v1/drafts` only — no `DELETE` handler yet.
-
-**Plan (PR sequence):** **IMM-W1-1…3** in [`workplans/IMMUTABILITE_PR.md`](./workplans/IMMUTABILITE_PR.md) — store `DeleteDraft` → HTTP route → tests + deploy smoke step 5.
-
-**Gap:** Users can be blocked by a draft (`CPM_EXISTS_FOR_WALLET_TARGET`) but cannot unblock via the public API until **IMM-W1-2** ships.
-
-**Acceptance:** After draft save, DELETE clears W1 for that `target_address`; Discovery IMM-9 smoke script completes step 5 with **200** on rescan.
-
-**Repos:** `cafe-crypto-policy-mgt` (API + OpenAPI); Discovery / frontend consume existing contract.
+**Priorité:** plus tard (refactor confort).
 
 ---
 
@@ -48,7 +64,9 @@ Items deferred; not blocking current IMM work unless noted.
 
 **Not a bug:** Do not “fix” by joining on `scan_id` and calling Discovery from CPM for W1. If product requires blocking in legacy shapes, migrate payloads or enforce address fields on `POST …/policies` / `POST …/drafts` at write time.
 
-**Repos:** Document in `workplans/IMMUTABILITE_PR.md` / persist validation if product wants stricter guarantees; lookup logic in `cafe-crypto-policy-mgt`.
+**Repos:** Document in `workplans/IMMUTABILITE_PR.md` / optional persist validation if product wants stricter guarantees.
+
+**Priorité:** doc / validation produit optionnelle — **pas** une nouvelle implémentation lookup.
 
 ---
 
@@ -73,3 +91,5 @@ Réutiliser ces symboles dans `auth.go`, `assessment_request.go` et les tests (m
 **Acceptance:** Un seul endroit définit les paths upstream ; `go test ./internal/app` inchangé ; smoke `cafe-deploy/scripts/test-cpm-imm10-wallet-scan-w7-w2-guards.sh` OK avec `CAFE_DISCOVERY_HTTP_BASE` → backend.
 
 **Repos:** `cafe-crypto-policy-mgt` ; aligner doc `internal/config` et éventuellement `scripts/lib/discovery-route-paths.sh` (bash) sur le même vocabulaire.
+
+**Priorité:** plus tard.

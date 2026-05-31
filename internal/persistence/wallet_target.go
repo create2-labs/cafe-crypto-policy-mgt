@@ -7,6 +7,9 @@ import (
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/authz"
 )
 
+// WalletSubjectPrefix is the canonical NATS / assessment subject prefix for EVM wallet targets.
+const WalletSubjectPrefix = "wallet:"
+
 // WalletTargetContextCounts is the minimal IMM-9b lookup result for a normalized wallet target_address.
 type WalletTargetContextCounts struct {
 	Exists       bool
@@ -73,6 +76,35 @@ func NormalizeWalletTargetAddress(address string) (string, error) {
 		}
 	}
 	return a, nil
+}
+
+// WalletSubjectIDFromAddress returns wallet:0x<40 lowercase hex> for a bare EVM address (Discovery detail, assessment HTTP).
+func WalletSubjectIDFromAddress(address string) (string, error) {
+	norm, err := NormalizeWalletTargetAddress(address)
+	if err != nil {
+		return "", err
+	}
+	return WalletSubjectPrefix + norm, nil
+}
+
+// NormalizeWalletSubjectID canonicalizes wallet:0x… or bare hex subject IDs (NATS assessment consumer).
+// Non-wallet subject IDs are returned unchanged when hex normalization fails (legacy pass-through).
+func NormalizeWalletSubjectID(subjectID string) string {
+	value := strings.TrimSpace(subjectID)
+	if value == "" {
+		return value
+	}
+	lower := strings.ToLower(value)
+	hexPart := value
+	hasWalletPrefix := strings.HasPrefix(lower, WalletSubjectPrefix)
+	if hasWalletPrefix {
+		hexPart = strings.TrimSpace(value[len(WalletSubjectPrefix):])
+	}
+	norm, err := NormalizeWalletTargetAddress(hexPart)
+	if err != nil {
+		return value
+	}
+	return WalletSubjectPrefix + norm
 }
 
 func walletTargetFromPayload(payload map[string]any) string {
