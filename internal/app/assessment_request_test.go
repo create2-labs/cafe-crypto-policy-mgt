@@ -72,6 +72,10 @@ func TestPoliciesAssessmentRequest_walletScanAccepted(t *testing.T) {
 	if len(cmd.Payload.Observation.Payload.ChainIDs) == 0 {
 		t.Fatalf("expected observation from Discovery detail")
 	}
+	const wantSubject = "wallet:0x742d35cc6634c0532925a3b844bc454e4438f44e"
+	if cmd.Subject.ID != wantSubject || cmd.Payload.Observation.Subject.ID != wantSubject {
+		t.Fatalf("subject ids = command %q observation %q, want %q", cmd.Subject.ID, cmd.Payload.Observation.Subject.ID, wantSubject)
+	}
 }
 
 func TestPoliciesAssessmentRequest_unknownScanNotFound(t *testing.T) {

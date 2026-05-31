@@ -15,9 +15,9 @@
 | Discovery | [`cafe-discovery/IMMUTABILITE_PR.md`](../../cafe-discovery/IMMUTABILITE_PR.md) |
 | Frontend | [`cafe-frontend/IMMUTABILITE.md`](../../cafe-frontend/IMMUTABILITE.md) |
 
-**Déjà livré :** policies par `scan_id` (**PR7**), référence interne scan (**PR5**), explore Option A (**PR8**), **DELETE scan → 409** (**PR6**, **W3**), **IMM-9b** lookup W1, **IMM-10** W7/W2.
+**Déjà livré :** policies par `scan_id` (**PR7**), référence interne scan (**PR5**), explore Option A (**PR8**), **DELETE scan → 409** (**PR6**, **W3**), **IMM-9b** lookup W1, **IMM-10** W7/W2, **IMM-W1-1…3** **`DELETE /api/cpm/v1/drafts?id=…`** ([#41](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/41)–[#44](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/44)) — smokes `test-cpm-imm-w1-delete-draft.sh`, `test-discovery-imm9-wallet-scan-w1-cpm-block.sh` step 5.
 
-**À faire (bloquant W1 UX) :** **`DELETE /api/cpm/v1/drafts?id=…`** — série **IMM-W1-1…3** ci-dessous.
+**Suite CPM (backlog) :** voir [`TODO.md`](../TODO.md) — normalisation adresse, refactor handlers internes, chemins Discovery upstream.
 
 **Périmètre CPM produit actuel :** assessment/remediation **wallet-only** (scans **wallet / EVM**). Les scans **TLS** restent dans **Discovery** (historique, CBOM, observation) — **pas** de cible CPM assessment/remediation pour cette release. Voir **WORKPLAN §5.4.6**.
 
@@ -27,7 +27,7 @@
 
 **Décision produit :** tant qu’une **policy persistée** **ou** un **draft** existe pour une **`target_address`** (wallet), **aucun** nouveau **`POST /api/discovery/v1/scan`**. L’utilisateur doit **finaliser** (`POST /api/cpm/v1/policies`) ou **supprimer** le brouillon (`DELETE /api/cpm/v1/drafts?id=…`) et/ou la policy (`DELETE /api/cpm/v1/policies?id=…`) avant tout rescan — y compris après un scan **`failed`**.
 
-**Gap actuel :** IMM-9b compte les drafts (Discovery **409**) mais **`owner_routes.go`** n’expose que **POST** / **GET** sur **`/drafts`** — pas de **DELETE**. Voir aussi [`TODO.md`](../TODO.md).
+**Parcours W1 :** Discovery **409** si policy/draft (**IMM-9**) ; déblocage via **`DELETE /api/cpm/v1/drafts?id=…`** (**IMM-W1-2**, livré). Voir [`TODO.md`](../TODO.md) pour le backlog technique restant.
 
 ---
 
@@ -210,7 +210,7 @@ Discovery **IMM-4** (`latest=true`, default sort, lifecycle enum).
 ## Critères d’acceptation (CPM)
 
 - [x] **W1** : lookup policy **+** draft par **`target_address`** normalisée pour **IMM-9**.
-- [ ] **`DELETE /api/cpm/v1/drafts?id=…`** livré (**IMM-W1-2**) — **WORKPLAN §0.2**.
+- [x] **`DELETE /api/cpm/v1/drafts?id=…`** livré (**IMM-W1-2**, [#42](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/42)) — **WORKPLAN §0.2**.
 - [x] **W7** : newest row testé — **pas** `latest=true`.
 - [x] **W2** : `latest=true` testé — **pas** `limit=1` seul.
 - [x] **W3** / **W4** inchangés (**DELETE policy** déjà livré).
@@ -222,8 +222,8 @@ Discovery **IMM-4** (`latest=true`, default sort, lifecycle enum).
 
 Voir [`cafe-discovery/IMMUTABILITE_PR.md`](../../cafe-discovery/IMMUTABILITE_PR.md) pour la séquence complète. Côté CPM :
 
-1. **IMM-W1-1** → **IMM-W1-2** → **IMM-W1-3** — **priorité** (débloque W1 UX + FE-IMM-1).
-2. **IMM-9b**, **IMM-10** — déjà mergés.
+1. **IMM-W1-1** → **IMM-W1-3**, **IMM-9b**, **IMM-10** — mergés.
+2. Backlog CPM : [`TODO.md`](../TODO.md) (normalisation adresse, refactor interne, chemins Discovery).
 
 **Parallèle Discovery :** **IMM-6b-1…8** (quota **P1/G1–G4** — success-only, garde POST, commit atomique, CBOM) — voir [`cafe-discovery/IMMUTABILITE_PR.md`](../../cafe-discovery/IMMUTABILITE_PR.md).
 

@@ -20,6 +20,7 @@ import (
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/policy"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/walletobserved"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/persistence"
 )
 
 func registerPoliciesAssessmentRequestRoute(mux *http.ServeMux, authCfg authConfig) {
@@ -230,9 +231,14 @@ func parseWalletScanAssessmentSource(w http.ResponseWriter, detailJSON []byte) (
 		writeJSON(w, http.StatusBadRequest, apiErrorJSON("wallet_scan_detail_invalid", werr.Error()))
 		return walletScanAssessmentSource{}, false
 	}
+	subjectID, serr := persistence.WalletSubjectIDFromAddress(walletAddr)
+	if serr != nil {
+		writeJSON(w, http.StatusBadRequest, apiErrorJSON("wallet_scan_detail_invalid", serr.Error()))
+		return walletScanAssessmentSource{}, false
+	}
 	return walletScanAssessmentSource{
 		payload:         pl,
-		walletSubjectID: normalizeWalletSubjectForAssessment(walletAddr),
+		walletSubjectID: subjectID,
 	}, true
 }
 
@@ -401,19 +407,6 @@ func targetAddressFromWalletScanDetailJSON(detail []byte) (string, error) {
 		return "", errDiscoveryScanNotWallet
 	}
 	return addr, nil
-}
-
-func normalizeWalletSubjectForAssessment(address string) string {
-	const walletPrefix = "wallet:"
-	a := strings.TrimSpace(address)
-	la := strings.ToLower(a)
-	if strings.HasPrefix(la, walletPrefix) {
-		return walletPrefix + strings.ToLower(strings.TrimSpace(a[len(walletPrefix):]))
-	}
-	if strings.HasPrefix(la, "0x") {
-		return walletPrefix + strings.ToLower(a)
-	}
-	return walletPrefix + strings.ToLower(a)
 }
 
 func policySelectionRequestToWire(r policy.PolicySelectionRequest) cafenatsv01.PolicySelectionRequestWire {
