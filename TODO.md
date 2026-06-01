@@ -2,6 +2,77 @@
 
 Items deferred; not blocking current IMM work unless noted.
 
+---
+
+## Open — Retirer entièrement le mode CPM mock (frontend)
+
+**Décision produit :** supprimer **tout** le mock CPM côté **`cafe-frontend`** — pas seulement le switch runtime `VITE_CPM_DATA_SOURCE=mock`, mais aussi **`mockCpmDataSource.ts`**, le placeholder `mock-discovery-scan-placeholder`, et l’UI / composables dédiés au parcours démo sans stack.
+
+**Hors scope backend :** `cafe-crypto-policy-mgt` n’expose que l’API HTTP réelle ; aucun changement Go requis pour ce chantier. Les « mocks » dans les tests Go (`httptest`, etc.) restent inchangés.
+
+**Prérequis (déjà en place) :** Option A mergé (F1–F5) ; parcours CPM = scan Discovery v1 + `createApiCpmDataSource` ; dev local `VITE_CPM_DATA_SOURCE=api` dans `cafe-deploy/env/dev.local.env` ; images release frontend déjà en `api`.
+
+### Périmètre `cafe-frontend`
+
+| Zone | Action |
+|------|--------|
+| `src/cpm/mockCpmDataSource.ts` | **Supprimer** (+ `mockCpmDataSource.spec.ts`) |
+| `src/cpm/cpmDataSourceFactory.ts` | Une seule implémentation : **`createApiCpmDataSource`** ; retirer `CpmDataSourceMode`, `normalizeMode`, branche `mock` |
+| `VITE_CPM_DATA_SOURCE` | Retirer de `vite-env.d.ts`, Dockerfiles, docs ; build toujours API |
+| `CryptoPolicyManagement.vue` | Retirer UI mock-only (wallet type/address éditables, `confirm-mock-signature`, copy « Preparing mock selection », badge mode `mock`, etc.) |
+| `useCpmPolicySelection.ts` | Retirer `CPM_SELECTION_CONTEXT_SCAN_ID` / adresse placeholder ; explore **uniquement** après scan v1 valide |
+| `useCpmScanContext.ts` | Retirer option `cpmMode` liée au mock ; garder rejet placeholder si besoin défensif |
+| `walletChallengeEligibility.ts` | Retirer `mock_pr10` ; EOA = règles API uniquement |
+| ESLint / imports fixtures | Vérifier que les fixtures JSON ne sont importées que par les tests (pattern PR 1) |
+
+### Tests unitaires / intégration (effet de bord principal)
+
+Les specs qui appellent **`createMockCpmDataSource()`** ou **`mode: 'mock'`** doivent migrer vers :
+
+- **`vi.mock('@/api')`** + réponses axios (modèle **`cpmOptionAFlow.e2e.spec.ts`** / **`apiCpmDataSource.spec.ts`**), ou
+- fakes légers implémentant l’interface **`CpmDataSource`** inline dans le fichier de test.
+
+**Fichiers à repasser (liste non exhaustive) :** `cpmDataSourceFactory.spec.ts`, `useCpmPolicySelection.spec.ts`, `usePolicyValidation.spec.ts`, `useLocalPolicyDraftStorage.spec.ts`, `useBackendDraftSave.spec.ts`, `usePolicyPersistence.spec.ts`, `useWalletChallengeGate.spec.ts`, `CryptoPolicyManagement.spec.ts`, composants CPM `*.spec.ts` qui injectent le mock.
+
+**Ne pas confondre :** les mocks Vitest (`vi.mock`) et HTTP stubs ≠ l’ancien « mode mock CPM » produit — on **garde** les mocks de transport pour des tests rapides sans Docker.
+
+**Acceptance tests :** `npm run test` + `npm run typecheck` verts ; `cpmOptionAFlow.e2e.spec.ts` inchangé en intention (déjà API + axios mock).
+
+### `cafe-deploy` + docs
+
+| Fichier | Action |
+|---------|--------|
+| `env/dev.env.template` | Retirer `VITE_CPM_DATA_SOURCE` ou documenter valeur fixe `api` puis suppression variable |
+| `scripts/redeployalldev.sh` | Retirer `--build-arg VITE_CPM_DATA_SOURCE` |
+| `README.md` (cafe-deploy) | Section « mock \| api » → CPM toujours API |
+
+### Docs CPM (ce dépôt)
+
+Mettre à jour les passages « preserve mock mode » / placeholder V1 :
+
+- [`workplans/CPM_post_v_1_option_a_scan_context.md`](./workplans/CPM_post_v_1_option_a_scan_context.md) §13.4
+- [`workplans/CPM_FRONTEND_PR_PLAN_V1.md`](./workplans/CPM_FRONTEND_PR_PLAN_V1.md) (historique V1 : noter mock retiré post-Option A)
+- [`workplans/CPM_OPTION_A_PR_PLAN.md`](./workplans/CPM_OPTION_A_PR_PLAN.md) — mentions `mock-discovery-scan-placeholder` limitées au passé
+- [`docs/CPM_OPTION_A_INTEGRATED.md`](./docs/CPM_OPTION_A_INTEGRATED.md)
+
+### Acceptance (produit)
+
+- Page **`/crypto-policy-management`** : auth + scan wallet Discovery requis pour explore ; aucun chemin UI sans scan réel.
+- Aucune occurrence runtime de **`mock-discovery-scan-placeholder`** dans les payloads HTTP CPM.
+- Stack locale : CPM utilisable uniquement avec Discovery + **cafe-cpm** (comportement attendu).
+
+### Suggested PR
+
+| Repo | Branche (suggestion) | Titre (suggestion) |
+|------|----------------------|-------------------|
+| `cafe-frontend` | `cpm/remove-mock-datasource` | `refactor(cpm): remove mock CpmDataSource and VITE_CPM_DATA_SOURCE` |
+| `cafe-deploy` | (même PR ou follow-up) | `chore(deploy): drop VITE_CPM_DATA_SOURCE mock default` |
+| `cafe-crypto-policy-mgt` | doc only | `docs(cpm): remove mock-mode references from workplans` |
+
+**Priorité :** après FE-IMM courant / quand la stack `api` est le seul chemin validé en dev.
+
+---
+
 ## Livré (IMM-W1 — ne pas réimplémenter DELETE)
 
 **`DELETE /api/cpm/v1/drafts?id=…`** — série **IMM-W1-1…3** mergée ([#41](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/41)–[#44](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/44)) dans **`cafe-crypto-policy-mgt`** (pas dans Discovery).
@@ -20,27 +91,21 @@ Items deferred; not blocking current IMM work unless noted.
 
 ---
 
-## IMM-9b follow-up — Unify wallet address normalization (2 PR)
+## Livré (IMM-9b — normalisation adresse wallet, une règle canonique)
 
-**Règle canonique (une seule) :** `persistence.NormalizeWalletTargetAddress` — `0x` + 42 car. hex minuscules. Helpers partagés dans `internal/persistence/wallet_target.go` :
+**Règle unique :** `persistence.NormalizeWalletTargetAddress` (`0x` + 42 car. hex minuscules), alignée Discovery.
 
-| Helper | Usage |
-|--------|--------|
-| `NormalizeWalletSubjectID` | NATS consumer — `wallet:0x…` ou hex nu ; invalide / non-wallet → pass-through |
-| `WalletSubjectIDFromAddress` | `POST …/policies/assessment/request` — adresse Discovery → `wallet:0x…` (erreur si invalide) |
+| PR | Rôle |
+|----|------|
+| [#45](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/45) | `NormalizeWalletSubjectID` — consumer NATS assessment |
+| [#46](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/46) | `WalletSubjectIDFromAddress` — `POST …/policies/assessment/request` |
 
-**Implémentation locale (branche à créer depuis `main`) :** code prêt sur le workspace ; à découper en **2 PR** :
+**Helpers :** `internal/persistence/wallet_target.go` — `NormalizeWalletSubjectID`, `WalletSubjectIDFromAddress`.
 
-| PR | Branche suggérée | Fichiers | Titre suggéré |
-|----|------------------|----------|---------------|
-| **1** | `cpm/imm-9b-wallet-normalization-nats` | `wallet_target.go` (+ tests `NormalizeWalletSubjectID`), `assessment_consumer.go`, tests NATS existants | `cpm: unify wallet subject normalization (NATS, IMM-9b)` |
-| **2** | `cpm/imm-9b-wallet-normalization-assessment` (après merge PR1) | `assessment_request.go`, `assessment_request_test.go`, tests `WalletSubjectIDFromAddress` | `cpm: assessment request uses canonical wallet subject id` |
-
-**Acceptance :** `go test ./internal/persistence/ ./internal/integration/nats/ ./internal/app/ -run 'Assessment|WalletSubject|NormalizeWallet'` inchangé en comportement pour adresses valides.
-
-**Repos :** `cafe-crypto-policy-mgt` uniquement.
+**Tests :** `go test ./internal/persistence/ ./internal/integration/nats/ ./internal/app/ -run 'Assessment|WalletSubject|NormalizeWallet'`
 
 ---
+
 
 ## IMM-9b follow-up — Factor internal policy-reference handlers
 
