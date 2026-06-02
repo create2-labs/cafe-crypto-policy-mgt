@@ -415,6 +415,57 @@ La coordination release (frontend, scripts, intégrations) reste nécessaire, ma
 | **`DELETE …/drafts?id=…`** | **`204`** \| **`404`** uniquement (**idempotence** **§5.4.9**) ; ne supprime **pas** le scan Discovery. Débloque **W1** pour **`POST …/scan`** après suppression du brouillon plateforme (**§2.2**). |
 | Relecture par **`scan_id`** | **`GET …/policies?id=…`** (une instance) ; **`GET …/policies?scan_id=…`** (liste) — **§5.2** ; combinaison **`id`** + **`scan_id`** → **`400`**. |
 | Traçabilité CPM | **`scan_id`** (**UUID**) aligné Discovery / **Option A** ; **`DELETE`** **`…/wallets/scans/{scan_id}`** ou **`…/tls/scans/{scan_id}`** bloqué **`409`** tant que référence — **§4.2**. |
+| Contrat brouillon plateforme (gel) | **[`CPM_DRAFT_1_PR.md`](./CPM_DRAFT_1_PR.md)** — **§4.4.1** ci-dessous ; PRs **CPM-DRAFT-1A/B/C** puis adoption frontend **CPM-DRAFT-2**. |
+
+#### 4.4.1 Platform drafts — contrat gelé (CPM-DRAFT-1)
+
+> **Diagnostic validé :** le frontend envoyait `{ draft: … }` alors que le backend attend `{ id, scan_id?, payload }` → **`400`**. Pas de patch frontend temporaire : stabiliser le contrat CPM d’abord.
+
+| Décision | Choix |
+|----------|--------|
+| **`draft_id`** | **Option A** — `id` **fourni par le client** (obligatoire sur chaque `POST`). Premier save : générer un UUID côté client ; updates : même `id`. |
+| **`draft_version`** | **Non exposé** tant qu’il n’existe pas de version sémantique en store. Réponse `POST` minimale : `draft_id`, `saved_at`, `status: "server_draft"`. |
+| **`GET /drafts`** | **Un seul** brouillon par query **`id`** (obligatoire). **Pas** de liste owner-scoped sans `id`. |
+| **`DELETE /drafts?id=…`** | **`204`** si supprimé ; **`404`** si inconnu / hors scope / **déjà supprimé**. Effet métier **idempotent** (état final = plus de brouillon) malgré le statut HTTP sur le 2ᵉ delete. |
+
+**`POST /api/cpm/v1/drafts` — `DraftUpsertRequest`**
+
+```json
+{ "id": "client-uuid", "scan_id": "uuid-optionnel", "payload": { } }
+```
+
+| Champ | Règle |
+|-------|--------|
+| `id` | Obligatoire, non vide. |
+| `payload` | Obligatoire, objet JSON (peut être `{}`). |
+| `scan_id` | Si présent : UUID valide. |
+| `binding` | **Interdit** sur brouillons CPM-DRAFT-1 → **`400`** `DRAFT_BINDING_FORBIDDEN`. |
+| `owner_user_id`, `tenant_id` | **Interdits** → **`400`** `DRAFT_OWNER_FIELDS_FORBIDDEN`. |
+
+**Réponse 200 — `DraftUpsertResponse`**
+
+```json
+{ "draft_id": "…", "saved_at": "RFC3339", "status": "server_draft" }
+```
+
+**`GET /api/cpm/v1/drafts?id=…` — `DraftRecord`**
+
+```json
+{ "id": "…", "scan_id": "…?", "payload": { }, "created_at": "…", "updated_at": "…" }
+```
+
+**Erreurs structurées (brouillons)** — corps `{ code, message, details, request_id }` :
+
+| `code` | HTTP | Quand |
+|--------|------|--------|
+| `DRAFT_ID_REQUIRED` | 400 | `POST` sans `id` ; `GET`/`DELETE` sans query `id` |
+| `DRAFT_PAYLOAD_REQUIRED` | 400 | `POST` sans `payload` ou pas un objet |
+| `DRAFT_SCAN_ID_INVALID` | 400 | `scan_id` présent mais pas un UUID |
+| `DRAFT_BINDING_FORBIDDEN` | 400 | `binding` présent dans le corps d’un upsert draft |
+| `DRAFT_OWNER_FIELDS_FORBIDDEN` | 400 | `owner_user_id` ou `tenant_id` dans le corps |
+| `DRAFT_NOT_FOUND` | 404 | `GET` inconnu ; `DELETE` inconnu / déjà supprimé (owner-safe) |
+
+Exemples **curl** : [`CPM_DRAFT_1_PR.md`](./CPM_DRAFT_1_PR.md) et [`README.md`](../README.md) § Platform drafts.
 
 ---
 
