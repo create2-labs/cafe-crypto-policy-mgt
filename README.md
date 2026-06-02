@@ -229,10 +229,71 @@ Authenticated business routes:
 
 Additional authenticated routes (owner-scoped draft / policy payloads):
 
-- `POST /api/cpm/v1/drafts` — upsert `{ "id", "scan_id?", "payload" }` (`owner_user_id` / `tenant_id` rejected from client)
-- `GET /api/cpm/v1/drafts?id=...`
+- `POST /api/cpm/v1/drafts` — upsert platform draft (`DraftUpsertRequest`)
+- `GET /api/cpm/v1/drafts?id=...` — single draft by id (query `id` required; no list without `id`)
+- `DELETE /api/cpm/v1/drafts?id=...` — remove platform draft (W1 unblock)
 - `POST /api/cpm/v1/policies` — upsert `{ "id", "scan_id?", "payload" }`
 - `GET /api/cpm/v1/policies?id=...`
+
+### Platform drafts API (CPM-DRAFT-1 contract)
+
+Canonical spec: [`workplans/CPM_DRAFT_1_PR.md`](workplans/CPM_DRAFT_1_PR.md), OpenAPI [`openapi/cpm-v1.yaml`](openapi/cpm-v1.yaml), WORKPLAN [`workplans/WORKPLAN_API.md`](workplans/WORKPLAN_API.md) §4.4.1.
+
+**Decisions (frozen):**
+
+- **`draft_id`:** client-supplied `id` on every `POST` (generate UUID on first save; reuse on update).
+- **Response:** `draft_id`, `saved_at`, `status: "server_draft"` — no `draft_version` until versioning exists.
+- **`DELETE`:** `204` if removed; `404` if unknown / out of scope / already deleted (product effect is idempotent).
+
+**POST body (`DraftUpsertRequest`):**
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440001",
+  "scan_id": "550e8400-e29b-41d4-a716-446655440000",
+  "payload": { "selected_candidate_id": "cpx_hybrid_prod" }
+}
+```
+
+**POST response (`DraftUpsertResponse`):**
+
+```json
+{
+  "draft_id": "550e8400-e29b-41d4-a716-446655440001",
+  "saved_at": "2026-06-02T10:00:00.000Z",
+  "status": "server_draft"
+}
+```
+
+**Rejected client fields:** `owner_user_id`, `tenant_id`, `binding` (owner scope from JWT only; `binding` forbidden on drafts).
+
+**Structured errors (`4xx`):**
+
+| Code | HTTP | When |
+|------|------|------|
+| `DRAFT_ID_REQUIRED` | 400 | Missing `id` on POST or missing query `id` on GET/DELETE |
+| `DRAFT_PAYLOAD_REQUIRED` | 400 | Missing `payload` or not a JSON object |
+| `DRAFT_SCAN_ID_INVALID` | 400 | `scan_id` present but not a valid UUID |
+| `DRAFT_BINDING_FORBIDDEN` | 400 | Client sent `binding` in draft upsert body |
+| `DRAFT_OWNER_FIELDS_FORBIDDEN` | 400 | Client sent `owner_user_id` or `tenant_id` |
+| `DRAFT_NOT_FOUND` | 404 | GET unknown id; DELETE unknown / already deleted |
+
+**curl examples** (replace `$TOKEN`, `$SCAN_ID`, `$DRAFT_ID`):
+
+```bash
+curl -sS -X POST "https://localhost/api/cpm/v1/drafts" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"id\":\"$DRAFT_ID\",\"scan_id\":\"$SCAN_ID\",\"payload\":{\"selected_candidate_id\":\"cpx_hybrid_prod\"}}"
+
+curl -sS "https://localhost/api/cpm/v1/drafts?id=$DRAFT_ID" \
+  -H "Authorization: Bearer $TOKEN"
+
+curl -sS -X DELETE "https://localhost/api/cpm/v1/drafts?id=$DRAFT_ID" \
+  -H "Authorization: Bearer $TOKEN" -w "\nHTTP %{http_code}\n"
+```
+
+**Not accepted:** `{ "draft": { ... } }` request body; `{ "item": { ... } }` Go-struct leak on POST response (removed in CPM-DRAFT-1B).
 
 ## AUTH-03 owner-scoped persistence foundation
 

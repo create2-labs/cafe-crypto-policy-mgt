@@ -258,38 +258,76 @@ paths:
   /drafts:
     get:
       tags: [drafts]
-      summary: List drafts (owner)
-      operationId: getDrafts
+      summary: Get platform draft by id (owner)
+      description: |
+        Single draft by query **`id`** (required). There is **no** owner-scoped list without `id`.
+        See `workplans/CPM_DRAFT_1_PR.md` (CPM-DRAFT-1A).
+      operationId: getDraftById
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Client-supplied draft key (same as POST body `id`).
       responses:
         "200":
-          description: Owner-scoped list of drafts.
+          description: Draft record for this owner.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/PolicyDraft"
+                $ref: "#/components/schemas/DraftRecord"
+              examples:
+                sample:
+                  value:
+                    id: draft-1
+                    scan_id: 550e8400-e29b-41d4-a716-446655440000
+                    payload:
+                      selected_candidate_id: cpx_hybrid_prod
+                    created_at: "2026-06-01T12:00:00Z"
+                    updated_at: "2026-06-02T10:00:00Z"
+        "400":
+          $ref: "#/components/responses/DraftBadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
     post:
       tags: [drafts]
-      summary: Create or update a draft
-      operationId: postDrafts
+      summary: Upsert platform draft (owner)
+      description: |
+        **Upsert** by client-supplied **`id`** (required). Owner scope from JWT only;
+        **`owner_user_id`** / **`tenant_id`** / **`binding`** in the body are rejected.
+        Response is minimal metadata (`draft_id`, `saved_at`, `status`) — no `draft_version` until versioning exists.
+      operationId: postDraftUpsert
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/PolicyDraftWrite"
+              $ref: "#/components/schemas/DraftUpsertRequest"
+            examples:
+              upsert:
+                value:
+                  id: 550e8400-e29b-41d4-a716-446655440001
+                  scan_id: 550e8400-e29b-41d4-a716-446655440000
+                  payload:
+                    selected_candidate_id: cpx_hybrid_prod
       responses:
         "200":
           description: Draft created or updated.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PolicyDraft"
+                $ref: "#/components/schemas/DraftUpsertResponse"
+              examples:
+                upserted:
+                  value:
+                    draft_id: 550e8400-e29b-41d4-a716-446655440001
+                    saved_at: "2026-06-02T10:00:00Z"
+                    status: server_draft
         "400":
-          $ref: "#/components/responses/BadRequest"
+          $ref: "#/components/responses/DraftBadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
     delete:
@@ -330,8 +368,18 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+    DraftBadRequest:
+      description: Draft contract validation failure (structured `code`).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/StructuredErrorResponse"
     NotFound:
       description: Unknown resource or idempotent delete miss.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/StructuredErrorResponse"
 
   schemas:
     ErrorResponse:
@@ -396,13 +444,89 @@ components:
           type: integer
           minimum: 0
 
+    StructuredErrorResponse:
+      type: object
+      required: [code, message, details, request_id]
+      description: AUTH-04 style error payload (draft routes — CPM-DRAFT-1B).
+      properties:
+        code:
+          type: string
+          example: DRAFT_ID_REQUIRED
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+        request_id:
+          type: string
+
+    DraftUpsertRequest:
+      type: object
+      required: [id, payload]
+      additionalProperties: false
+      description: |
+        Platform draft upsert body (WORKPLAN_API.md §4.4.1, CPM_DRAFT_1_PR.md).
+        Client generates stable `id` on first save; reuse on update.
+        `binding` is forbidden for drafts in CPM-DRAFT-1 (`DRAFT_BINDING_FORBIDDEN`).
+      properties:
+        id:
+          type: string
+          minLength: 1
+          description: Client-supplied draft key (required).
+        scan_id:
+          type: string
+          format: uuid
+          description: Optional Discovery scan binding (recommended for wallet flows).
+        payload:
+          type: object
+          additionalProperties: true
+          description: Required JSON object (may be empty `{}`).
+
+    DraftUpsertResponse:
+      type: object
+      required: [draft_id, saved_at, status]
+      description: Minimal upsert acknowledgement — no draft_version until store versioning exists.
+      properties:
+        draft_id:
+          type: string
+        saved_at:
+          type: string
+          format: date-time
+          description: Mapped from persistence `updated_at` (RFC3339 UTC).
+        status:
+          type: string
+          enum: [server_draft]
+          description: Platform work-in-progress; not a persisted policy instance.
+
+    DraftRecord:
+      type: object
+      required: [id, payload, created_at, updated_at]
+      description: Full draft row returned by GET …/drafts?id=….
+      properties:
+        id:
+          type: string
+        scan_id:
+          type: string
+          format: uuid
+        payload:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
     PolicyDraft:
       type: object
-      additionalProperties: true
+      deprecated: true
+      description: Legacy placeholder — use DraftUpsertRequest / DraftRecord (CPM-DRAFT-1A).
 
     PolicyDraftWrite:
       type: object
-      additionalProperties: true
+      deprecated: true
+      description: Legacy placeholder — use DraftUpsertRequest (CPM-DRAFT-1A).
 
     DecisionExploreRequest:
       type: object
