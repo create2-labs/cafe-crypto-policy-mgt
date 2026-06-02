@@ -101,6 +101,50 @@ func TestMissingPrincipalFailsClosedOnOwnerEndpoints(t *testing.T) {
 	}
 }
 
+func TestDraftPOSTUpsertCreateAndUpdate(t *testing.T) {
+	h := newAuthedTestHandler(t)
+	token := mustToken(t, "draft-upsert-user")
+	draftID := "draft-upsert-1"
+
+	create := httptest.NewRequest(http.MethodPost, cpmroutes.Drafts, strings.NewReader(
+		`{"id":"`+draftID+`","payload":{"step":"create"}}`,
+	))
+	create.Header.Set("Authorization", "Bearer "+token)
+	create.Header.Set("Content-Type", "application/json")
+	createRes := httptest.NewRecorder()
+	h.ServeHTTP(createRes, create)
+	if createRes.Code != http.StatusOK {
+		t.Fatalf("create: expected 200, got %d body=%s", createRes.Code, createRes.Body.String())
+	}
+
+	update := httptest.NewRequest(http.MethodPost, cpmroutes.Drafts, strings.NewReader(
+		`{"id":"`+draftID+`","payload":{"step":"update"}}`,
+	))
+	update.Header.Set("Authorization", "Bearer "+token)
+	update.Header.Set("Content-Type", "application/json")
+	updateRes := httptest.NewRecorder()
+	h.ServeHTTP(updateRes, update)
+	if updateRes.Code != http.StatusOK {
+		t.Fatalf("update: expected 200, got %d body=%s", updateRes.Code, updateRes.Body.String())
+	}
+
+	get := httptest.NewRequest(http.MethodGet, cpmroutes.Drafts+"?id="+draftID, nil)
+	get.Header.Set("Authorization", "Bearer "+token)
+	getRes := httptest.NewRecorder()
+	h.ServeHTTP(getRes, get)
+	if getRes.Code != http.StatusOK {
+		t.Fatalf("get: expected 200, got %d body=%s", getRes.Code, getRes.Body.String())
+	}
+	var record map[string]any
+	if err := json.Unmarshal(getRes.Body.Bytes(), &record); err != nil {
+		t.Fatalf("decode get: %v", err)
+	}
+	payload, ok := record["payload"].(map[string]any)
+	if !ok || payload["step"] != "update" {
+		t.Fatalf("expected updated payload, got %#v", record["payload"])
+	}
+}
+
 func TestOwnerPersistedFromPrincipal(t *testing.T) {
 	h := newAuthedTestHandler(t)
 	token := mustToken(t, "user-persist")
