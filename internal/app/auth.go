@@ -657,6 +657,14 @@ func extractScanIDsForAuthorization(r *http.Request) ([]string, authz.APIError, 
 	if len(scanIDs) == 0 {
 		return nil, authz.APIError{}, http.StatusOK
 	}
+	// Platform draft POST: malformed scan_id is rejected by the handler (DRAFT_SCAN_ID_INVALID),
+	// not by upstream scan authorization (which would return 503 for non-UUID paths).
+	if r.Method == http.MethodPost && r.URL.Path == cpmroutes.Drafts {
+		scanIDs = filterScanIDsForDraftPostAuthorization(scanIDs)
+		if len(scanIDs) == 0 {
+			return nil, authz.APIError{}, http.StatusOK
+		}
+	}
 	base := scanIDs[0]
 	for _, scanID := range scanIDs[1:] {
 		if scanID != base {
@@ -668,6 +676,17 @@ func extractScanIDsForAuthorization(r *http.Request) ([]string, authz.APIError, 
 		}
 	}
 	return []string{base}, authz.APIError{}, http.StatusOK
+}
+
+// filterScanIDsForDraftPostAuthorization keeps only UUID-shaped scan_id values for AUTH-02.
+func filterScanIDsForDraftPostAuthorization(scanIDs []string) []string {
+	out := make([]string, 0, len(scanIDs))
+	for _, id := range scanIDs {
+		if norm, err := NormalizeDiscoveryScanID(id); err == nil {
+			out = append(out, norm)
+		}
+	}
+	return out
 }
 
 func scanIDsFromOwnerPoliciesGETQuery(r *http.Request) ([]string, authz.APIError, int) {

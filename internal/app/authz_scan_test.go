@@ -76,6 +76,19 @@ func assertExtractScanIDsForAuthorization(t *testing.T, tc extractScanIDsCase) {
 	}
 }
 
+func TestExtractScanIDsForAuthorizationDraftPostSkipsMalformedScanID(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.Drafts, strings.NewReader(
+		`{"id":"draft-1","scan_id":"not-a-uuid","payload":{}}`,
+	))
+	scanIDs, authErr, status := extractScanIDsForAuthorization(req)
+	if authErr.Code != "" || status != http.StatusOK {
+		t.Fatalf("expected no scan auth error, got code=%q status=%d", authErr.Code, status)
+	}
+	if len(scanIDs) != 0 {
+		t.Fatalf("expected no scan ids for AUTH-02, got %#v", scanIDs)
+	}
+}
+
 func TestExtractScanIDsForAuthorizationGETPolicies(t *testing.T) {
 	scan := "550e8400-e29b-41d4-a716-446655440000"
 	req := httptest.NewRequest(http.MethodGet, cpmroutes.Policies+"?scan_id="+scan, nil)
