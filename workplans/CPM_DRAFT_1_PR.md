@@ -210,7 +210,8 @@ Legacy `{"error":"id is required"}` on owner routes is **deprecated** — replac
 | 400 matrix (id, payload, scan_id, owner fields) | `owner_routes_drafts_contract_test.go` (new) |
 | GET with/without id | same |
 | DELETE 204 / second 404 / cross-owner 404 | same |
-| OpenAPI example smoke (optional) | `scripts/` or test helper |
+| Contract test runner | `scripts/test-cpm-draft-1-contract.sh` (`go test`; `--smoke` → cafe-deploy) |
+| Integration smoke (stack up) | [`cafe-deploy/scripts/test-cpm-draft-1-contract.sh`](../../cafe-deploy/scripts/test-cpm-draft-1-contract.sh) |
 
 ---
 
