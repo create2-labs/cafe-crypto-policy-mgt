@@ -117,9 +117,14 @@ func TestOwnerPersistedFromPrincipal(t *testing.T) {
 	if err := json.Unmarshal(createRes.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	item, _ := body["item"].(map[string]any)
-	if item["OwnerUserID"] != "user-persist" {
-		t.Fatalf("expected persisted owner from principal, got %#v", item["OwnerUserID"])
+	if body["draft_id"] != "draft-persist" {
+		t.Fatalf("expected draft_id in upsert response, got %#v", body["draft_id"])
+	}
+	if body["status"] != "server_draft" {
+		t.Fatalf("expected status server_draft, got %#v", body["status"])
+	}
+	if body["saved_at"] == nil || body["saved_at"] == "" {
+		t.Fatalf("expected saved_at in upsert response, got %#v", body["saved_at"])
 	}
 }
 

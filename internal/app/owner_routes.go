@@ -61,17 +61,22 @@ func handleOwnerPOSTDrafts(w http.ResponseWriter, r *http.Request, store *persis
 		obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, errMsgAuthenticationRequired, reasonDetails(authReasonPrincipalMissing))
 		return
 	}
-	req, err := decodeOwnerScopedUpsertRequest(r)
+	req, err := decodeDraftUpsertRequest(r)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: err.Error()})
+		var decErr *draftDecodeError
+		if errors.As(err, &decErr) {
+			writeDraftStructuredError(w, r, obs, http.StatusBadRequest, decErr.code, decErr.message, map[string]any{})
+			return
+		}
+		writeDraftStructuredError(w, r, obs, http.StatusBadRequest, draftCodePayloadRequired, err.Error(), map[string]any{})
 		return
 	}
 	record, saveErr := store.SaveDraft(principal, req.ID, req.ScanID, req.Payload)
 	if saveErr != nil {
-		mapPersistenceError(w, r, obs, principal, saveErr)
+		mapDraftPersistenceError(w, r, obs, principal, saveErr)
 		return
 	}
-	writeJSON(w, http.StatusOK, apiItemJSON(record))
+	writeJSON(w, http.StatusOK, draftUpsertResponseFromRecord(record))
 }
 
 func handleOwnerGETDrafts(w http.ResponseWriter, r *http.Request, store *persistence.OwnerScopedStore, obs *authObservability) {
@@ -84,15 +89,15 @@ func handleOwnerGETDrafts(w http.ResponseWriter, r *http.Request, store *persist
 	}
 	id := strings.TrimSpace(r.URL.Query().Get("id"))
 	if id == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: errMsgIDRequired})
+		writeDraftStructuredError(w, r, obs, http.StatusBadRequest, draftCodeIDRequired, "id is required", map[string]any{})
 		return
 	}
 	record, err := store.GetDraft(principal, id)
 	if err != nil {
-		mapPersistenceError(w, r, obs, principal, err)
+		mapDraftPersistenceError(w, r, obs, principal, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, apiItemJSON(record))
+	writeJSON(w, http.StatusOK, draftRecordResponseFromStore(record))
 }
 
 func handleOwnerDELETEDrafts(w http.ResponseWriter, r *http.Request, store *persistence.OwnerScopedStore, obs *authObservability) {
@@ -105,7 +110,7 @@ func handleOwnerDELETEDrafts(w http.ResponseWriter, r *http.Request, store *pers
 	}
 	id := strings.TrimSpace(r.URL.Query().Get("id"))
 	if id == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: errMsgIDRequired})
+		writeDraftStructuredError(w, r, obs, http.StatusBadRequest, draftCodeIDRequired, "id is required", map[string]any{})
 		return
 	}
 	err := store.DeleteDraft(principal, id)
@@ -113,12 +118,12 @@ func handleOwnerDELETEDrafts(w http.ResponseWriter, r *http.Request, store *pers
 	case err == nil:
 		w.WriteHeader(http.StatusNoContent)
 	case errors.Is(err, persistence.ErrDraftNotFound), errors.Is(err, persistence.ErrForbidden):
-		writeJSON(w, http.StatusNotFound, map[string]any{jsonKeyError: errMsgNotFound})
+		writeDraftStructuredError(w, r, obs, http.StatusNotFound, draftCodeNotFound, "draft not found", map[string]any{})
 	case errors.Is(err, persistence.ErrPrincipalRequired):
 		obs.recordDecision(r, requestID, authCategoryOwner, authOutcomeDenied, authCodePrincipalRequired, authReasonPrincipalMissing, "", "")
 		obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, errMsgAuthenticationRequired, reasonDetails(authReasonPrincipalMissing))
 	default:
-		writeJSON(w, http.StatusInternalServerError, map[string]any{jsonKeyError: errMsgInternalServerError})
+		writeDraftStructuredError(w, r, obs, http.StatusInternalServerError, draftCodeInternalError, errMsgInternalServerError, map[string]any{})
 	}
 }
 
