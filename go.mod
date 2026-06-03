@@ -1,6 +1,6 @@
 module github.com/create2-labs/cafe-crypto-policy-mgt
 
-go 1.26.2
+go 1.26.4
 
 require (
 	github.com/create2-labs/cafe-contracts v0.0.2-0.20260427141324-4a96a8df5546
