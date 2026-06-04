@@ -12,14 +12,19 @@ const WalletSubjectPrefix = "wallet:"
 
 // WalletTargetContextCounts is the minimal IMM-9b lookup result for a normalized wallet target_address.
 type WalletTargetContextCounts struct {
-	Exists       bool
-	PolicyCount  int
-	DraftCount   int
+	Exists            bool
+	PolicyCount       int
+	DraftCount        int
+	PlatformDraftID   string // set when DraftCount == 1 (owner GET /drafts?id= for W1 UI)
 }
 
 // CountActiveWalletCPMContext returns how many persisted policies and platform drafts for principal
 // reference the given normalized wallet target_address (WORKPLAN §2.2 W1, IMM-9b).
 func (s *OwnerScopedStore) CountActiveWalletCPMContext(principal authz.Principal, normalizedTargetAddress string) (WalletTargetContextCounts, error) {
+	return s.lookupActiveWalletCPMContext(principal, normalizedTargetAddress)
+}
+
+func (s *OwnerScopedStore) lookupActiveWalletCPMContext(principal authz.Principal, normalizedTargetAddress string) (WalletTargetContextCounts, error) {
 	if err := principal.Validate(); err != nil {
 		return WalletTargetContextCounts{}, ErrPrincipalRequired
 	}
@@ -30,6 +35,7 @@ func (s *OwnerScopedStore) CountActiveWalletCPMContext(principal authz.Principal
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	var policyCount, draftCount int
+	var soleDraftID string
 	for _, rec := range s.policies {
 		if !sameOwner(rec.OwnerUserID, rec.TenantID, principal.UserID, principal.TenantID) {
 			continue
@@ -44,14 +50,23 @@ func (s *OwnerScopedStore) CountActiveWalletCPMContext(principal authz.Principal
 		}
 		if walletTargetFromPayload(rec.Payload) == needle {
 			draftCount++
+			if draftCount == 1 {
+				soleDraftID = strings.TrimSpace(rec.ID)
+			} else {
+				soleDraftID = ""
+			}
 		}
 	}
 	total := policyCount + draftCount
-	return WalletTargetContextCounts{
+	out := WalletTargetContextCounts{
 		Exists:      total > 0,
 		PolicyCount: policyCount,
 		DraftCount:  draftCount,
-	}, nil
+	}
+	if draftCount == 1 {
+		out.PlatformDraftID = soleDraftID
+	}
+	return out, nil
 }
 
 // NormalizeWalletTargetAddress applies the same normalization as Discovery wallet scans (0x + lowercase).
