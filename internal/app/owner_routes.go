@@ -42,6 +42,7 @@ func registerOwnerScopedRoutesForPrefix(mux *http.ServeMux, base string, store *
 	mux.HandleFunc("DELETE "+base+ownerDraftsPath, func(w http.ResponseWriter, r *http.Request) {
 		handleOwnerDELETEDrafts(w, r, store, obs)
 	})
+	registerOwnerWalletTargetContextRoute(mux, base, store, obs)
 	mux.HandleFunc("POST "+base+ownerPoliciesPath, func(w http.ResponseWriter, r *http.Request) {
 		handleOwnerPOSTPolicies(w, r, store, obs)
 	})

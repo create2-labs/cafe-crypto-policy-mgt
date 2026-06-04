@@ -17,6 +17,8 @@ const (
 	PoliciesAssessmentRequest = PoliciesPrefix + "/assessment/request"
 
 	Drafts = V1Base + "/drafts"
+	// WalletTargetContext is the owner-scoped IMM-9b lookup for proactive wallet scan UI (FE-IMM-2).
+	WalletTargetContext = V1Base + "/wallet-target-context"
 
 	Healthz = "/healthz"
 
@@ -46,6 +48,7 @@ func AuthenticatedRoutes() []AuthenticatedRoute {
 		{Method: http.MethodPost, Path: Drafts},
 		{Method: http.MethodGet, Path: Drafts},
 		{Method: http.MethodDelete, Path: Drafts},
+		{Method: http.MethodGet, Path: WalletTargetContext},
 		{Method: http.MethodPost, Path: Policies},
 		{Method: http.MethodGet, Path: Policies},
 		{Method: http.MethodDelete, Path: Policies},

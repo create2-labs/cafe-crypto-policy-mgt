@@ -38,8 +38,8 @@ func TestCountActiveWalletCPMContext_policyAndDraft(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CountActiveWalletCPMContext: %v", err)
 	}
-	if !got.Exists || got.PolicyCount != 1 || got.DraftCount != 1 {
-		t.Fatalf("got %+v, want exists=true policy=1 draft=1", got)
+	if !got.Exists || got.PolicyCount != 1 || got.DraftCount != 1 || got.PlatformDraftID != "draft-1" {
+		t.Fatalf("got %+v, want exists=true policy=1 draft=1 platform_draft_id=draft-1", got)
 	}
 
 	empty, err := store.CountActiveWalletCPMContext(user, "0x0000000000000000000000000000000000000001")
