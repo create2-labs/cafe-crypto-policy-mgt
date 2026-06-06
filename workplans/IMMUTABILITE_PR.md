@@ -25,11 +25,17 @@
 
 ---
 
-## Principe W1 — un contexte CPM actif par adresse
+## Principe W1 — policy bloque le rescan ; draft orphelin + rebind CPM (tranché 2026-06)
 
-**Décision produit :** tant qu’une **policy persistée** **ou** un **draft** existe pour une `**target_address`** (wallet), **aucun** nouveau `**POST /api/discovery/v1/scan`**. L’utilisateur doit finaliser (`POST /api/cpm/v1/policies`) ou supprimer le brouillon (`DELETE /api/cpm/v1/drafts?id=…`) et/ou la policy (`DELETE /api/cpm/v1/policies?id=…`) avant tout rescan — y compris après un scan `**failed`**.
+**Décision produit :**
 
-**Parcours W1 :** Discovery **409** si policy/draft (**IMM-9**) ; déblocage via `**DELETE /api/cpm/v1/drafts?id=…`** (**IMM-W1-2**, livré). Normalisation `**target_address`** / sujets `**wallet:0x…`** : [#45](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/45)–[#46](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/46). Voir `[TODO.md](../TODO.md)` pour le backlog technique restant.
+- **Policy persistée** sur une **`target_address`** (wallet) → **aucun** nouveau **`POST /api/discovery/v1/scan`** (**409**).
+- **Draft plateforme seul** → **n’empêche pas** le rescan (**IMM-W1-4** / révision **IMM-9**).
+- Après rescan, le draft peut rester sur un **ancien** **`scan_id`** (**orphan**) → **explore / validate / persist** CPM **bloqués** jusqu’à **rebind manuel** sur le dernier scan **`completed`** (**W2**) — bouton **« Rebind to last scan for this address »** ; **`wallet_type`** inchangé requis.
+
+**Parcours W1 (policy) :** Discovery **409** si policy (**IMM-9**) ; CTAs finalize / **`DELETE /api/cpm/v1/policies?id=…`**. **`DELETE /api/cpm/v1/drafts?id=…`** (**IMM-W1-2…3** ✅) = abandon draft — **pas** prérequis rescan.
+
+**Hors scope :** sauvegarde locale client (export / `localStorage` / reload) — **retiré du périmètre produit (2026-06)**. Voir `[cafe-frontend/IMMUTABILITE_PR.md](../../cafe-frontend/IMMUTABILITE_PR.md)` (**FE-IMM-4** = rebind orphan uniquement).
 
 ---
 
@@ -52,7 +58,7 @@
 
 | ID        | Règle                                                                                                                                  | CPM                                                                                                                                                      |
 | --------- | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **W1**    | **Un contexte CPM actif max** : pas de scan si **policy** ou **draft** sur la cible (après **W8**)                                     | Lookup policies **+** drafts (**IMM-9b**) → Discovery **IMM-9**                                                                                          |
+| **W1**    | **Policy persistée** bloque le rescan ; **draft seul** non (**IMM-W1-4**) ; **orphan draft** → rebind **W2** avant explore/persist | Lookup policies pour guard POST (**IMM-9b**) ; drafts pour orphan CPM |
 | **W2**    | CPM sur le dernier `**completed`** uniquement                                                                                          | `**GET …/wallets/scans?address=&latest=true`** (**IMM-10**)                                                                                              |
 | **W3–W6** | DELETE / historique / CBOM                                                                                                             | Voir WORKPLAN                                                                                                                                            |
 | **W7**    | Pas d’explore/persist tant que le **newest row** n’est pas `**completed`**                                                             | explore/persist → **400** `LATEST_SCAN_NOT_COMPLETED`                                                                                                    |
@@ -60,7 +66,7 @@
 | **P1**    | Quota plan (success-only, monotonic)                                                                                                   | **Hors CPM** — Discovery **IMM-6b** ; `**used`** = completed success ; DELETE policy/draft/scan **ne modifie pas** `**used`** ; voir WORKPLAN **§2.2.1** |
 
 
-> **Discovery POST** : **W8** (`SCAN_IN_PROGRESS` si en cours) ; puis **W1** (policy **ou** draft). **W7** ne s’applique **pas** à POST.
+> **Discovery POST** : **W8** (`SCAN_IN_PROGRESS` si en cours) ; puis **W1** (**policy persistée** uniquement — **IMM-W1-4**). **W7** ne s’applique **pas** à POST.
 
 ---
 
@@ -93,7 +99,8 @@ Convention statuts: `✅ done` | `🟡 in progress` | `⚪ planned`.
 | **IMM-W1-1**      | ✅ done    | `cpm/imm-w1-delete-draft-store`        | [#41](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/41)                           | IMM-9b          | `OwnerScopedStore.DeleteDraft`                                                  |
 | **IMM-W1-2**      | ✅ done    | `cpm/imm-w1-delete-draft-route`        | [#42](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/42)                           | IMM-W1-1        | Route `DELETE /api/cpm/v1/drafts?id=…`                                          |
 | **IMM-W1-2**      | ✅ done    | `cpm/imm-w1-delete-draft-route`        | [#43](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/43)                           | IMM-W1-1        | Ajustements route + OpenAPI                                                     |
-| **IMM-W1-3**      | ✅ done    | `cpm/imm-w1-delete-draft-smoke`        | [#44](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/44)                           | IMM-W1-2        | Tests intégration + smoke step 5                                                |
+| **IMM-W1-3**      | ✅ done    | `cpm/imm-w1-delete-draft-smoke`        | [#44](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/44)                           | IMM-W1-2        | Tests intégration + smoke step 5 (legacy : rescan after delete draft)                |
+| **IMM-W1-4**      | ⚪ planned | `discovery/w1-policy-only-post-guard`  | —                                                                                               | IMM-9 ✅         | Révision **W1** : POST scan **409** si **policy** seule ; draft seul OK ; `blocking_kind` |
 | **IMM-9b-norm-1** | ✅ done    | `cpm/imm-9b-wallet-normalization-nats` | [#45](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/45)                           | IMM-9b          | Normalisation NATS `NormalizeWalletSubjectID`                                   |
 | **IMM-9b-norm-2** | ✅ done    | `cpm/imm-9b-wallet-normalization-http` | [#46](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/46)                           | #45             | Normalisation HTTP `WalletSubjectIDFromAddress`                                 |
 | **CPM-DRAFT-1A**  | ✅ done    | `cpm/cpm-draft-1a-contract-docs`       | [#67](https://github.com/create2-labs/cafe-frontend/pull/67) (merge en meme temps que FE-IMM-1) | —               | OpenAPI + WORKPLAN §4.4.1 + README + `[CPM_DRAFT_1_PR.md](./CPM_DRAFT_1_PR.md)` |
@@ -115,8 +122,8 @@ Source de référence frontend: `[cafe-frontend/IMMUTABILITE_PR.md](../../cafe-f
 | **FE-IMM-0**    | ✅ done    | n/a                                     | [#66](https://github.com/create2-labs/cafe-frontend/pull/66)                                        | IMM-6b-5                        | P1 quota breakdown dashboard                                                                       |
 | **FE-IMM-1**    | ✅ done    | `fe-imm/pr-1-api-data-layer`            | [#67](https://github.com/create2-labs/cafe-frontend/pull/67) (merge en meme temps que CPM-DRAFT-1A) | —                               | API/data layer (wallet scans, POST scan, draft/policy delete, CBOM client)                         |
 | **FE-IMM-2**    | ⚪ planned | `fe-imm/pr-2-scan-eligibility-model`    | —                                                                                                   | FE-IMM-1                        | Modèle d'éligibilité scan (W8, G1, G2)                                                             |
-| **FE-IMM-3**    | ⚪ planned | `fe-imm/pr-3-scan-trigger-ui`           | —                                                                                                   | FE-IMM-1, FE-IMM-2              | UI trigger scan + gestion W1 au POST                                                               |
-| **FE-IMM-4**    | ⚪ planned | `fe-imm/pr-4-local-draft-export-import` | —                                                                                                   | FE-IMM-1, FE-IMM-3, CPM-DRAFT-2 | Export/import local draft pour déblocage W1 (rehydrate server draft via `POST /api/cpm/v1/drafts`) |
+| **FE-IMM-3**    | 🟡 revise | `fe-imm/pr-3-scan-trigger-ui`           | [#70](https://github.com/create2-labs/cafe-frontend/pull/70) | FE-IMM-1, FE-IMM-2, **IMM-W1-4** | UI trigger scan ; **policy** W1 on POST ; draft-only informational — **no** Save locally |
+| **FE-IMM-4**    | ⚪ planned | `fe-imm/pr-4-draft-rebind-orphan-gate` | —                                                                                                   | FE-IMM-1, FE-IMM-5, CPM-DRAFT-2, **IMM-W1-4** | Orphan draft gate ; **Rebind to last scan** ; explore/persist blocked until W2 ; **no** local export |
 | **FE-IMM-5**    | ⚪ planned | `fe-imm/pr-5-cpm-scan-selector-w2-w7`   | —                                                                                                   | FE-IMM-1                        | Séparation W2 (`latest=true`) / W7 (`limit=1`)                                                     |
 | **FE-IMM-6**    | ⚪ planned | `fe-imm/pr-6-delete-policy-ux`          | —                                                                                                   | FE-IMM-1                        | UX suppression policy (W3/W4)                                                                      |
 | **FE-IMM-7**    | ⚪ planned | `fe-imm/pr-7-delete-scan-ux`            | —                                                                                                   | FE-IMM-1, FE-IMM-6              | UX suppression scan + copy P1                                                                      |
@@ -172,7 +179,7 @@ Source de référence frontend: `[cafe-frontend/IMMUTABILITE_PR.md](../../cafe-f
 - **Out of scope:** Frontend FE-IMM-1.
 - **Dependencies:** **IMM-W1-2**, Discovery IMM-9 (mergé)
 - **Proposed commit title:** `test: W1 unblock via DELETE platform draft`
-- **Completion criteria:** Smoke step 5 vert ; **409** → DELETE draft → **POST scan** accepté.
+- **Completion criteria (IMM-W1-3 legacy smoke):** step 5 documented — **IMM-W1-4** replaces « rescan after DELETE draft » as W1 unblock path ; DELETE draft remains valid for **discard** only.
 
 ---
 
@@ -199,20 +206,23 @@ Owner-scoped internal lookup **before** Discovery allocates a new `scan_id` on `
 
 or `{ "exists": false, "policy_count": 0, "draft_count": 0 }`.
 
-### Public draft deletion (W1 unblock)
+### Public draft deletion (discard)
 
-Platform draft removal for **W1** uses the canonical public API:
+Platform draft removal uses the canonical public API:
 
-- `**DELETE /api/cpm/v1/drafts?id=…`** → `**204`**  **404** (**WORKPLAN §2.4**, **§4.4**) — **IMM-W1-2**.
+- `**DELETE /api/cpm/v1/drafts?id=…`** → `**204`** / **404** (**WORKPLAN §2.4**, **§4.4**) — **IMM-W1-2**.
 
-**Client workflow (not IMM-9b):** user may **export draft locally**, `**DELETE`** platform draft, run new scan, then **reload local save** only if latest `**completed`** scan matches same `**target_address`** and `**wallet_type**` — see `[cafe-frontend/IMMUTABILITE.md](../../cafe-frontend/IMMUTABILITE.md)`.
+Under **IMM-W1-4**, DELETE draft is **discard** only — it is **not** required to unblock rescan (draft alone no longer blocks POST). Rescan unblock requires removing **persisted policy** (**409** when `policy_count > 0`).
+
+**Client workflow (not IMM-9b):** after rescan, an **orphan platform draft** (stale `scan_id`) blocks CPM explore/persist until **manual rebind** to the latest **`completed`** scan (**W2**) — **FE-IMM-4** in `[cafe-frontend/IMMUTABILITE_PR.md](../../cafe-frontend/IMMUTABILITE_PR.md)`. **No** client-side local draft export / reload.
 
 ### Acceptance criteria
 
 - Internal API or shared module (service token); callable **before** new scan creation.
 - Lookup by **normalized `target_address`** only — no Discovery round-trip for address resolution.
-- Response: `{ exists, policy_count, draft_count }`.
-- **409** path when `exists: true` (policy and/or draft).
+- Response: `{ exists, policy_count, draft_count, platform_draft_id? }`.
+- **POST scan guard (Discovery IMM-W1-4):** **409** when **`policy_count > 0`** — draft alone does **not** block.
+- **`wallet-target-context`** may still expose draft for informational UI / orphan detection.
 - Wallet-only scope: TLS scans **out of** W1 lookup for current product flow.
 - Tests: policy → true; draft → true; false when both removed.
 

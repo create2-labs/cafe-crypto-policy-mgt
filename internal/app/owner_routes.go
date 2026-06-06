@@ -151,7 +151,7 @@ func handleOwnerPOSTPolicies(w http.ResponseWriter, r *http.Request, store *pers
 		mapPersistenceError(w, r, obs, principal, saveErr)
 		return
 	}
-	writeJSON(w, http.StatusOK, apiItemJSON(record))
+	writeJSON(w, http.StatusOK, policyRecordResponseFromStore(record))
 }
 
 func validatePolicyPersistBinding(req ownerScopedUpsertRequest) (scanIDToStore string, err error) {
@@ -205,7 +205,7 @@ func handleOwnerGETPolicies(w http.ResponseWriter, r *http.Request, store *persi
 			mapPersistenceError(w, r, obs, principal, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, apiItemJSON(record))
+		writeJSON(w, http.StatusOK, policyRecordResponseFromStore(record))
 		return
 	}
 	norm, err := NormalizeDiscoveryScanID(scanID)
@@ -228,7 +228,7 @@ func handleOwnerGETPolicies(w http.ResponseWriter, r *http.Request, store *persi
 		limit = 1
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"items":  list,
+		"items":  policyRecordResponsesFromStore(list),
 		"total":  total,
 		"limit":  limit,
 		"offset": 0,

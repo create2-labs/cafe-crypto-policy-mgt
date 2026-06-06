@@ -393,8 +393,8 @@ components:
 
     PolicyRecord:
       type: object
-      required: [id, payload]
-      description: Persisted instance (WORKPLAN_API.md §4.4, §8.3 `PolicyRecord`).
+      required: [id, payload, created_at, updated_at]
+      description: Persisted instance (WORKPLAN_API.md §4.4, §8.3 `PolicyRecord`). Public JSON mirrors `draftRecordResponse` field naming.
       properties:
         id:
           type: string
@@ -405,6 +405,12 @@ components:
         payload:
           type: object
           additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
 
     PolicyRecordWrite:
       type: object

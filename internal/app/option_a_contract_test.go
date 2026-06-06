@@ -45,9 +45,11 @@ func TestOptionAContract_persistBindingDiscoveryWithUUIDSetsScanID(t *testing.T)
 	if err := json.Unmarshal(res.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	item, _ := out["item"].(map[string]any)
-	if got := item["ScanID"]; got != optionAContractScanID {
-		t.Fatalf("item.ScanID = %v, want %s", got, optionAContractScanID)
+	if got := out["scan_id"]; got != optionAContractScanID {
+		t.Fatalf("scan_id = %v, want %s", got, optionAContractScanID)
+	}
+	if out["id"] != "policy-with-scan" {
+		t.Fatalf("id = %v, want policy-with-scan", out["id"])
 	}
 }
 

@@ -4,7 +4,6 @@ const (
 	jsonKeyError      = "error"
 	jsonKeyMessage    = "message"
 	jsonKeyReason     = "reason"
-	jsonKeyItem       = "item"
 	jsonKeyDetails    = "details"
 	jsonKeyCode       = "code"
 	jsonKeyRequestID  = "request_id"
@@ -56,8 +55,4 @@ func apiErrorJSON(code, message string) map[string]any {
 
 func apiErrorWithDetails(code, message string, details map[string]any) map[string]any {
 	return map[string]any{jsonKeyError: code, jsonKeyMessage: message, jsonKeyDetails: details}
-}
-
-func apiItemJSON(item any) map[string]any {
-	return map[string]any{jsonKeyItem: item}
 }

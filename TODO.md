@@ -79,7 +79,7 @@ Mettre à jour les passages « preserve mock mode » / placeholder V1 :
 
 | Couche | Rôle |
 |--------|------|
-| **Discovery IMM-9** ([#76](https://github.com/create2-labs/cafe-discovery/pull/76)) | `POST /scan` → **409** `CPM_EXISTS_FOR_WALLET_TARGET` si policy/draft (lookup CPM **IMM-9b**) |
+| **Discovery IMM-9** ([#76](https://github.com/create2-labs/cafe-discovery/pull/76)) | `POST /scan` → **409** if **policy** (**IMM-W1-4** revises draft-only) |
 | **CPM IMM-W1** | `OwnerScopedStore.DeleteDraft` + route **`DELETE /api/cpm/v1/drafts?id=…`** → **204** \| **404** |
 
 **Validation smoke (stack locale :8080 / :8082) :**
