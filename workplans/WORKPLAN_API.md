@@ -492,6 +492,25 @@ Rôle de **`explore`** :
 
 Aucun autre verbe d’exploration n’est ajouté dans cette remise à plat. Si un besoin futur apparaît, il devra être ajouté comme endpoint **explicitement nommé** sous la même famille **`policies/decisions/...`**, sans modifier la sémantique du catalogue.
 
+#### 5.1.1 Explore — périmètre chaînes (`target_chain_ids`, tout-ou-rien)
+
+**Décision (2026-06) :** le corps **`POST …/policies/decisions/explore`** inclut un **`selection_request`** avec **`target_chain_ids`** (liste d’identifiants de chaîne EVM). Ce champ définit le **set demandé** pour l’exploration — pas un sous-ensemble optionnel ni une suggestion.
+
+**Règle tout-ou-rien :**
+
+- **chaque** identifiant dans **`target_chain_ids`** doit entrer dans le **`scope.chain_ids`** (ou équivalent catalog/instance) d’un candidat pour que ce candidat soit **deployable** ;
+- **aucune** couverture partielle silencieuse : si l’UI demande `{1, 56, 8453, 42161}`, un candidat ne couvrant que `{1}` **ne doit pas** être sélectionné comme policy deployable ;
+- lorsqu’aucun candidat ne satisfait le set entier, **`explore`** retourne **`200`** avec **`selected_policy_id`** vide et **`rejected_candidates`** non vide ; le code de rejet attendu côté moteur de compatibilité est **`incompatible.chain_scope`** (évaluateur existant — **pas** de changement de sémantique dans cette release).
+
+**Invariant W1 inchangé :** au plus **une** policy persistée active par **adresse wallet normalisée** (**§2.2 W1**). La règle chaînes porte sur le **périmètre** de l’exploration, pas sur le nombre de policies par adresse.
+
+**Source des chaînes côté client :** les **`target_chain_ids`** transmis à **`explore`** doivent provenir du **`result.chain_ids`** du scan référencé (**`GET …/wallets/scans/{scan_id}`** au terminal **`completed`**) — **pas** de valeurs inventées en liste ou en smoke (**§5.4.10**).
+
+**UX et ops (hors contrat HTTP) :**
+
+- **frontend** : expliquer l’absence de candidat deployable (**codes `incompatible.chain_scope`**, chains observées vs scope catalog) — voir [`cafe-frontend/IMMUTABILITE_PR.md`](../../cafe-frontend/IMMUTABILITE_PR.md) **FE-IMM-13** ;
+- **plateforme** : signaler les échecs applicatifs récurrents (métrique / alerte) — voir [`IMMUTABILITE_PR.md`](./IMMUTABILITE_PR.md) **IMM-OPS-1…2**.
+
 ### 5.2 Règles sur `scan_id` pour `POST|GET|DELETE …/policies`
 
 **Décision :** une instance persistée de crypto policy reste représentée par **`PolicyRecord`** et exposée via (préfixe **§0.2** ou **§0.3**) :
@@ -737,6 +756,32 @@ Erreur recommandée si conflit :
 
 **Décision :** l’**audit** interne, la **journalisation** et les exigences **RGPD** ne changent **pas** le contrat HTTP de cette release. Si nécessaire, le backend peut conserver un événement interne ou une **tombstone** technique, mais cette donnée n’est **pas** exposée comme instance persistée **active** dans l’API produit.
 
+#### 5.4.10 Intégrité des données scan (scanners only)
+
+**Décision produit (2026-06) :** aucune couche (persistence Discovery, API, UI, scripts de déploiement) n’**invente** de métadonnées wallet ou TLS. Seuls les **scanners** écrivent le **`result`** métier terminal à l’événement **`scan.completed`**.
+
+**Persistence — `scan.started` (lifecycle only) :**
+
+- à **`OnStarted`**, la ligne insérée ne porte que les champs **lifecycle** : **`scan_id`**, **`user_id`**, identité de cible (**`address`** / **`url`**), **`status`** (**`started`** côté API — **§5.4.1**) ;
+- **interdit** à ce stade : **`wallet_type`**, **`type`** / **`is_eoa`**, algorithmes, posture NIST, **`chain_ids`** ou tout autre champ **résultat métier** supposé avant exécution scanner ;
+- stubs quota / limite plan (**`PLAN_LIMIT_EXCEEDED`**) : lifecycle + code d’erreur uniquement — **pas** de faux résultat crypto.
+
+**API — liste vs détail :**
+
+- **liste** (**`ScanListItem`**, **`TLSListItem`**) : synopsis **lifecycle** (**§5.4.2**, **§5.4.3**) ; **`chain_ids`** en synopsis wallet peuvent rester **`[]`** tant que non connus — **pas** de posture inventée ;
+- **détail** : **`result`** présent et **complet** au terminal **`completed`** ; **`result`** absent ou partiel tant que non terminal (**§2.2**, **§5.4.4**, **§5.4.5**) ;
+- **`wallet_type`** et posture : **une** dérivation canonique à **`scan.completed`** uniquement.
+
+**CPM :** **`wallet_type`**, adresse et **`target_chain_ids`** pour **`explore`** proviennent du **détail** scan terminal — **pas** de default interne (ex. EOA supposé).
+
+**Implémentation et validation (cross-links) :**
+
+| Dépôt | PR / artefact | Rôle |
+|-------|---------------|------|
+| `cafe-discovery` | **IMM-D1…D5** | `OnStarted` lifecycle-only ; statut sans default implicite ; contrat liste/détail ; `wallet_type` à completion — voir [`cafe-discovery/IMMUTABILITE_PR.md`](../../cafe-discovery/IMMUTABILITE_PR.md) § Scan data integrity |
+| `cafe-frontend` | **FE-IMM-10…14** | Mappers sans default EOA ; `wallet_type` depuis détail ; tests data integrity — voir [`cafe-frontend/IMMUTABILITE_PR.md`](../../cafe-frontend/IMMUTABILITE_PR.md) |
+| `cafe-deploy` | **IMM-DEP-1** | Smokes : `target_chain_ids` depuis **`result.chain_ids`** du détail ; pas de `wallet_type` fabriqué |
+
 ### 5.5 Edge / nginx
 
 **Décision :** les routes edge à publier sont celles de **§0**.
@@ -935,6 +980,7 @@ Les invariants suivants sont **acceptés** comme comportement produit :
 - **`scan_id`** est **obligatoire** pour toute instance issue d’un flux **Discovery → CPM**.
 - Tant que la **newest row** n’est pas **`completed`**, **aucune** nouvelle policy / **explore** (**§2.2 W7**). **`POST …/scan`** : **W8** — interdit si scan en cours ; si newest **`failed`**, retry autorisé sous **W1** (**§2.2 W8**, **W1**).
 - **`scan_id`** pour **explore** / **persist** = **`scan_id`** du **`GET …/wallets/scans?address=&latest=true`** (dernier **`completed`** — **§2.2 W2**) ; sinon **`400`**.
+- **`selection_request.target_chain_ids`** : contrat **tout-ou-rien** vs **`scope.chain_ids`** catalog/instance — **§5.1.1** ; rejet **`incompatible.chain_scope`** si aucun candidat deployable sur le set entier.
 - **`DELETE …/drafts?id=...`** : **`204`** \| **`404`** ; supprime le brouillon plateforme pour débloquer **W1** / **`POST …/scan`** (**§2.4**).
 - **`GET …/policies?scan_id=...`** est **requis** pour le parcours utilisateur avant **`DELETE`** scan (**§2.2 W3**, **`SCAN_REFERENCED_BY_POLICY`**).
 - **`GET …/policies?id=...`** retourne une **instance unique**.
@@ -982,6 +1028,8 @@ Les **PRs** d’implémentation doivent couvrir au minimum :
 - **`DELETE`** scan : **`409`** si policy référence ; **`204`** après **`DELETE`** policies ;
 - **`status`** **lifecycle-only** ;
 - séparation **`result`** wallet / **`result`** TLS ;
+- **data integrity** : après **`scan.started`**, aucun champ métier scanner exposé avant terminal ; **`result`** rempli à **`scan.completed`** uniquement (**§5.4.10**) ;
+- **`explore`** avec **`target_chain_ids`** partiellement hors scope catalog → **`selected_policy_id`** vide, **`rejected_candidates`** avec **`incompatible.chain_scope`** (**§5.1.1**) ;
 - routes hors contrat §0 **supprimées** ou **non routées**.
 
 ### 8.9 Propriétaires de surfaces
