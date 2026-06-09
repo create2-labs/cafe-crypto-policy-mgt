@@ -12,6 +12,12 @@
 #   CPM_BASE_URL          target for smoke (default http://127.0.0.1:8082)
 #   CPM_HTTP_ADDR         listen addr for local mode (default :0 = random free port)
 #   CPM_LOG_FILE          server log path for local mode (default: timestamped file in $TMPDIR)
+#   DISCOVERY_BASE        Discovery root for JWT when smoking against cafe-deploy (default http://localhost:8080)
+#   DISCOVERY_TOKEN       reuse existing Bearer (optional; else signup/signin via cafe-deploy lib)
+#   CPM_AUTH_TOKEN        alias for DISCOVERY_TOKEN
+#   CPM_SKIP_AUTH=1       omit Authorization (only when CPM_AUTH_REQUIRED=false on target)
+#   SCAN_ID               optional real wallet scan_id for explore binding=discovery (else omitted → binding=unknown)
+#   CAFE_DEPLOY_ROOT      path to cafe-deploy if not ../cafe-deploy (for discovery-test-user.sh)
 #   VERBOSE=1             show explore JSON, metrics lines, structured log (-v)
 #   SKIP_UNIT=1           skip unit tests in "all"
 #   SKIP_SMOKE=1          skip smoke in "all"
@@ -43,6 +49,9 @@ WALLET_RAW="0x742d35cc6634c0532925a3b844bc454e4438f44e"
 
 SERVER_PID=""
 CPM_LOG_FILE="${CPM_LOG_FILE:-}"
+CPM_HEADERS=()
+SMOKE_INCLUDE_SCAN_ID=1
+SMOKE_EXPECT_BINDING=discovery
 
 info()  { printf '→ %s\n' "$*"; }
 warn()  { printf '⚠ %s\n' "$*" >&2; }
@@ -175,16 +184,74 @@ json_get() {
   fi
 }
 
+find_discovery_test_user_lib() {
+  local candidates=()
+  [[ -n "${CAFE_DEPLOY_ROOT:-}" ]] && candidates+=("${CAFE_DEPLOY_ROOT}/scripts/lib/discovery-test-user.sh")
+  candidates+=("$REPO_ROOT/../cafe-deploy/scripts/lib/discovery-test-user.sh")
+  local c
+  for c in "${candidates[@]}"; do
+    [[ -f "$c" ]] && { printf '%s\n' "$c"; return 0; }
+  done
+  return 1
+}
+
+setup_smoke_auth() {
+  CPM_HEADERS=()
+  SMOKE_INCLUDE_SCAN_ID=1
+  SMOKE_EXPECT_BINDING=discovery
+
+  if [[ "${CPM_SKIP_AUTH:-}" == "1" ]]; then
+    info "CPM_SKIP_AUTH=1 — no Authorization header (target must have CPM_AUTH_REQUIRED=false)"
+    return 0
+  fi
+
+  local token="${CPM_AUTH_TOKEN:-${DISCOVERY_TOKEN:-}}"
+  if [[ -z "$token" ]]; then
+    local lib
+    lib="$(find_discovery_test_user_lib)" || true
+    DISCOVERY_BASE="${DISCOVERY_BASE:-http://localhost:8080}"
+    if [[ -n "$lib" ]]; then
+      # shellcheck disable=SC1090
+      . "$lib"
+      discovery_test_user_init "imm-ops-1"
+      discovery_test_user_signup_signin || fail "Discovery auth failed (DISCOVERY_BASE=${DISCOVERY_BASE})"
+      token="$DISCOVERY_TOKEN"
+      info "authenticated via Discovery (${EMAIL})"
+    else
+      fail "CPM explore requires auth on cafe-deploy stacks. Set DISCOVERY_BASE (cafe-deploy sibling), export DISCOVERY_TOKEN, CPM_SKIP_AUTH=1, or run: ./scripts/test-imm-ops-1.sh local"
+    fi
+  fi
+  CPM_HEADERS=( -H "Authorization: Bearer ${token}" )
+
+  if [[ -n "${SCAN_ID:-}" ]]; then
+    SMOKE_INCLUDE_SCAN_ID=1
+    SMOKE_EXPECT_BINDING=discovery
+    info "SCAN_ID set — explore payloads include scan_id (requires scan authorization)"
+  else
+    SMOKE_INCLUDE_SCAN_ID=0
+    SMOKE_EXPECT_BINDING=unknown
+    warn "no SCAN_ID — omitting scan_id from explore payloads (binding=unknown; avoids AUTH-02 403 on fake scan)"
+  fi
+}
+
 post_explore() {
-  local payload="$1"
-  curl -fsS -X POST "$CPM_BASE_URL$EXPLORE_PATH" \
+  local payload="$1" tmp code body
+  tmp="$(mktemp)"
+  # shellcheck disable=SC2068
+  code="$(curl -sS -o "$tmp" -w '%{http_code}' -X POST "$CPM_BASE_URL$EXPLORE_PATH" \
     -H 'Content-Type: application/json' \
     -H 'X-Request-Id: imm-ops-1-smoke' \
-    -d "$payload"
+    "${CPM_HEADERS[@]}" \
+    -d "$payload")"
+  body="$(cat "$tmp")"
+  rm -f "$tmp"
+  [[ "$code" == "200" ]] || fail "POST explore HTTP ${code}: ${body} (auth? try DISCOVERY_BASE=http://localhost:8080 or ./scripts/test-imm-ops-1.sh local)"
+  printf '%s' "$body"
 }
 
 fetch_policy_instances() {
-  curl -fsS "$CPM_BASE_URL$INSTANCES_PATH"
+  # shellcheck disable=SC2068
+  curl -fsS "${CPM_HEADERS[@]}" "$CPM_BASE_URL$INSTANCES_PATH"
 }
 
 # Explains why target_chain_ids were rejected: catalog scope.chain_ids must cover the full set (all-or-nothing).
@@ -319,10 +386,14 @@ print_scope_match_analysis() {
 }
 
 no_candidate_payload() {
-  cat <<'EOF'
+  local scan_json=""
+  if [[ "${SMOKE_INCLUDE_SCAN_ID:-1}" == "1" ]]; then
+    scan_json='"scan_id": "705c9704-9428-45e0-882d-fae4cb9d2a0b",
+  '
+  fi
+  cat <<EOF
 {
-  "scan_id": "705c9704-9428-45e0-882d-fae4cb9d2a0b",
-  "policy_context": {
+  ${scan_json}  "policy_context": {
     "wallet_address": "0x742d35cc6634c0532925a3b844bc454e4438f44e",
     "wallet_type": "eoa",
     "chain_ids": [1, 2, 5],
@@ -346,9 +417,14 @@ EOF
 }
 
 candidate_found_payload() {
-  cat <<'EOF'
+  local scan_json=""
+  if [[ "${SMOKE_INCLUDE_SCAN_ID:-1}" == "1" ]]; then
+    scan_json='"scan_id": "705c9704-9428-45e0-882d-fae4cb9d2a0b",
+  '
+  fi
+  cat <<EOF
 {
-  "policy_context": {
+  ${scan_json}  "policy_context": {
     "wallet_address": "0x742d35cc6634c0532925a3b844bc454e4438f44e",
     "wallet_type": "eoa",
     "chain_ids": [1, 8453],
@@ -431,7 +507,7 @@ assert_metric_labels() {
   verbose_block "Prometheus metric line"
   verbose_line "$line"
   grep -q 'rejection_code="incompatible.chain_scope"' <<<"$line" || fail "missing rejection_code label"
-  grep -q 'binding="discovery"' <<<"$line" || fail "missing binding=discovery label"
+  grep -q "binding=\"${SMOKE_EXPECT_BINDING}\"" <<<"$line" || fail "missing binding=${SMOKE_EXPECT_BINDING} label"
   grep -q 'wallet_type="eoa"' <<<"$line" || fail "missing wallet_type label"
   grep -q 'missing_chain_count=' <<<"$line" || fail "missing missing_chain_count label"
   grep -q 'scan_id' <<<"$line" && fail "scan_id must not appear in Prometheus labels"
@@ -457,6 +533,14 @@ run_smoke() {
   CPM_BASE_URL="${CPM_BASE_URL:-http://127.0.0.1:8082}"
   info "smoke against $CPM_BASE_URL"
   verbose_enabled && info "verbose mode enabled"
+
+  if [[ -n "$SERVER_PID" ]]; then
+    CPM_HEADERS=()
+    SMOKE_INCLUDE_SCAN_ID=1
+    SMOKE_EXPECT_BINDING=discovery
+  else
+    setup_smoke_auth
+  fi
 
   local health_body
   health_body="$(curl -fsS "$CPM_BASE_URL/healthz")" || fail "GET /healthz failed"

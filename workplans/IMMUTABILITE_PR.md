@@ -85,7 +85,7 @@
 | **IMM-9b-norm-2** | [#46](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/46) | `cafe-crypto-policy-mgt` | **#45**             | `WalletSubjectIDFromAddress` — `POST …/policies/assessment/request` |
 | **IMM-DOC-1**     | ✅ done                                                                | `cafe-crypto-policy-mgt` | —                   | WORKPLAN **§5.1.1** + **§5.4.10** ; cross-links IMM-D1…D5, FE-IMM-10…14, IMM-DEP-1 |
 | **IMM-OPS-1**     | [#50](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/50)                                                                     | `cafe-crypto-policy-mgt` | IMM-10 ✅            | Log structuré + métrique Prometheus explore sans candidat deployable (**REQ9**) |
-| **IMM-OPS-2**     | —                                                                     | `cafe-deploy`            | **IMM-OPS-1**       | Dashboard Grafana + alerte hausse soutenue rejection codes          |
+| **IMM-OPS-2**     | [#28](https://github.com/create2-labs/cafe-deploy/pull/28)                                                                    | `cafe-deploy`            | **IMM-OPS-1**       | Dashboard Grafana + alerte hausse soutenue rejection codes          |
 | **IMM-OPS-3**     | —                                                                     | TBD                      | **IMM-OPS-1**, **IMM-OPS-2** | Future visibilité produit/admin sur gaps couverture CP — **non bloquant** |
 
 
@@ -112,7 +112,7 @@ Convention statuts: `✅ done` | `🟡 in progress` | `⚪ planned`.
 | **CPM-DRAFT-1C**  | ✅ done    | `cpm/cpm-draft-1c-contract-tests`             | [#48](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/48)                           | 1B              | Tests contrat POST/GET/DELETE + cross-owner                                               |
 | **IMM-DOC-1**     | ✅ done    | `cpm/doc-chain-all-or-nothing-data-integrity` | —                                                                                               | —               | WORKPLAN **§5.1.1** (chains tout-ou-rien) + **§5.4.10** (scanners-only `result`) ; cross-links IMM-D1…D5, FE-IMM-10…14, IMM-DEP-1 |
 | **IMM-OPS-1**     | ⚪ planned | `cpm/explore-no-candidate-observability`      | —                                                                                               | IMM-10 ✅        | Hook explore post-Evaluate ; log `cpm.explore.no_deployable_candidate` ; compteur Prometheus ; `GET /metrics` minimal (**REQ9**) |
-| **IMM-OPS-2**     | ⚪ planned | `deploy/cpm-explore-rejection-dashboard`      | `cafe-deploy`                                                                                   | **IMM-OPS-1**   | Dashboard Grafana + alerte warning hausse soutenue `incompatible.chain_scope`             |
+| **IMM-OPS-2**     | ✅ done | `deploy/cpm-explore-rejection-dashboard`      | [#28](https://github.com/create2-labs/cafe-deploy/pull/28)                                                          | **IMM-OPS-1**   | Dashboard Grafana + alerte warning hausse soutenue `incompatible.chain_scope`             |
 
 
 > **CPM-DRAFT-1** : gel contrat brouillon plateforme — **1A/B/C ✅** ([#47](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/47)–[#48](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/48)). Frontend **CPM-DRAFT-2** ✅ ([#68](https://github.com/create2-labs/cafe-frontend/pull/68)) — voir `[cafe-frontend/IMMUTABILITE_PR.md](../../cafe-frontend/IMMUTABILITE_PR.md)`.
@@ -469,19 +469,12 @@ Les vrais `missing_chain_ids` vont dans le **log structuré**, jamais en label.
 - Aucun label haute cardinalité ; adresse wallet jamais en clair (log ou métrique).
 - Réponse API explore inchangée.
 
-### Limites connues / reste IMM-OPS-2
-
-- Pas de job scrape Prometheus dans `cafe-deploy` — métrique exposée mais pas encore consommée par la stack ops.
-- Pas de métrique totale `explore` pour calculer un ratio no-candidate / total — alerte ratio conditionnelle reportée à **IMM-OPS-2** si métrique ajoutée plus tard.
-- Pas de dashboard Grafana ni alerte hausse soutenue.
-
-- **Proposed commit title:** `feat(cpm): add observability for no deployable explore candidate`
 
 ---
 
 ## IMM-OPS-2 — Deploy: Grafana dashboard and alert for CPM explore no-candidate events
 
-- **Status:** ⚪ planned
+- **Status:**  ✅ done [#28](https://github.com/create2-labs/cafe-deploy/pulls/28)
 - **Branch:** `deploy/cpm-explore-rejection-dashboard`
 - **Repository:** `cafe-deploy`
 - **Objective:** Ajouter une visibilité ops/admin dans la stack observability quand CPM ne peut pas sélectionner de Crypto Policy deployable pendant explore.

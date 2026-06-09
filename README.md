@@ -445,8 +445,24 @@ Validates explore no-deployable-candidate observability (unit tests, HTTP smoke,
 | `VERBOSE` / `-v` | off | Full explore JSON, metrics snippets, catalog snapshot |
 | `SKIP_UNIT` / `SKIP_SMOKE` | `0` | For `all` mode |
 
-**Example (against an already running CPM with auth off):**
+**Examples**
+
+Local CPM (auth off, `binding=discovery`, structured log assertions):
 
 ```bash
-CPM_BASE_URL=http://127.0.0.1:8082 ./scripts/test-imm-ops-1.sh smoke -v
+./scripts/test-imm-ops-1.sh local -v
+```
+
+Against **cafe-deploy** dev stack (`CPM_AUTH_REQUIRED=true` on `cafe-cpm:8082`):
+
+```bash
+DISCOVERY_BASE=http://localhost:8080 CPM_BASE_URL=http://127.0.0.1:8082 ./scripts/test-imm-ops-1.sh smoke -v
+```
+
+The script signs up/signs in via `cafe-deploy/scripts/lib/discovery-test-user.sh` and omits `scan_id` from explore payloads unless `SCAN_ID` is set (`binding=unknown` — still exercises `incompatible.chain_scope` and increments the Prometheus counter).
+
+Auth-off target only:
+
+```bash
+CPM_SKIP_AUTH=1 CPM_BASE_URL=http://127.0.0.1:8082 ./scripts/test-imm-ops-1.sh smoke -v
 ```
