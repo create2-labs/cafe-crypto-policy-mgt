@@ -112,6 +112,39 @@ func TestPolicyCompatibilityEvaluator_compatButNotDeployable(t *testing.T) {
 	}
 }
 
+func TestPolicyCompatibilityEvaluator_incompatibleChainScope(t *testing.T) {
+	cat, tpl, inst := mustLoadFixtures(t)
+	inst = shallowCopyInstance(inst)
+	inst.Scope.ChainIDs = []int64{1, 3, 5}
+	if err := inst.NormalizeAndValidate(cat); err != nil {
+		t.Fatalf("instance: %v", err)
+	}
+
+	obs := baseObservation()
+	obs.ChainIDs = []int64{1, 2, 5}
+	req := baseSelection()
+	req.TargetChainIDs = []int64{1, 2, 5}
+
+	var ev PolicyCompatibilityEvaluator
+	res, err := ev.Evaluate(obs, &req, inst, cat, tpl)
+	if err != nil {
+		t.Fatalf("Evaluate: %v", err)
+	}
+	if res.Status != AssessmentStatusIncompatible {
+		t.Fatalf("want incompatible, got %q %+v", res.Status, res.Findings)
+	}
+	found := false
+	for _, finding := range res.Findings {
+		if finding.Code == "incompatible.chain_scope" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected incompatible.chain_scope finding, got %+v", res.Findings)
+	}
+}
+
 func TestPolicyCompatibilityEvaluator_chainNotObserved(t *testing.T) {
 	cat, tpl, inst := mustLoadFixtures(t)
 	obs := baseObservation()

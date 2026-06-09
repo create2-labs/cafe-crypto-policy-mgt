@@ -9,8 +9,10 @@ import (
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/api"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/config"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/metrics"
 	cpmmats "github.com/create2-labs/cafe-crypto-policy-mgt/internal/integration/nats"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/persistence"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Run starts a minimal HTTP server used as bootstrap for CPM.
@@ -76,6 +78,7 @@ func handlerWithOwnerStore(serviceName string, store *api.ReadStore, ownerStore 
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(serviceName + " ok"))
 	})
+	mux.Handle(cpmroutes.Metrics, promhttp.HandlerFor(metrics.Registry(), promhttp.HandlerOpts{}))
 	if err := api.RegisterReadRoutes(mux, store); err != nil {
 		return nil, fmt.Errorf("register read routes: %w", err)
 	}

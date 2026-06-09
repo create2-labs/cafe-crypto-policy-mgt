@@ -508,8 +508,8 @@ Aucun autre verbe d’exploration n’est ajouté dans cette remise à plat. Si 
 
 **UX et ops (hors contrat HTTP) :**
 
-- **frontend** : expliquer l’absence de candidat deployable (**codes `incompatible.chain_scope`**, chains observées vs scope catalog) — voir [`cafe-frontend/IMMUTABILITE_PR.md`](../../cafe-frontend/IMMUTABILITE_PR.md) **FE-IMM-13** ;
-- **plateforme** : signaler les échecs applicatifs récurrents (métrique / alerte) — voir [`IMMUTABILITE_PR.md`](./IMMUTABILITE_PR.md) **IMM-OPS-1…2**.
+- **frontend (user)** : expliquer l’absence de candidat deployable (**codes `incompatible.chain_scope`**, chains observées vs scope catalog) — voir [`cafe-frontend/IMMUTABILITE_PR.md`](../../cafe-frontend/IMMUTABILITE_PR.md) **FE-IMM-13** ✅ / **REQ8** ;
+- **plateforme (ops)** : instrumentation CPM (**IMM-OPS-1** : hook explore post-Evaluate, log `cpm.explore.no_deployable_candidate`, compteur `cpm_explore_no_deployable_candidate_total`, `GET /metrics`) + dashboard/alerte Grafana (**IMM-OPS-2**) — voir [`IMMUTABILITE_PR.md`](./IMMUTABILITE_PR.md) § **IMM-OPS-1…2** (**REQ9**) ; future visibilité admin **IMM-OPS-3** (deferred). Labels Prometheus : `rejection_code` (dominant), `wallet_type`, `binding`, `missing_chain_count` (bucket). Détails investigables → logs structurés uniquement.
 
 ### 5.2 Règles sur `scan_id` pour `POST|GET|DELETE …/policies`
 

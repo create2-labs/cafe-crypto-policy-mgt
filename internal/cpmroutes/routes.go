@@ -20,7 +20,8 @@ const (
 	// WalletTargetContext is the owner-scoped IMM-9b lookup for proactive wallet scan UI (FE-IMM-2).
 	WalletTargetContext = V1Base + "/wallet-target-context"
 
-	Healthz = "/healthz"
+	Healthz  = "/healthz"
+	Metrics  = "/metrics"
 
 	// InternalPolicyReferenceScan is the service-token-gated lookup used by Discovery DELETE (PR5).
 	InternalPolicyReferenceScan = "/internal/policies/references/scan"
