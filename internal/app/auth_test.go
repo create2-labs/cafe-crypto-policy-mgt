@@ -22,6 +22,9 @@ func TestClassifyRoute(t *testing.T) {
 	if got := classifyRoute(http.MethodGet, cpmroutes.Healthz); got != authz.RouteClassPublicHealth {
 		t.Fatalf("expected healthz class %q, got %q", authz.RouteClassPublicHealth, got)
 	}
+	if got := classifyRoute(http.MethodGet, cpmroutes.Metrics); got != authz.RouteClassPublicHealth {
+		t.Fatalf("expected metrics class %q, got %q", authz.RouteClassPublicHealth, got)
+	}
 	if got := classifyRoute(http.MethodGet, cpmroutes.PoliciesCatalog); got != authz.RouteClassAuthenticated {
 		t.Fatalf("expected catalog class %q, got %q", authz.RouteClassAuthenticated, got)
 	}

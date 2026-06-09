@@ -49,6 +49,7 @@ var routeInventory = buildRouteInventory()
 func buildRouteInventory() []routeSpec {
 	routes := []routeSpec{
 		{Method: http.MethodGet, Path: cpmroutes.Healthz, Class: authz.RouteClassPublicHealth},
+		{Method: http.MethodGet, Path: cpmroutes.Metrics, Class: authz.RouteClassPublicHealth},
 		{Method: http.MethodPost, Path: cpmroutes.InternalPolicyReferenceScan, Class: authz.RouteClassInternalService},
 		{Method: http.MethodPost, Path: cpmroutes.InternalPolicyReferenceWalletTarget, Class: authz.RouteClassInternalService},
 	}

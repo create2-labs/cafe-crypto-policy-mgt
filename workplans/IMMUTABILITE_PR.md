@@ -84,8 +84,9 @@
 | **IMM-9b-norm-1** | [#45](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/45) | `cafe-crypto-policy-mgt` | IMM-9b              | `NormalizeWalletSubjectID` — consumer NATS assessment               |
 | **IMM-9b-norm-2** | [#46](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/46) | `cafe-crypto-policy-mgt` | **#45**             | `WalletSubjectIDFromAddress` — `POST …/policies/assessment/request` |
 | **IMM-DOC-1**     | ✅ done                                                                | `cafe-crypto-policy-mgt` | —                   | WORKPLAN **§5.1.1** + **§5.4.10** ; cross-links IMM-D1…D5, FE-IMM-10…14, IMM-DEP-1 |
-| **IMM-OPS-1**     | —                                                                     | `cafe-crypto-policy-mgt` | IMM-10 ✅            | Observabilité explore sans candidat deployable (**REQ9**)           |
-| **IMM-OPS-2**     | —                                                                     | `cafe-deploy`            | **IMM-OPS-1**       | Grafana / alertes rejection codes                                   |
+| **IMM-OPS-1**     | [#50](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/50)                                                                     | `cafe-crypto-policy-mgt` | IMM-10 ✅            | Log structuré + métrique Prometheus explore sans candidat deployable (**REQ9**) |
+| **IMM-OPS-2**     | —                                                                     | `cafe-deploy`            | **IMM-OPS-1**       | Dashboard Grafana + alerte hausse soutenue rejection codes          |
+| **IMM-OPS-3**     | —                                                                     | TBD                      | **IMM-OPS-1**, **IMM-OPS-2** | Future visibilité produit/admin sur gaps couverture CP — **non bloquant** |
 
 
 ---
@@ -110,8 +111,8 @@ Convention statuts: `✅ done` | `🟡 in progress` | `⚪ planned`.
 | **CPM-DRAFT-1B**  | ✅ done    | `cpm/cpm-draft-1b-backend-dto`                | [#47](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/47)                           | 1A              | `DraftUpsertRequest`/`Response`, validation, erreurs structurées                          |
 | **CPM-DRAFT-1C**  | ✅ done    | `cpm/cpm-draft-1c-contract-tests`             | [#48](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/48)                           | 1B              | Tests contrat POST/GET/DELETE + cross-owner                                               |
 | **IMM-DOC-1**     | ✅ done    | `cpm/doc-chain-all-or-nothing-data-integrity` | —                                                                                               | —               | WORKPLAN **§5.1.1** (chains tout-ou-rien) + **§5.4.10** (scanners-only `result`) ; cross-links IMM-D1…D5, FE-IMM-10…14, IMM-DEP-1 |
-| **IMM-OPS-1**     | ⚪ planned | `cpm/explore-no-candidate-observability`      | —                                                                                               | IMM-10 ✅        | Métrique/log structuré quand explore : 0 ranked, rejected non vide (**REQ9**)             |
-| **IMM-OPS-2**     | ⚪ planned | `deploy/cpm-explore-failure-dashboard`        | `cafe-deploy`                                                                                   | **IMM-OPS-1**   | Grafana panel + alerte sur rejection codes (ex. `incompatible.chain_scope`)               |
+| **IMM-OPS-1**     | ⚪ planned | `cpm/explore-no-candidate-observability`      | —                                                                                               | IMM-10 ✅        | Hook explore post-Evaluate ; log `cpm.explore.no_deployable_candidate` ; compteur Prometheus ; `GET /metrics` minimal (**REQ9**) |
+| **IMM-OPS-2**     | ⚪ planned | `deploy/cpm-explore-rejection-dashboard`      | `cafe-deploy`                                                                                   | **IMM-OPS-1**   | Dashboard Grafana + alerte warning hausse soutenue `incompatible.chain_scope`             |
 
 
 > **CPM-DRAFT-1** : gel contrat brouillon plateforme — **1A/B/C ✅** ([#47](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/47)–[#48](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/48)). Frontend **CPM-DRAFT-2** ✅ ([#68](https://github.com/create2-labs/cafe-frontend/pull/68)) — voir `[cafe-frontend/IMMUTABILITE_PR.md](../../cafe-frontend/IMMUTABILITE_PR.md)`.
@@ -131,7 +132,7 @@ Source de référence frontend: `[cafe-frontend/IMMUTABILITE_PR.md](../../cafe-f
 | **FE-IMM-1**    | ✅ done    | `fe-imm/pr-1-api-data-layer`               | [#67](https://github.com/create2-labs/cafe-frontend/pull/67) (merge en meme temps que CPM-DRAFT-1A)                        | —                                                            | API/data layer (wallet scans, POST scan, draft/policy delete, CBOM client)                           |
 | **FE-IMM-2**    | ✅ done    | `fe-imm/pr-2-scan-eligibility-model`       | [#69](https://github.com/create2-labs/cafe-frontend/pull/69)                                                               | FE-IMM-1                                                     | Modèle d'éligibilité scan (W8, G1, G2)                                                               |
 | **FE-IMM-3**    | ✅ done    | `fe-imm/pr-3-scan-trigger-ui`              | [#70](https://github.com/create2-labs/cafe-frontend/pull/70), [#72](https://github.com/create2-labs/cafe-frontend/pull/72) | FE-IMM-1, FE-IMM-2, **IMM-W1-4** ✅                           | UI trigger scan ; **policy** W1 on POST ; draft-only informational — **no** Save locally             |
-| **FE-IMM-4**    | ⚪ planned | `fe-imm/pr-4-draft-rebind-orphan-gate`     | [#82](https://github.com/create2-labs/cafe-frontend/pull/82)                                                               | FE-IMM-1, FE-IMM-5, FE-IMM-11, CPM-DRAFT-2 ✅, **IMM-W1-4** ✅ | Orphan draft gate ; **Rebind to last scan** ; explore/persist blocked until W2 ; **no** local export |
+| **FE-IMM-4**    | ✅ done    | `fe-imm/pr-4-draft-rebind-orphan-gate`     | [#82](https://github.com/create2-labs/cafe-frontend/pull/82)                                                               | FE-IMM-1, FE-IMM-5, FE-IMM-11, CPM-DRAFT-2 ✅, **IMM-W1-4** ✅ | Orphan draft gate ; **Rebind to last scan** ; explore/persist blocked until W2 ; **no** local export |
 | **FE-IMM-5**    | ✅ done    | `fe-imm/pr-5-cpm-scan-selector-w2-w7`      | [#73](https://github.com/create2-labs/cafe-frontend/pull/73)                                                               | FE-IMM-1                                                     | Séparation W2 (`latest=true`) / W7 (`limit=1`)                                                       |
 | **FE-IMM-6**    | ✅ done    | `fe-imm/pr-6-delete-policy-ux`             | [#74](https://github.com/create2-labs/cafe-frontend/pull/74)                                                               | FE-IMM-1                                                     | UX suppression policy (W3/W4)                                                                        |
 | **FE-IMM-7**    | ✅ done    | `fe-imm/pr-7-delete-scan-ux`               | [#76](https://github.com/create2-labs/cafe-frontend/pull/76)                                                               | FE-IMM-1, FE-IMM-6                                           | UX suppression scan + copy P1                                                                        |
@@ -303,8 +304,8 @@ Voir `[cafe-discovery/IMMUTABILITE_PR.md](../../cafe-discovery/IMMUTABILITE_PR.m
 1. **IMM-W1-1** → **IMM-W1-3**, **IMM-9b**, **IMM-10**, **IMM-9b-norm-1…2** ([#45](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/45)–[#46](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/46)) — mergés.
 2. Backlog CPM : `[TODO.md](../TODO.md)` (refactor handlers internes, chemins Discovery upstream).
 3. **IMM-DOC-1** ✅ — WORKPLAN **§5.1.1** + **§5.4.10** (liens Discovery **IMM-D1…D5**, frontend **FE-IMM-10…14**, deploy **IMM-DEP-1**).
-4. **IMM-OPS-1…2** — observabilité admin explore sans candidat (**REQ9**).
-5. **FE-IMM-13** — UX user rejection explore (**REQ8**) — peut précéder OPS.
+4. **IMM-OPS-1…2** — observabilité plateforme explore sans candidat deployable (**REQ9**) ; **FE-IMM-13** / **REQ8** ✅ livré en amont.
+5. **IMM-OPS-3** — cadrage futur visibilité admin produit (deferred, non bloquant pour **IMM-OPS-1…2**).
 
 **Parallèle Discovery :** **IMM-6b-1…8** (quota **P1/G1–G4** — success-only, garde POST, commit atomique, CBOM) — voir `[cafe-discovery/IMMUTABILITE_PR.md](../../cafe-discovery/IMMUTABILITE_PR.md)`.
 
@@ -318,12 +319,16 @@ Frontend **FE-IMM-*** : `[cafe-frontend/IMMUTABILITE.md](../../cafe-frontend/IMM
 
 **Décision (2026-06) :** une policy persistée par adresse (**W1**). `selection_request.target_chain_ids` est un contrat **tout-ou-rien** : chaque chain demandée doit entrer dans le scope instance/catalog pour un candidat **deployable**. Pas de couverture partielle silencieuse.
 
+**Exemple :** discovered/requested chains `[1, 2, 5]` ; candidate scope `[1, 3, 5]` → rejet attendu `incompatible.chain_scope` (chaîne `2` manquante). Le moteur de compatibilité reste inchangé.
+
 
 | Rôle                            | PR / artefact                                                              |
 | ------------------------------- | -------------------------------------------------------------------------- |
 | Spec WORKPLAN                   | **IMM-DOC-1** ✅ (**§5.1.1**, **§5.4.10**)                                  |
-| UX : expliquer le rejet         | **FE-IMM-13** (**REQ8**)                                                   |
-| Ops : signaler échec applicatif | **IMM-OPS-1…2** (**REQ9**)                                                 |
+| UX user : expliquer le rejet    | **FE-IMM-13** ✅ (**REQ8**)                                                |
+| Ops : instrumenter CPM          | **IMM-OPS-1** (**REQ9**) — hook post-Evaluate ; log + compteur dominant-code ; `GET /metrics` |
+| Ops : visualiser / alerter      | **IMM-OPS-2** (**REQ9**) — Grafana dashboard + alerte hausse soutenue     |
+| Admin produit (futur)           | **IMM-OPS-3** — deferred ; synthèse gaps couverture CP, non bloquant        |
 | Moteur compatibilité            | Inchangé (`compatibility_result.go` — blocking `incompatible.chain_scope`) |
 
 
@@ -347,23 +352,199 @@ Frontend **FE-IMM-*** : `[cafe-frontend/IMMUTABILITE.md](../../cafe-frontend/IMM
 ## IMM-OPS-1 — Explore: no deployable candidate observability
 
 - **Status:** ⚪ planned
+- **Branch:** `cpm/explore-no-candidate-observability`
 - **Repository:** `cafe-crypto-policy-mgt`
-- **Objective:** Platform admin visibility when explore returns 200 with empty `selected_policy_id` and non-empty `rejected_candidates` (**REQ9**).
-- **Scope:**
-  - Structured log or Prometheus counter `cpm_explore_no_deployable_candidate_total{rejection_code=…}`.
-  - Dimensions: `scan_id`, normalized address (hashed if needed), `chain_ids`, `policy_instance_id`, rejection codes.
-- **Out of scope:** User-facing UI (**FE-IMM-13**).
-- **Dependencies:** Explore handler ✅
-- **Proposed commit title:** `feat(cpm): metrics for explore with no deployable candidate`
+- **Objective:** Donner de la visibilité plateforme quand `POST /api/cpm/v1/policies/decisions/explore` retourne HTTP **200**, `selected_policy_id` vide, et `rejected_candidates` non vide (**REQ9**).
+- **Rationale:** Ce cas n’est **pas** une erreur technique. C’est un signal produit / ops indiquant que Discovery a trouvé un contexte wallet exploitable, mais que CPM ne peut pas proposer de Crypto Policy deployable. Cela peut révéler :
+  - un gap du catalogue de policies ;
+  - un mismatch de chain scope ;
+  - une couverture multi-chain incomplète ;
+  - un cas utilisateur fréquent à traiter côté produit.
+
+### Point d’accroche (handler explore)
+
+Instrumenter **uniquement** dans `internal/api/read_api.go`, **après** `PolicyDecisionEvaluator.Evaluate`, **avant** `respondJSON(200, …)` :
+
+| Condition | Instrumenter ? |
+| --------- | -------------- |
+| `len(decision.RankedCandidates) == 0` **et** `len(decision.RejectedCandidates) > 0` | **Oui** — log + **un** increment métrique |
+| Candidat sélectionné (`len(RankedCandidates) > 0`) | **Non** |
+| `rejected_candidates` vide | **Non** |
+| Erreurs HTTP (400 guards W7/W2, decode, evaluate error, auth) | **Non** |
+
+Le hook ne modifie **pas** le corps JSON de la réponse explore.
+
+### Prometheus — compteur
+
+**Nom :** `cpm_explore_no_deployable_candidate_total`
+
+**Labels autorisés (faible cardinalité uniquement) :**
+
+| Label | Sémantique |
+| ----- | ---------- |
+| `rejection_code` | Code **dominant** de l’événement — **un seul** increment par événement, **pas** un increment par code. Priorité : (1) `incompatible.chain_scope` si présent parmi les rejets ; (2) sinon premier autre code bloquant stable si disponible ; (3) sinon `unknown`. |
+| `wallet_type` | Valeur canonique du `policy_context` si disponible ; sinon `unknown`. |
+| `binding` | `discovery` si `scan_id` présent (corps ou `policy_context`) ou si le `policy_context` indique un contexte Discovery ; sinon `unknown`. **Ne pas** inventer `fixture`, `catalog` ou `none` si le handler ne peut pas les dériver clairement. |
+| `missing_chain_count` | Bucket string : `0`, `1`, `2`, `3`, `4_plus`, ou `unknown` — voir § missing_chain_count ci-dessous. |
+
+**Interdits comme labels Prometheus :** `scan_id`, wallet address, wallet address hash, `chain_ids`, `policy_instance_id`, catalog ids, `request_id`, `tenant_id`, `owner_id`.
+
+**Dépendance :** ajouter `prometheus/client_golang` ; package `internal/metrics` ; exposer `GET /metrics` via `promhttp.Handler()` dans `internal/app/app.go`. **Pas** de configuration scrape `cafe-deploy` dans cette PR — **IMM-OPS-2**.
+
+### missing_chain_count (label bucket)
+
+Pour les rejets `incompatible.chain_scope` :
+
+1. Calculer, par candidat rejeté avec ce code, les chaînes de `selection_request.target_chain_ids` absentes du `scope.chain_ids` du candidat (quand les données sont disponibles).
+2. S’il y a **plusieurs** candidats `incompatible.chain_scope`, prendre le **minimum** de chaînes manquantes — le candidat le plus proche d’être deployable.
+3. Bucketiser ce minimum : `0` → `0`, `1` → `1`, `2` → `2`, `3` → `3`, `≥4` → `4_plus`.
+4. Si les données ne sont pas disponibles de manière fiable → `unknown`.
+
+Les vrais `missing_chain_ids` vont dans le **log structuré**, jamais en label.
+
+### Logs structurés
+
+**Event name :** `cpm.explore.no_deployable_candidate`
+
+**Champs autorisés dans le log (investigation) :**
+
+- `event` (nom ci-dessus)
+- `scan_id` si disponible
+- `wallet_address_hash` — adresse **normalisée** puis hashée ; **jamais** l’adresse brute
+- `wallet_type`
+- `requested_chain_ids` (`selection_request.target_chain_ids`)
+- `observed_chain_ids` (chains du `policy_context` / observation)
+- `candidate_chain_ids` si disponibles (scope des candidats rejetés)
+- `missing_chain_ids` si disponibles
+- `rejected_candidates_count`
+- `rejection_codes` (liste agrégée)
+- `dominant_rejection_code` (même règle de priorité que le label Prometheus)
+- candidate policy `instance_id` / `template_id` / catalog ids si disponibles
+- `request_id` si le pattern `X-Request-Id` existe déjà sur la requête
+
+**Hash wallet :** SHA-256 tronqué (ex. 16 hex chars) si aucun pattern existant dans le repo ; normaliser via `NormalizeWalletTargetAddress` avant hash.
+
+### Implémentation ciblée (fichiers attendus)
+
+| Fichier / zone | Rôle |
+| -------------- | ---- |
+| `internal/metrics/` | Compteur `cpm_explore_no_deployable_candidate_total` |
+| `internal/api/explore_observability.go` (ou équivalent) | Helper log + labels + `missing_chain_count` |
+| `internal/api/read_api.go` | Hook post-Evaluate |
+| `internal/app/app.go` | `GET /metrics` |
+| `*_test.go` | Voir critères ci-dessous |
+
+### Tests minimum
+
+- Test moteur ou helper : produire / reconnaître `incompatible.chain_scope` (ex. `target_chain_ids` `[1,2,5]` vs scope candidat `[1,3,5]`).
+- Test helper observabilité :
+  - ranked vide + rejected non vide → increment métrique + log émis ;
+  - candidat sélectionné → **pas** d’increment ;
+  - rejected vide → **pas** d’increment ;
+  - labels basse cardinalité (pas de `scan_id` / adresse en labels) ;
+  - `missing_chain_count` bucketisé correctement ;
+  - log ne contient **pas** l’adresse brute, seulement le hash (si testable sans fragilité excessive).
+
+### Out of scope (strict)
+
+- Sémantique du moteur de compatibilité (`compatibility_result.go`) ;
+- **FE-IMM-13** / UX user ;
+- corps JSON explore, OpenAPI explore ;
+- Grafana / alerting ;
+- `cafe-deploy` (scrape Prometheus, dashboards, edge public) ;
+- **IMM-OPS-3**.
+
+### Dependencies
+
+- Explore handler ✅ (`internal/api/read_api.go`)
+- Guards W7/W2 ✅ (`internal/app/auth.go` — hors hook observabilité)
+
+### Acceptance criteria
+
+- Hook uniquement quand `len(ranked)==0` et `len(rejected)>0`, avant `respondJSON(200)`.
+- Un log structuré `cpm.explore.no_deployable_candidate` par événement.
+- Un increment `cpm_explore_no_deployable_candidate_total` par événement (code dominant, pas multi-increment).
+- `GET /metrics` expose le compteur.
+- Cas `incompatible.chain_scope` couvert par test ; helper observabilité testé.
+- Aucun label haute cardinalité ; adresse wallet jamais en clair (log ou métrique).
+- Réponse API explore inchangée.
+
+### Limites connues / reste IMM-OPS-2
+
+- Pas de job scrape Prometheus dans `cafe-deploy` — métrique exposée mais pas encore consommée par la stack ops.
+- Pas de métrique totale `explore` pour calculer un ratio no-candidate / total — alerte ratio conditionnelle reportée à **IMM-OPS-2** si métrique ajoutée plus tard.
+- Pas de dashboard Grafana ni alerte hausse soutenue.
+
+- **Proposed commit title:** `feat(cpm): add observability for no deployable explore candidate`
 
 ---
 
-## IMM-OPS-2 — Deploy: Grafana alert on CPM explore failures
+## IMM-OPS-2 — Deploy: Grafana dashboard and alert for CPM explore no-candidate events
 
 - **Status:** ⚪ planned
+- **Branch:** `deploy/cpm-explore-rejection-dashboard`
 - **Repository:** `cafe-deploy`
-- **Objective:** Dashboard + alert when **IMM-OPS-1** metrics show sustained `incompatible.chain_scope` (or aggregate no-candidate rate).
-- **Scope:** Prometheus rules / Grafana panel in observability stack.
+- **Objective:** Ajouter une visibilité ops/admin dans la stack observability quand CPM ne peut pas sélectionner de Crypto Policy deployable pendant explore.
+- **Scope:**
+  - Dashboard ou panel Grafana montrant :
+    - volume de no-deployable-candidate par `rejection_code` ;
+    - focus sur `incompatible.chain_scope` ;
+    - évolution temporelle ;
+    - taux de no-candidate explores si une métrique totale d’explore existe.
+  - Alerte basée sur une **hausse soutenue**, pas sur un événement unitaire.
+  - L’alerte doit détecter :
+    - hausse soutenue de `incompatible.chain_scope` ;
+    - ou ratio anormal de no-candidate explores par rapport au total des explores, si disponible.
+- **Out of scope:**
+  - notification par wallet ;
+  - stockage événementiel détaillé ;
+  - UI admin produit ;
+  - modification backend CPM ;
+  - labels Prometheus haute cardinalité.
+- **Prérequis IMM-OPS-1 (livré par la PR CPM) :** compteur `cpm_explore_no_deployable_candidate_total` + endpoint `GET /metrics` sur `cafe-cpm`. **Cette PR ajoute** la configuration scrape Prometheus / edge dans `cafe-deploy`.
 - **Dependencies:** **IMM-OPS-1**
-- **Proposed commit title:** `feat(deploy): grafana panel for CPM explore rejections`
+- **Acceptance criteria:**
+  - Un panel Grafana permet de visualiser les rejets CPM explore par code.
+  - Une alerte warning existe sur hausse soutenue de `incompatible.chain_scope`.
+  - Le dashboard fonctionne uniquement avec les métriques exposées par **IMM-OPS-1**.
+  - Aucun label haute cardinalité n’est introduit.
+- **Proposed commit title:** `feat(deploy): add CPM explore rejection dashboard`
+
+---
+
+## Future / deferred — IMM-OPS-3
+
+> **Hors chemin critique release.** Ne bloque ni **IMM-OPS-1** ni **IMM-OPS-2**.
+
+## IMM-OPS-3 — Admin visibility for CPM policy coverage gaps
+
+- **Status:** 🧊 deferred
+- **Repository:** TBD — dépend d’une décision produit sur l’interface admin cible (pas de repo `cafe-admin` à ce jour).
+- **Objective:** Cadrer une future visibilité produit/admin sur les gaps de couverture CP détectés pendant explore, en particulier `incompatible.chain_scope`.
+- **Positionnement:**
+  - **IMM-OPS-1** = instrumentation backend CPM ;
+  - **IMM-OPS-2** = dashboard / alert ops ;
+  - **IMM-OPS-3** = future vue produit/admin actionnable ;
+  - **IMM-OPS-3** ne bloque ni **IMM-OPS-1** ni **IMM-OPS-2**.
+- **Scope potentiel:**
+  - Synthèse des cas récents où aucune CP deployable n’a été trouvée ;
+  - Groupement par : rejection code, missing chains, wallet type, policy template / catalog family si disponible ;
+  - Aide à identifier : CP absente pour certaines chaînes, CP trop restrictive, mismatch Discovery / CPM, besoin de création ou ajustement de catalog entry.
+- **Privacy / data handling:**
+  - Utiliser des données anonymisées ou hashées pour les wallets ;
+  - Ne pas exposer de wallet address brute sauf décision explicite produit/sécurité ;
+  - Ne pas persister de données sensibles sans design préalable.
+- **Out of scope:**
+  - implémentation immédiate ;
+  - workflow automatique de création de CP ;
+  - notification temps réel ;
+  - Slack / email ;
+  - stockage détaillé d’événements wallet sans décision privacy.
+- **Dependencies:** **IMM-OPS-1**, **IMM-OPS-2**, décision produit sur l’interface admin cible.
+- **Acceptance criteria (cadrage doc) :**
+  - Le ticket distingue clairement observability technique, dashboard ops et visibilité admin produit.
+  - Le ticket précise les contraintes privacy / cardinality.
+  - Le ticket est non bloquant pour **IMM-OPS-1** et **IMM-OPS-2**.
+  - Les cross-links **REQ9** / **IMM-OPS-1…3** sont cohérents.
+- **Proposed commit title:** `docs(product): specify admin visibility for CPM policy coverage gaps`
 

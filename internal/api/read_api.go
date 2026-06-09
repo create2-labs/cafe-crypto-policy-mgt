@@ -134,6 +134,8 @@ func registerReadRoutesForPrefix(mux *http.ServeMux, store *ReadStore, prefix st
 			return
 		}
 
+		recordExploreNoDeployableCandidate(r, req, decision, instanceScopeByID(store.instances))
+
 		respondJSON(w, http.StatusOK, map[string]any{"decision": decision})
 	})
 }

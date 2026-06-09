@@ -22,7 +22,8 @@ CPM does not depend on Discovery’s database or internal domain structs. Inboun
 | `internal/api` | PR17 read-only HTTP APIs for policy inspection and decision exploration |
 | `internal/persistence` | Owner-scoped in-memory persistence (`OwnerScopedStore`) for drafts and persisted policy records exposed under `/api/cpm/v1/*` |
 | `docs/` | Integration narratives (e.g. [`docs/CPM_OPTION_A_INTEGRATED.md`](./docs/CPM_OPTION_A_INTEGRATED.md) — Option A v1 flow) |
-| `scripts/` | Operational helpers (e.g. [`test-discovery-v1-wallet-scans-to-cpm.sh`](https://github.com/create2-labs/cafe-deploy/scripts/test-discovery-v1-wallet-scans-to-cpm.sh) — Option A v1 smoke) |
+| `scripts/` | Operational helpers — [`scripts/test-imm-ops-1.sh`](./scripts/test-imm-ops-1.sh) (IMM-OPS-1 explore observability smoke); Option A v1 smoke lives in [`cafe-deploy`](https://github.com/create2-labs/cafe-deploy/scripts/test-discovery-v1-wallet-scans-to-cpm.sh) |
+| `internal/metrics` | Prometheus registry and CPM application counters (IMM-OPS-1) |
 | `internal/integration/nats` | NATS integration for inbound explicit assessment requests + outbound CPM event publication |
 
 ## Discovery → CPM contract (`cafe.discovery.wallet.observed` v0.1)
@@ -121,9 +122,14 @@ Tests in `internal/integration/nats/assessment_consumer_test.go` cover:
 - non-triggering behavior for `cafe.discovery.wallet.observed`
 - canonical lowercase normalization of wallet subject identifiers before handler delegation
 
-## Health endpoint contract
+## Health and metrics endpoints
 
-CPM exposes `GET /healthz` as its service health endpoint. `GET /health` is not registered in CPM runtime.
+| Endpoint | Auth | Purpose |
+| --- | --- | --- |
+| `GET /healthz` | Public | Liveness (`<service-name> ok`) |
+| `GET /metrics` | Public | Prometheus scrape (CPM application registry; IMM-OPS-1 explore counter) |
+
+`GET /health` is not registered in CPM runtime.
 
 ## Outbound CPM events 
 
@@ -174,6 +180,34 @@ and returns `PolicyDecision` output that keeps the distinction between:
 - `compatible_but_not_deployable`
 - `compatible_and_deployable`
 
+**Chain scope (explore):** `selection_request.target_chain_ids` is evaluated **all-or-nothing** against each candidate instance `scope.chain_ids` — every requested chain must appear in the instance scope (see `WORKPLAN_API.md` §5.1.1). Wallet `chain_ids` and `target_chain_ids` may match each other while explore still returns no deployable candidate when the catalog scope does not cover the full target set (rejection code `incompatible.chain_scope`).
+
+## Explore no-deployable-candidate observability (IMM-OPS-1)
+
+When `POST …/decisions/explore` returns HTTP **200** with **no** ranked deployable candidate and **non-empty** `rejected_candidates`, CPM emits platform observability (REQ9). This is **not** an HTTP error — it signals that Discovery context is usable but no catalog route is deployable on the requested chain set.
+
+**Hook:** `internal/api/read_api.go` — after `PolicyDecisionEvaluator.Evaluate`, before `respondJSON(200)`. The explore JSON response is unchanged.
+
+**Structured log** (`event=cpm.explore.no_deployable_candidate`):
+
+- May include `scan_id`, `requested_chain_ids`, `observed_chain_ids`, `missing_chain_ids`, `rejection_codes`, candidate instance/template ids, `request_id`.
+- Wallet address is **never** logged in clear text — only `wallet_address_hash` (normalized address, SHA-256 truncated).
+
+**Prometheus counter:** `cpm_explore_no_deployable_candidate_total`
+
+| Label | Meaning |
+| --- | --- |
+| `rejection_code` | Dominant code for the event (priority: `incompatible.chain_scope`, else first stable blocking code, else `unknown`). **One increment per explore event.** |
+| `wallet_type` | Canonical account kind from `policy_context`, or `unknown`. |
+| `binding` | `discovery` when `scan_id` or Discovery context is present; else `unknown`. |
+| `missing_chain_count` | Bucket: `0`, `1`, `2`, `3`, `4_plus`, or `unknown` (minimum missing chains among `incompatible.chain_scope` rejections). |
+
+High-cardinality values (`scan_id`, wallet address/hash, `chain_ids`, policy/catalog ids, tenant/owner/request ids) are **not** used as Prometheus labels.
+
+**Metrics endpoint:** `GET /metrics` (public, same route class as `/healthz`). Uses a dedicated CPM Prometheus registry (`internal/metrics`). Grafana scrape and dashboards are **IMM-OPS-2** (`cafe-deploy`).
+
+Tracking: [`workplans/IMMUTABILITE_PR.md`](./workplans/IMMUTABILITE_PR.md) § IMM-OPS-1.
+
 ## Auth/Authz contract (AUTH-00)
 
 AUTH-00 freezes the cross-repo contract required for CPM authenticated rollout:
@@ -216,9 +250,10 @@ Important:
 - Optional config: `CAFE_SESSION_JWT_VALIDATION_SERVICE_TOKEN` for service-to-service protection (temporary placeholder; to be replaced by first-class service identity in later auth hardening).
 - AUTH-02 adds fail-closed scan authorization for requests carrying a `scan_id` field in the JSON body by delegating to Discovery scan visibility checks.
 
-Public route:
+Public routes:
 
 - `GET /healthz`
+- `GET /metrics`
 
 Authenticated business routes:
 
@@ -367,4 +402,51 @@ Integrators use Discovery **`/discovery/v1/wallets/scans`** (edge: **`/api/disco
 go test ./...
 # Default bind: :8082 (override with CPM_HTTP_ADDR)
 go run ./cmd/cafe-cpm
+```
+
+With repo test fixtures and auth disabled:
+
+```bash
+export CPM_AUTH_REQUIRED=false
+export CPM_POLICY_CATALOG_PATH=internal/domain/policy/testdata/policy_graph_catalog_valid.json
+export CPM_POLICY_TEMPLATE_PATHS=internal/domain/policy/testdata/crypto_policy_template_valid.json
+export CPM_POLICY_INSTANCE_PATHS=internal/domain/policy/testdata/crypto_policy_instance_valid.json
+go run ./cmd/cafe-cpm
+```
+
+## IMM-OPS-1 smoke script (`scripts/test-imm-ops-1.sh`)
+
+Validates explore no-deployable-candidate observability (unit tests, HTTP smoke, optional local CPM startup). Requires `curl` and `jq` (or `python3`) for smoke JSON assertions.
+
+```bash
+./scripts/test-imm-ops-1.sh unit          # go test (IMM-OPS-1 packages)
+./scripts/test-imm-ops-1.sh smoke         # against running CPM (default http://127.0.0.1:8082)
+./scripts/test-imm-ops-1.sh smoke -v      # + explore JSON, /metrics lines, structured log
+./scripts/test-imm-ops-1.sh local           # start CPM with fixtures, smoke, stop
+./scripts/test-imm-ops-1.sh local -v      # recommended first run
+./scripts/test-imm-ops-1.sh all             # unit + local
+```
+
+**What the smoke test does**
+
+1. `GET /healthz` and `GET /metrics`
+2. **No-candidate case** — `POST …/decisions/explore` with `target_chain_ids: [1, 2, 5]` while fixture instance `cpx_hybrid_prod` has `scope.chain_ids: [1, 8453]` → HTTP 200, empty `ranked_candidates`, `incompatible.chain_scope` in `rejected_candidates`
+3. Prints **CP scope vs request** (via `GET /policies/instances`): requested targets, instance `scope.chain_ids`, chains missing from scope — explains why observed and requested wallet chains can match while explore still rejects
+4. Asserts log `cpm.explore.no_deployable_candidate` and increment of `cpm_explore_no_deployable_candidate_total`
+5. **Negative case** — explore with `target_chain_ids: [1, 8453]` → deployable candidate; metric must **not** increment again
+
+**Environment variables**
+
+| Variable | Default | Role |
+| --- | --- | --- |
+| `CPM_BASE_URL` | `http://127.0.0.1:8082` | Smoke target when not using `local` |
+| `CPM_HTTP_ADDR` | `:0` (random port) | Listen address in `local` mode |
+| `CPM_LOG_FILE` | `$TMPDIR/cpm-imm-ops-1-<timestamp>-<pid>.log` | Server log path (`local`) |
+| `VERBOSE` / `-v` | off | Full explore JSON, metrics snippets, catalog snapshot |
+| `SKIP_UNIT` / `SKIP_SMOKE` | `0` | For `all` mode |
+
+**Example (against an already running CPM with auth off):**
+
+```bash
+CPM_BASE_URL=http://127.0.0.1:8082 ./scripts/test-imm-ops-1.sh smoke -v
 ```
