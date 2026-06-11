@@ -12,6 +12,8 @@
 
 **Option A (définition produit) :** [`CPM_post_v_1_option_a_scan_context.md`](./CPM_post_v_1_option_a_scan_context.md). **Narratif intégré (jalons mergés) :** [`docs/CPM_OPTION_A_INTEGRATED.md`](../docs/CPM_OPTION_A_INTEGRATED.md) — plan de PR [`CPM_OPTION_A_PR_PLAN.md`](./CPM_OPTION_A_PR_PLAN.md) ; index PR mergées [`WORKPLAN_API_PR.md`](./WORKPLAN_API_PR.md).
 
+**CP-PERSIST (wallet control proof, EOA) :** [`docs/CP_PERSIST.md`](../docs/CP_PERSIST.md) — normative workflow for persisting a Crypto Policy after wallet challenge. **CP-PERSIST V1 is signed off independently** through that document (Part VI frozen decisions). This workplan may keep its **global proposal status**; CP-PERSIST implementation follows the PR train in `CP_PERSIST.md`, not global WORKPLAN sign-off. **Architecture (English) :** the wallet challenge/proof ephemeral store is **owned by CPM**, not Discovery. V1 uses a configurable Redis adapter via `CPM_REDIS_URL` (`redis://` scheme; internal Docker network only). Handlers must use `ChallengeStore` / `ProofStore` abstractions — not a Redis client tied to Discovery. Local dev example: `redis://redis:6379/1` with mandatory `cpm:*` key namespace. Production target: dedicated instance `redis://redis-cpm:6379/0`. CPM depends on Discovery only for session/scan HTTP contracts, not for challenge storage. **Expected gaps after PR1 (docs-only) :** enforcement (PR5), OpenAPI (PR2), store (PR3), client migration (PR6–PR7) — see [`CP_PERSIST.md` § Expected implementation gaps](../docs/CP_PERSIST.md#expected-implementation-gaps-after-pr1).
+
 ---
 
 ## 0. Convention de chemins publics (cible pour OpenAPI / edge)
@@ -44,10 +46,15 @@ Si le service CPM est publié sous **`/api/cpm/v1`** (le segment **`cpm`** n’a
 | **GET** | `/api/cpm/v1/policies/templates` |
 | **GET** | `/api/cpm/v1/policies/instances` |
 | **POST** | `/api/cpm/v1/policies/decisions/explore` |
-| **POST**, **GET**, **DELETE** | `/api/cpm/v1/policies` — instances persistées (**`GET`** / **`DELETE`** avec query **`id`** ; **`GET`** liste owner-scoped avec query **`scan_id`** — **pas** **`id`** + **`scan_id`** ensemble — **§5.2**) |
+| **POST**, **GET**, **DELETE** | `/api/cpm/v1/policies` — instances persistées (**`GET`** / **`DELETE`** avec query **`id`** ; **`GET`** liste owner-scoped avec query **`scan_id`** — **pas** **`id`** + **`scan_id`** ensemble — **§5.2**). **Not** the normative EOA CP-PERSIST write path — see **§2.5**. |
 | **POST**, **GET**, **DELETE** | `/api/cpm/v1/drafts` — brouillons (**`DELETE`** avec query **`id`** — **§2.4**, **§4.4**) |
+| **POST** *(planned — CP-PERSIST / OpenAPI PR2)* | `/api/cpm/v1/wallet-challenges` — create EOA wallet challenge |
+| **POST** *(planned — CP-PERSIST / OpenAPI PR2)* | `/api/cpm/v1/wallet-challenges/verify` — verify challenge signature |
+| **POST** *(planned — CP-PERSIST / OpenAPI PR2)* | `/api/cpm/v1/drafts/{draft_id}/persist` — **normative EOA CP persistence** (requires `wallet_control_proof_id`) |
 
 **Remarque :** pas de chemin du type **`/api/cpm/v1/cpm/policies`**. Les **réponses d’erreur** référencent les **instances** persistées comme **`…/policies`** sous ce préfixe (ex. **`409`** scan — **§4.2**).
+
+**CP-PERSIST (EOA, English):** for wallet control proof workflows, **`POST /api/cpm/v1/policies` is not the normative persistence endpoint**. EOA CP persistence must use **`POST /api/cpm/v1/drafts/{draft_id}/persist`** with a valid **`wallet_control_proof_id`**. **`POST /api/cpm/v1/policies` must not create or update an EOA persisted CP without wallet control proof** (legacy, fixture, catalog or non-EOA flows may still use **`POST …/policies`** under explicit rules — **§2.4**, **§5.2**). Normative spec: [`docs/CP_PERSIST.md`](../docs/CP_PERSIST.md).
 
 **Contrat produit CPM :** la **cible** à documenter dans **OpenAPI** et à viser côté clients est **§0.2** uniquement. La transition ingress/clients est **clôturée** (voir **§0.3**).
 
@@ -249,9 +256,31 @@ Série **IMM-6b-1…8** — [`cafe-discovery/IMMUTABILITE_PR.md`](../../cafe-dis
 ### 2.4 Instances de crypto policy persistées 
 
 - **Chemins canoniques** : **`POST` \| `GET` \| `DELETE`** sur la ressource **instances** — **§0.2** (`/api/cpm/v1/policies`) ou **§0.3** (`alias CPM de transition policies`) ; **brouillons** **`…/drafts`** (**§0.2** / **§0.3**). JWT + scope propriétaire (`cafe-crypto-policy-mgt`, `internal/app/owner_routes.go`).
+- **CP-PERSIST (EOA, English):** **`POST /api/cpm/v1/policies` is not the normative EOA persistence endpoint.** EOA CP persistence must use **`POST /api/cpm/v1/drafts/{draft_id}/persist`** with a valid **`wallet_control_proof_id`** (planned route — **§2.5**, OpenAPI PR2). **`POST /api/cpm/v1/policies` must not create or update an EOA persisted CP without wallet control proof.** The existing **`POST …/policies`** route may remain for legacy, fixture, catalog or explicitly non-EOA flows until migrated; product EOA flows must not treat it as proof-free persist.
 - **`DELETE …/policies?id=…`** (suffixe après préfixe **§0**) : **`204`** si l’instance existait et est supprimée ; **`404`** si inconnue / hors scope / **déjà supprimée** (**idempotence** — **§5.4.9**). **Même query **`id`** que **`GET`**. Pas de **`409`** sur cette route dans ce plan.
 - **`DELETE …/drafts?id=…`** : **`204`** si le brouillon existait et est supprimé ; **`404`** si inconnu / hors scope / **déjà supprimé** (**idempotence** — **§5.4.9**). **Même query **`id`** que **`GET …/drafts?id=…`**. Supprime le brouillon plateforme pour satisfaire **W1** et débloquer **`POST …/scan`** (parcours **§2.2**). Ne supprime **pas** le scan Discovery référencé.
 - Le corps d’écriture **`POST`** inclut **`id`**, **`scan_id`** (liaison **`scan_result`** Discovery / **Option A** CPM lorsque applicable), **`payload`** — affiner uniquement les **règles métier** (ex. **`scan_id` obligatoire** pour certains flux) et l’AUTH scan (AUTH-02).
+
+### 2.5 CP-PERSIST — wallet control proof (architecture note, English)
+
+Normative spec: [`docs/CP_PERSIST.md`](../docs/CP_PERSIST.md).
+
+- **Ownership:** CPM owns the wallet challenge/proof ephemeral store (bounded context CPM). It must not use Discovery cache, Discovery DB, Discovery internal structs or Discovery Redis key semantics.
+- **Discovery coupling:** CPM may call Discovery for session validation and scan authorization only (existing HTTP/JWT contracts). Challenge storage is **not** delegated to Discovery auth.
+- **V1 adapter:** Redis behind `ChallengeStore` / `ProofStore` interfaces, configured with `CPM_REDIS_URL` (for example `redis://redis:6379/1` in local dev, `redis://redis-cpm:6379/0` in production). Mandatory key prefix `cpm:*`. Redis stays internal to the Docker network.
+- **Future CAFE rearchitecture:** persistence and auth management may become separate services; Discovery may shed direct Redis/Postgres ownership. CP-PERSIST V1 is unchanged: challenge/proof storage remains a CPM concern via configurable ephemeral store.
+
+**Planned public routes** (OpenAPI PR2 / implementation PR3–PR5 — not yet deployed; listed in **§0.2**):
+
+- `POST /api/cpm/v1/wallet-challenges`
+- `POST /api/cpm/v1/wallet-challenges/verify`
+- `POST /api/cpm/v1/drafts/{draft_id}/persist` — **normative EOA CP persistence** (body: `{ "wallet_control_proof_id": "uuid" }`)
+
+**EOA persist rule (frozen):** `POST /api/cpm/v1/policies` is **not** the normative persistence endpoint for EOA CP-PERSIST workflows. It must **not** create or update an EOA persisted CP without wallet control proof.
+
+**Sign-off scope (English):** CP-PERSIST V1 decisions are frozen in [`CP_PERSIST.md`](../docs/CP_PERSIST.md) Part VI, independently of this document’s global proposal status.
+
+**Expected implementation gaps after PR1 (English):** PR1 is docs-only. Runtime still lacks EOA enforcement (**PR5**), OpenAPI (**PR2**), ephemeral store (**PR3**), and compliant frontend/CLI flows (**PR6**–**PR7**). Session auth (Discovery JWT) and wallet challenge (CPM proof) are orthogonal. Full list: [`CP_PERSIST.md`](../docs/CP_PERSIST.md#expected-implementation-gaps-after-pr1).
 
 ---
 
@@ -313,7 +342,7 @@ La coordination release (frontend, scripts, intégrations) reste nécessaire, ma
 | **Garde CPM lifecycle (W7)** | Explore/persist : refus si le plus récent n’est pas **`completed`** (**`LATEST_SCAN_NOT_COMPLETED`**) — **§2.2 W7**. **Ne s’applique pas** à **`POST …/scan`**. |
 | **Garde rescan (W8)** | **`POST …/scan`** : refus si le plus récent est **`requested`** / **`started`** (**`SCAN_IN_PROGRESS`**). **Indépendant** de **W7** — **§2.2 W8**. |
 | Détail | **`GET …/wallets/scans/{scan_id}`** — **`scan_id`**, **`status`** (lifecycle), **`result`** métier wallet — **exemple JSON** ci‑dessous ; **404** si absent / hors scope. |
-| Lifecycle + immutabilité | **`scan_id`** alloué en **`requested`** (**§2.2**) ; **`result`** immutable après terminal. **Re-scan** = **nouvelle ligne** + **nouveau **`scan_id`**** **seulement** si **aucune** policy **ni** **draft** CPM pour la **`target_address`** (**§2.2 W1**). |
+| Lifecycle + immutabilité | **`scan_id`** alloué en **`requested`** (**§2.2**) ; **`result`** immutable après terminal. **Re-scan** = **nouvelle ligne** + **nouveau **`scan_id`****, sous réserve des gardes **W8** puis **W1** : **aucun** scan **en cours** et **aucune** policy **persistée** pour la **`target_address`**. Un **draft** seul **ne bloque pas** le rescan (**IMM-W1-4** — **§2.2**). |
 | **POST scan** (wallet) | **`POST …/scan`** avec **`address`** : **`409`** si **policy persistée** pour la cible (**W1**) — **pas** si **draft** seul (**IMM-W1-4**) ; sinon flux existant (**§8.3**). |
 | **CBOM** | **`GET …/wallets/scans/{scan_id}/cbom`** — **404** sauf scan **`completed` success** (**G4**, **IMM-6b-7**). |
 | Effacement | **`DELETE …/wallets/scans/{scan_id}`** — **`204`** \| **`404`** \| **`409`** ; **`409`** **`SCAN_REFERENCED_BY_POLICY`** si policy référence ce **`scan_id`**. **Parcours utilisateur** : **`GET …/policies?scan_id=`** → **`DELETE …/policies?id=`** → **`DELETE`** scan (**§2.2 W3**, rationale **§4.2**). **Idempotence** : second **`DELETE`** → **`404`** (**§5.4.6**). |
@@ -410,7 +439,8 @@ La coordination release (frontend, scripts, intégrations) reste nécessaire, ma
 | Élément | Décision de travail |
 |--------|---------------------|
 | Rôle | **`POST` \| `GET` \| `DELETE …/policies`** (instances, query **`id`** pour **GET**/**DELETE**) ; **`POST` \| `GET` \| `DELETE …/drafts`** (brouillons, query **`id`** pour **GET**/**DELETE**). Préfixes **§0.2** (`/api/cpm/v1/`) ou **§0.3** (`alias CPM de transition `). |
-| Corps **`POST`** | **`{ id, scan_id?, payload }`** — règles **`scan_id`** / **AUTH-02** : **§2.4**, OpenAPI. |
+| Corps **`POST`** | **`{ id, scan_id?, payload }`** — règles **`scan_id`** / **AUTH-02** : **§2.4**, OpenAPI. **EOA CP-PERSIST:** not the normative persist path — use **`POST …/drafts/{draft_id}/persist`** + **`wallet_control_proof_id`** (**§2.5**). **`POST …/policies` must not persist EOA CP without proof.** |
+| **`POST …/drafts/{draft_id}/persist`** *(planned)* | **EOA normative persist** — **`{ wallet_control_proof_id }`** only ; spec [`CP_PERSIST.md`](../docs/CP_PERSIST.md) ; OpenAPI PR2. |
 | **`DELETE …/policies?id=…`** | **`204`** \| **`404`** uniquement (**idempotence** **§5.4.9**) ; **pas** de **`409`**. Ne supprime **pas** le **`scan_result`** Discovery (**§2.4**). |
 | **`DELETE …/drafts?id=…`** | **`204`** \| **`404`** uniquement (**idempotence** **§5.4.9**) ; ne supprime **pas** le scan Discovery. Débloque **W1** pour **`POST …/scan`** après suppression du brouillon plateforme (**§2.2**). |
 | Relecture par **`scan_id`** | **`GET …/policies?id=…`** (une instance) ; **`GET …/policies?scan_id=…`** (liste) — **§5.2** ; combinaison **`id`** + **`scan_id`** → **`400`**. |
@@ -518,6 +548,8 @@ Aucun autre verbe d’exploration n’est ajouté dans cette remise à plat. Si 
 - **`POST …/policies`**
 - **`GET …/policies?id=...`**
 - **`DELETE …/policies?id=...`**
+
+**CP-PERSIST (EOA, English):** for EOA wallet control proof workflows, **`POST /api/cpm/v1/policies` is not the normative persistence endpoint.** EOA CP persistence must use **`POST /api/cpm/v1/drafts/{draft_id}/persist`** with a valid **`wallet_control_proof_id`** (**§2.5**, planned). **`POST /api/cpm/v1/policies` must not create or update an EOA persisted CP without wallet control proof.** Legacy **`POST …/policies`** may remain for fixture, catalog or non-EOA cases under explicit rules below; product EOA flows must not bypass proof.
 
 **Décision :** **`scan_id`** est **obligatoire** pour toute instance persistée issue d’un flux **Discovery → CPM**.
 
@@ -820,6 +852,10 @@ DELETE /api/cpm/v1/policies?id=...
 POST   /api/cpm/v1/drafts
 GET    /api/cpm/v1/drafts?id=...
 DELETE /api/cpm/v1/drafts?id=...
+
+POST   /api/cpm/v1/wallet-challenges              # planned CP-PERSIST PR2 — not yet deployed
+POST   /api/cpm/v1/wallet-challenges/verify       # planned CP-PERSIST PR2 — not yet deployed
+POST   /api/cpm/v1/drafts/{draft_id}/persist      # planned CP-PERSIST PR2 — not yet deployed
 ```
 
 La variante **§0.3** reste **uniquement** un mécanisme de **transition ingress / déploiement**. Elle ne doit **pas** être documentée comme contrat produit **long terme**.
@@ -877,6 +913,9 @@ Le document est **acceptable** lorsque les éléments ci-dessous sont **validés
   - `POST /api/cpm/v1/drafts`
   - `GET /api/cpm/v1/drafts?id=...`
   - `DELETE /api/cpm/v1/drafts?id=...`
+  - `POST /api/cpm/v1/wallet-challenges` *(planned CP-PERSIST PR2 — not yet deployed)*
+  - `POST /api/cpm/v1/wallet-challenges/verify` *(planned CP-PERSIST PR2 — not yet deployed)*
+  - `POST /api/cpm/v1/drafts/{draft_id}/persist` *(planned CP-PERSIST PR2 — not yet deployed)*
 
 - La variante rollout **§0.3** est **confirmée** comme **transition ingress / déploiement** uniquement, **sans** statut de contrat produit pérenne.
 - La **suppression** de **§0.3** après bascule vers **§0.2** est **acceptée** (chemins **non** servis, **non** documentés comme supportés — **§0**).
@@ -976,7 +1015,7 @@ Les invariants suivants sont **acceptés** comme comportement produit :
 - Le **triple GET** catalogue reste **lecture statique**.
 - **`POST …/policies/decisions/explore`** est le **seul** endpoint d’**exploration décisionnelle**.
 - **`explore`** **ne persiste rien**.
-- **`POST …/policies`** persiste une **instance finale**.
+- **`POST …/policies`** persiste une **instance finale** pour les flux **hors CP-PERSIST EOA** ou cas legacy/fixture explicites — **pas** le chemin normatif EOA (**§2.5** : **`POST …/drafts/{draft_id}/persist`** + **`wallet_control_proof_id`** ; **`POST …/policies` must not persist EOA CP without proof**).
 - **`scan_id`** est **obligatoire** pour toute instance issue d’un flux **Discovery → CPM**.
 - Tant que la **newest row** n’est pas **`completed`**, **aucune** nouvelle policy / **explore** (**§2.2 W7**). **`POST …/scan`** : **W8** — interdit si scan en cours ; si newest **`failed`**, retry autorisé sous **W1** (**§2.2 W8**, **W1**).
 - **`scan_id`** pour **explore** / **persist** = **`scan_id`** du **`GET …/wallets/scans?address=&latest=true`** (dernier **`completed`** — **§2.2 W2**) ; sinon **`400`**.
@@ -1014,7 +1053,7 @@ Les **PRs** d’implémentation doivent couvrir au minimum :
 - **`DELETE`** idempotence → second **`DELETE`** → **`404`** ;
 - **`DELETE`** scan avec policy référente → **`409`** ;
 - **`GET …/policies?scan_id=...`** retourne les policies **owner-scoped** ;
-- re-scan **même cible** **sans** policy **ni** draft CPM (**W1**) → **nouvelle** ligne → nouveau **`scan_id`** ;
+- re-scan **même cible** sous gardes **W8** puis **W1** (aucun scan en cours, aucune policy persistée) → **nouvelle** ligne → nouveau **`scan_id`** ; **draft** seul **ne bloque pas** (**IMM-W1-4**) ;
 - **`POST …/scan`** avec **policy persistée** sur la cible → **`409`** (**W1**) — **pas** si **draft** seul (**IMM-W1-4**) ;
 - **`DELETE …/drafts?id=...`** → **`204`** \| **`404`** ; débloque **W1** pour rescan ;
 - explore/persist avec **`scan_id`** non latest → **`400`** **`SCAN_ID_NOT_LATEST_FOR_TARGET`** ;

@@ -5,6 +5,7 @@
    2. [Purpose](#purpose)
    3. [Scope](#scope)
    4. [Out of scope](#out-of-scope)
+   5. [Expected implementation gaps (after PR1)](#expected-implementation-gaps-after-pr1)
 2. [Part I — Functional specifications](#part-i--functional-specifications)
    1. [Definitions](#definitions)
    2. [Core product rule](#core-product-rule)
@@ -50,6 +51,7 @@
 | Jun 10th, 2026 | O. Lodygensky | 0.5     | Align PR3–PR8 breakdown and tasks with frozen decisions |
 | Jun 10th, 2026 | O. Lodygensky | 0.6     | Document CPM-owned ephemeral store, CPM_REDIS_URL and store abstractions |
 | Jun 10th, 2026 | O. Lodygensky | 0.7     | Editorial cleanup; align WORKPLAN/README; clarify PR8 vs PR1 cross-links |
+| Jun 10th, 2026 | O. Lodygensky | 0.8     | Document expected implementation gaps after PR1 and independent V1 sign-off |
 
 
 ---
@@ -103,6 +105,26 @@ Important CAFE rule:
 
 > CPM assessment and persistence flows are wallet-only.
 > TLS endpoints may remain visible in Discovery, history, CBOM or risk inventory, but TLS endpoints are not CPM persistence targets.
+
+---
+
+## Expected implementation gaps (after PR1)
+
+PR1 is **docs-only** and freezes the CP-PERSIST V1 contract. It intentionally does not implement runtime behavior.
+
+The following gaps are **expected** after PR1 merge. They are **not** PR1 defects; each maps to a later PR in Part IV.
+
+1. **EOA persistence enforcement is not implemented yet.** This is **PR5**. No EOA CP persistence path may remain callable without `wallet_control_proof_id`. Existing `POST /api/cpm/v1/policies` must be blocked, migrated or made compliant for EOA flows.
+
+2. **OpenAPI is not implemented yet.** This is **PR2** and is the **mandatory gate** before backend implementation.
+
+3. **`CPM_REDIS_URL` is decided and documented.** **PR3** will implement runtime config loading, `ChallengeStore` / `ProofStore`, Redis adapter, TTL, namespace and fail-closed behavior. Deploy wiring may land with PR3 or an adjacent deploy change.
+
+4. **Frontend and CLI still use legacy or mock persistence flows.** **PR6** and **PR7** will migrate them to the frozen CP-PERSIST V1 flow. Session auth and wallet challenge are **orthogonal**: session auth identifies the user; wallet challenge proves control of the EOA for the persist action.
+
+5. **CP-PERSIST V1 is signed off independently through this document** (Part VI frozen decisions). [`workplans/WORKPLAN_API.md`](../workplans/WORKPLAN_API.md) remains a broader API workplan and may keep its global proposal status.
+
+Do not expose PR3–PR4 endpoints to product users without **PR5** enforcement unless they are feature-flagged or otherwise unreachable from product flows.
 
 ---
 
@@ -1450,6 +1472,8 @@ README cross-links and planned CPM_REDIS_URL note
 
 No implementation in this PR.
 
+**Expected implementation gaps after this PR:** see [Expected implementation gaps (after PR1)](#expected-implementation-gaps-after-pr1). Reviewers must not treat current runtime behavior (proof-free `POST /api/cpm/v1/policies`, missing OpenAPI, no Redis store, legacy frontend paths) as documentation defects.
+
 Expected commit title:
 
 ```text
@@ -1900,7 +1924,7 @@ Define audit requirements for institutional custody.
 
 # Part VI — Frozen decisions
 
-The following decisions are frozen for **CP-PERSIST V1**. Implementation PRs must not reopen them without an explicit spec revision.
+The following decisions are frozen for **CP-PERSIST V1**. **CP-PERSIST V1 is signed off independently through this document** — it does not require global acceptance of [`workplans/WORKPLAN_API.md`](../workplans/WORKPLAN_API.md). Implementation PRs must not reopen frozen decisions without an explicit spec revision.
 
 ## 33. Persistence endpoint
 

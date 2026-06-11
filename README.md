@@ -8,7 +8,11 @@
 - CPM validates policy documents, selects compatible routes, assesses observations, and emits policy outcomes. 
 - Remediation consumes policy outcomes and plans or executes migration work.
 
-CPM does not depend on Discovery’s database or internal domain structs. Inbound integration is explicitly user-triggered via `policy.assessment.requested.v0.1`; `cafe.discovery.wallet.observed` remains informational.
+CPM does not depend on Discovery’s database or internal domain structs. CPM depends on Discovery only through the HTTP/JWT contracts required by the product workflow (session validation, scan authorization). Inbound integration is explicitly user-triggered via `policy.assessment.requested.v0.1`; `cafe.discovery.wallet.observed` remains informational.
+
+Wallet control proof for CP persistence (EOA challenge flow) is specified in [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md). **CP-PERSIST V1 is signed off independently** through that document (Part VI frozen decisions); [`workplans/WORKPLAN_API.md`](./workplans/WORKPLAN_API.md) remains the broader API workplan. The challenge/proof **ephemeral store is owned by CPM** (planned Redis adapter via `CPM_REDIS_URL` under CP-PERSIST PR3 — not wired in runtime yet). It is not coupled to Discovery cache or Redis key semantics.
+
+**Expected gaps after PR1 (docs-only):** EOA persist enforcement (PR5), OpenAPI (PR2), ephemeral store (PR3), frontend/CLI migration (PR6–PR7). Session auth and wallet challenge are orthogonal. See [Expected implementation gaps (after PR1)](./docs/CP_PERSIST.md#expected-implementation-gaps-after-pr1).
 
 ## Repository layout
 
@@ -21,7 +25,7 @@ CPM does not depend on Discovery’s database or internal domain structs. Inboun
 | `internal/domain/policy` | Policy domain contracts (`PolicySelectionRequest`, `PolicyGraphCatalog`, `CryptoPolicyTemplate`, `CryptoPolicyInstance`, `CryptoPolicyValidationResult`, `CryptoPolicyAssessmentResult`, `PolicyCompatibilityResult` + `PolicyCompatibilityEvaluator`, and PR13 `PolicyDecision` models/evaluator) |
 | `internal/api` | PR17 read-only HTTP APIs for policy inspection and decision exploration |
 | `internal/persistence` | Owner-scoped in-memory persistence (`OwnerScopedStore`) for drafts and persisted policy records exposed under `/api/cpm/v1/*` |
-| `docs/` | Integration narratives (e.g. [`docs/CPM_OPTION_A_INTEGRATED.md`](./docs/CPM_OPTION_A_INTEGRATED.md) — Option A v1 flow) |
+| `docs/` | Integration narratives — [`docs/CPM_OPTION_A_INTEGRATED.md`](./docs/CPM_OPTION_A_INTEGRATED.md) (Option A v1 flow); [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md) (EOA wallet control proof for CP persistence) |
 | `scripts/` | Operational helpers — [`scripts/test-imm-ops-1.sh`](./scripts/test-imm-ops-1.sh) (IMM-OPS-1 explore observability smoke); Option A v1 smoke lives in [`cafe-deploy`](https://github.com/create2-labs/cafe-deploy/scripts/test-discovery-v1-wallet-scans-to-cpm.sh) |
 | `internal/metrics` | Prometheus registry and CPM application counters (IMM-OPS-1) |
 | `internal/integration/nats` | NATS integration for inbound explicit assessment requests + outbound CPM event publication |
@@ -235,6 +239,12 @@ Environment variables:
 - `CAFE_SCAN_AUTHORIZATION_SERVICE_TOKEN` (optional placeholder for service-to-service auth)
 - `CAFE_POLICY_REFERENCE_INTERNAL_SERVICE_TOKEN` (required when `CPM_AUTH_REQUIRED=true` for `POST /internal/policies/references/scan`; shared secret for Discovery → CPM scan-reference check — WORKPLAN PR5)
 - `CPM_AUTH_CLOCK_SKEW_SEC` (default: `30`)
+
+### CP-PERSIST planned configuration (not yet implemented)
+
+- **`CPM_REDIS_URL`** — planned under **CP-PERSIST PR3**; Redis adapter URL for the **CPM-owned** ephemeral challenge/proof store (`ChallengeStore` / `ProofStore`). Local dev example: `redis://redis:6379/1`; production target: `redis://redis-cpm:6379/0`. Redis must remain **internal-only** (Docker network); keys must use the mandatory **`cpm:*`** namespace. This is **not** a dependency on Discovery cache or Redis key semantics. See [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md) §13.0.
+
+Other expected post-PR1 gaps (enforcement, OpenAPI, clients) are documented in [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md#expected-implementation-gaps-after-pr1).
 
 Important:
 - **`CPM_AUTH_REQUIRED=false`** disables the entire auth middleware: user JWT routes and **`POST /internal/policies/references/scan`** are unauthenticated at CPM — use only in controlled local dev. **Staging/production** should keep **`CPM_AUTH_REQUIRED=true`** and set **`CAFE_POLICY_REFERENCE_INTERNAL_SERVICE_TOKEN`** (see `cafe-deploy` env templates and **WORKPLAN_API_PR** PR9).
