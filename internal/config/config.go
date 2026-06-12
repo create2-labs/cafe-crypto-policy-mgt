@@ -41,6 +41,8 @@ type Config struct {
 	PolicyCatalogPath   string
 	PolicyTemplatePaths []string
 	PolicyInstancePaths []string
+	// WalletAuthDomain is embedded in CP-PERSIST canonical messages (§12); falls back to request Host.
+	WalletAuthDomain string
 }
 
 func LoadFromEnv() Config {
@@ -63,6 +65,7 @@ func LoadFromEnv() Config {
 		PolicyCatalogPath:                   getEnv("CPM_POLICY_CATALOG_PATH", defaultPolicyCatalogPath),
 		PolicyTemplatePaths:                 parseCommaList(getEnv("CPM_POLICY_TEMPLATE_PATHS", defaultPolicyTemplatePaths)),
 		PolicyInstancePaths:                 parseCommaList(getEnv("CPM_POLICY_INSTANCE_PATHS", defaultPolicyInstancePaths)),
+		WalletAuthDomain:                    getEnv("CPM_WALLET_AUTH_DOMAIN", ""),
 	}
 }
 

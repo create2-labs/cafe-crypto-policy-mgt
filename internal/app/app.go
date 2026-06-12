@@ -49,6 +49,7 @@ func Run(cfg config.Config) error {
 		DiscoveryHTTPBaseURL:                cfg.DiscoveryHTTPBaseURL,
 		DiscoveryHTTPTimeoutSec:             cfg.DiscoveryHTTPTimeoutSec,
 		AssessmentNATSPublish:               assessmentPublish,
+		WalletAuthDomain:                    cfg.WalletAuthDomain,
 	})
 	if err != nil {
 		return err
@@ -84,6 +85,7 @@ func handlerWithOwnerStore(serviceName string, store *api.ReadStore, ownerStore 
 	}
 	registerPoliciesAssessmentRequestRoute(mux, authCfg)
 	registerOwnerScopedRoutes(mux, ownerStore, obs)
+	registerWalletChallengeRoutes(mux, ownerStore, authCfg, obs)
 	registerPolicyReferenceInternalRoute(mux, ownerStore)
 	registerPolicyWalletTargetReferenceInternalRoute(mux, ownerStore)
 	protected, err := withAuthentication(mux, authCfg)
