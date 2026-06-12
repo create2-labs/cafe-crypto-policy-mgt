@@ -10,9 +10,11 @@
 
 CPM does not depend on Discovery’s database or internal domain structs. CPM depends on Discovery only through the HTTP/JWT contracts required by the product workflow (session validation, scan authorization). Inbound integration is explicitly user-triggered via `policy.assessment.requested.v0.1`; `cafe.discovery.wallet.observed` remains informational.
 
-Wallet control proof for CP persistence (EOA challenge flow) is specified in [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md). **CP-PERSIST V1 is signed off independently** through that document (Part VI frozen decisions); [`workplans/WORKPLAN_API.md`](./workplans/WORKPLAN_API.md) remains the broader API workplan. The challenge/proof **ephemeral store is owned by CPM** (planned Redis adapter via `CPM_REDIS_URL` under CP-PERSIST PR3 — not wired in runtime yet). It is not coupled to Discovery cache or Redis key semantics.
+Wallet control proof for CP persistence (EOA) is specified in [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md). **CP-PERSIST V1 is signed off independently** through that document (Part VI frozen decisions); [`workplans/WORKPLAN_API.md`](./workplans/WORKPLAN_API.md) remains the broader API workplan.
 
-**Expected gaps after PR1 (docs-only):** EOA persist enforcement (PR5), OpenAPI (PR2), ephemeral store (PR3), frontend/CLI migration (PR6–PR7). Session auth and wallet challenge are orthogonal. See [Expected implementation gaps (after PR1)](./docs/CP_PERSIST.md#expected-implementation-gaps-after-pr1).
+**CP-PERSIST V1 (stateless):** clients **must** obtain the canonical authorization message from CPM via `POST /api/cpm/v1/wallet-challenges` before signing (stateless helper — stores nothing server-side). Normative persist is `POST /api/cpm/v1/drafts/{draft_id}/persist` with `signed_message` + `signature`. At persist time, CPM verifies the submitted message exactly matches the expected canonical message, then EIP-191 / `personal_sign`. Advanced clients must not invent an alternative message format. **No V1 Redis**, `CPM_REDIS_URL`, `ProofStore` or `wallet_control_proof_id`. Redis / proof handles are **V2 optional** hardening only (see `CP_PERSIST.md` §13.3).
+
+**Expected gaps after PR1 (docs-only):** EOA persist enforcement (PR4), OpenAPI (PR2), canonical message + verifier (PR3), frontend/CLI migration (PR5–PR6). Session auth (JWT) and wallet signature are orthogonal. See [Expected implementation gaps (after PR1)](./docs/CP_PERSIST.md#expected-implementation-gaps-after-pr1).
 
 ## Repository layout
 
@@ -240,11 +242,13 @@ Environment variables:
 - `CAFE_POLICY_REFERENCE_INTERNAL_SERVICE_TOKEN` (required when `CPM_AUTH_REQUIRED=true` for `POST /internal/policies/references/scan`; shared secret for Discovery → CPM scan-reference check — WORKPLAN PR5)
 - `CPM_AUTH_CLOCK_SKEW_SEC` (default: `30`)
 
-### CP-PERSIST planned configuration (not yet implemented)
+### CP-PERSIST (not yet implemented)
 
-- **`CPM_REDIS_URL`** — planned under **CP-PERSIST PR3**; Redis adapter URL for the **CPM-owned** ephemeral challenge/proof store (`ChallengeStore` / `ProofStore`). Local dev example: `redis://redis:6379/1`; production target: `redis://redis-cpm:6379/0`. Redis must remain **internal-only** (Docker network); keys must use the mandatory **`cpm:*`** namespace. This is **not** a dependency on Discovery cache or Redis key semantics. See [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md) §13.0.
+CP-PERSIST V1 does **not** add new mandatory runtime environment variables. Wallet authorization is verified at persist time from the request body (`signed_message`, `signature`). See [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md).
 
-Other expected post-PR1 gaps (enforcement, OpenAPI, clients) are documented in [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md#expected-implementation-gaps-after-pr1).
+**V2 optional (not V1):** `CPM_REDIS_URL` and ephemeral proof stores may be introduced later for advanced workflows — not required for CP-PERSIST V1.
+
+Other expected post-PR1 gaps are documented in [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md#expected-implementation-gaps-after-pr1).
 
 Important:
 - **`CPM_AUTH_REQUIRED=false`** disables the entire auth middleware: user JWT routes and **`POST /internal/policies/references/scan`** are unauthenticated at CPM — use only in controlled local dev. **Staging/production** should keep **`CPM_AUTH_REQUIRED=true`** and set **`CAFE_POLICY_REFERENCE_INTERNAL_SERVICE_TOKEN`** (see `cafe-deploy` env templates and **WORKPLAN_API_PR** PR9).

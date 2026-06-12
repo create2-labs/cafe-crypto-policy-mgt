@@ -8,32 +8,88 @@
    5. [Expected implementation gaps (after PR1)](#expected-implementation-gaps-after-pr1)
 2. [Part I — Functional specifications](#part-i--functional-specifications)
    1. [Definitions](#definitions)
+      1. [Discovery scan](#discovery-scan)
+      2. [CP explore decision](#cp-explore-decision)
+      3. [Crypto Policy / CP](#crypto-policy--cp)
+      4. [CP draft](#cp-draft)
+      5. [Persisted CP](#persisted-cp)
+      6. [Wallet control proof](#wallet-control-proof)
    2. [Core product rule](#core-product-rule)
-   3. [Interface-independent challenge requirement](#interface-independent-challenge-requirement)
+   3. [Interface-independent wallet authorization requirement](#interface-independent-wallet-authorization-requirement)
    4. [Functional workflow — EOA wallet](#functional-workflow--eoa-wallet)
+      1. [Step 1 - Discovery scan](#step-1---discovery-scan)
+      2. [Step 2 — CP exploration](#step-2--cp-exploration)
+      3. [Step 3 — CP draft creation](#step-3--cp-draft-creation)
+      4. [Step 4 — Canonical message preparation](#step-4--canonical-message-preparation)
+      5. [Step 5 — Wallet signature](#step-5--wallet-signature)
+      6. [Step 6 — CP persistence with signed authorization](#step-6--cp-persistence-with-signed-authorization)
    5. [Functional workflow summary](#functional-workflow-summary)
    6. [Required UX behavior](#required-ux-behavior)
+      1. [Web UI](#web-ui)
+      2. [CLI](#cli)
+      3. [Direct API](#direct-api)
    7. [Error semantics](#error-semantics)
+      1. [Stateless message helper errors (`POST /api/cpm/v1/wallet-challenges`)](#stateless-message-helper-errors-post-apicpmv1wallet-challenges)
+      2. [Persistence errors (`POST /api/cpm/v1/drafts/{draft_id}/persist`)](#persistence-errors-post-apicpmv1draftsdraft_idpersist)
 3. [Part II — Technical specifications](#part-ii--technical-specifications)
-   1. [Backend enforcement](#backend-enforcement)
-   2. [Proposed CPM API contract](#proposed-cpm-api-contract)
-   3. [Challenge message format](#challenge-message-format)
-   4. [Ephemeral authorization model](#ephemeral-authorization-model)
-   5. [Address normalization](#address-normalization)
-   6. [Expiration and replay protection](#expiration-and-replay-protection)
-   7. [Security requirements](#security-requirements)
-   8. [Audit requirements](#audit-requirements)
-   9. [OpenAPI requirements](#openapi-requirements)
-   10. [Testing requirements](#testing-requirements)
+   1. [10. Backend enforcement](#10-backend-enforcement)
+   2. [11. Proposed CPM API contract](#11-proposed-cpm-api-contract)
+      1. [11.1 Canonical message helper (mandatory before sign)](#111-canonical-message-helper-mandatory-before-sign)
+      2. [11.2 Not in V1: `POST /api/cpm/v1/wallet-challenges/verify`](#112-not-in-v1-post-apicpmv1wallet-challengesverify)
+      3. [11.3 Persist draft (normative)](#113-persist-draft-normative)
+   3. [12. Challenge message format](#12-challenge-message-format)
+   4. [13. Stateless authorization model](#13-stateless-authorization-model)
+      1. [13.0 V1 authorization flow](#130-v1-authorization-flow)
+      2. [13.1 Replay control (V1)](#131-replay-control-v1)
+      3. [13.2 Durable persisted policy metadata](#132-durable-persisted-policy-metadata)
+      4. [13.3 V2 optional hardening (not V1)](#133-v2-optional-hardening-not-v1)
+   5. [14. Address normalization](#14-address-normalization)
+   6. [15. Expiration and replay protection](#15-expiration-and-replay-protection)
+   7. [16. Security requirements](#16-security-requirements)
+   8. [17. Audit requirements](#17-audit-requirements)
+   9. [18. OpenAPI requirements](#18-openapi-requirements)
+   10. [19. Testing requirements](#19-testing-requirements)
+       1. [19.1 Unit tests](#191-unit-tests)
+       2. [19.2 API tests](#192-api-tests)
+       3. [19.3 Non-regression tests](#193-non-regression-tests)
 4. [Part III — Stories and tasks](#part-iii--stories-and-tasks)
    1. [Epic](#epic)
    2. [Baseline / non-regression stories](#baseline--non-regression-stories)
    3. [User stories](#user-stories)
    4. [Implementation tasks](#implementation-tasks)
+      1. [CP-PERSIST-T1 — Specification (PR1)](#cp-persist-t1--specification-pr1)
+      2. [CP-PERSIST-T2 — OpenAPI contract (PR2)](#cp-persist-t2--openapi-contract-pr2)
+      3. [CP-PERSIST-T3 — Canonical message and EIP-191 verifier (PR3)](#cp-persist-t3--canonical-message-and-eip-191-verifier-pr3)
+      4. [CP-PERSIST-T4 — Persist enforcement (PR4)](#cp-persist-t4--persist-enforcement-pr4)
+      5. [CP-PERSIST-T5 — Web UI integration (PR5)](#cp-persist-t5--web-ui-integration-pr5)
+      6. [CP-PERSIST-T6 — CLI integration (PR6)](#cp-persist-t6--cli-integration-pr6)
+      7. [CP-PERSIST-T7 — Documentation and E2E validation (PR7)](#cp-persist-t7--documentation-and-e2e-validation-pr7)
    5. [Tracking table](#tracking-table)
 5. [Part IV — PR breakdown](#part-iv--pr-breakdown)
+   1. [20. PR1 — Contract-first CP persistence specification](#20-pr1--contract-first-cp-persistence-specification)
+   2. [21. PR2 — OpenAPI contract for stateless CP-PERSIST](#21-pr2--openapi-contract-for-stateless-cp-persist)
+   3. [22. PR3 — Canonical message builder and EIP-191 verifier](#22-pr3--canonical-message-builder-and-eip-191-verifier)
+   4. [23. PR4 — Enforce wallet signed authorization on CP persistence](#23-pr4--enforce-wallet-signed-authorization-on-cp-persistence)
+   5. [24. PR5 — Web UI integration](#24-pr5--web-ui-integration)
+   6. [25. PR6 — CLI integration](#25-pr6--cli-integration)
+   7. [26. PR7 — Documentation and end-to-end validation](#26-pr7--documentation-and-end-to-end-validation)
 6. [Part V — TODO list for future wallet types](#part-v--todo-list-for-future-wallet-types)
-7. [Part VI — Frozen decisions](#part-vi--frozen-decisions) (§33–§43)
+   1. [28. Smart contract wallets](#28-smart-contract-wallets)
+   2. [29. Safe / multisig wallets](#29-safe--multisig-wallets)
+   3. [30. Institutional delegated wallets](#30-institutional-delegated-wallets)
+   4. [31. Contract admin / proxy admin ownership](#31-contract-admin--proxy-admin-ownership)
+   5. [32. Hardware and custody providers](#32-hardware-and-custody-providers)
+7. [Part VI — Frozen decisions](#part-vi--frozen-decisions)
+   1. [33. Persistence endpoint](#33-persistence-endpoint)
+   2. [34. Legacy `POST /api/cpm/v1/policies`](#34-legacy-post-apicpmv1policies)
+   3. [35. Message helper API path](#35-message-helper-api-path)
+   4. [36. Challenge message and signature format](#36-challenge-message-and-signature-format)
+   5. [37. Replay policy (stateless V1)](#37-replay-policy-stateless-v1)
+   6. [38. No V1 server-side challenge/proof store](#38-no-v1-server-side-challengeproof-store)
+   7. [39. Signed message validity (TTL)](#39-signed-message-validity-ttl)
+   8. [40. Persist ordering (transactional persist-once)](#40-persist-ordering-transactional-persist-once)
+   9. [41. V2 optional hardening (not V1)](#41-v2-optional-hardening-not-v1)
+   10. [42. Long-term architecture](#42-long-term-architecture)
 8. [Part VII — Non-goals](#part-vii--non-goals)
 9. [Part VIII — Summary](#part-viii--summary)
 
@@ -52,6 +108,10 @@
 | Jun 10th, 2026 | O. Lodygensky | 0.6     | Document CPM-owned ephemeral store, CPM_REDIS_URL and store abstractions |
 | Jun 10th, 2026 | O. Lodygensky | 0.7     | Editorial cleanup; align WORKPLAN/README; clarify PR8 vs PR1 cross-links |
 | Jun 10th, 2026 | O. Lodygensky | 0.8     | Document expected implementation gaps after PR1 and independent V1 sign-off |
+| Jun 10th, 2026 | O. Lodygensky | 0.9     | Adopt stateless signature-at-persist model for CP-PERSIST V1; move Redis/proof store to V2 |
+| Jun 10th, 2026 | O. Lodygensky | 0.9.1   | TOC Part VI range; wallet signed authorization wording; issued_at clock skew rule |
+| Jun 10th, 2026 | O. Lodygensky | 0.9.2   | Mandatory CPM-issued canonical message via POST /wallet-challenges before sign |
+| Jun 10th, 2026 | O. Lodygensky | 0.9.3   | Clarify signed-message vs server-side binding model (PR3/PR4) |
 
 
 ---
@@ -77,14 +137,14 @@ This document covers:
 
 - Wallet-only Crypto Policy persistence.
 - EOA wallets.
-- Wallet control proof through a signed challenge.
-- Challenge enforcement for all interfaces:
+- Wallet control proof through a stateless signed authorization message (EIP-191 verified at persist time).
+- Wallet signed authorization enforcement for all interfaces:
   - Web UI.
   - CLI.
   - Direct API usage.
 - Transition from non-actionable draft to persisted CP.
 - Backend-side enforcement in CPM.
-- CPM-owned ephemeral store for wallet challenges and proofs (`ChallengeStore` / `ProofStore`, `CPM_REDIS_URL` in V1).
+- Stateless signature-at-persist model for V1 (mandatory CPM-issued canonical message via `POST /wallet-challenges`; verified at persist time).
 - Functional and technical API expectations.
 - Suggested implementation split by PR.
 
@@ -110,21 +170,21 @@ Important CAFE rule:
 
 ## Expected implementation gaps (after PR1)
 
-PR1 is **docs-only** and freezes the CP-PERSIST V1 contract. It intentionally does not implement runtime behavior.
+PR1 is **docs-only** and freezes the CP-PERSIST V1 contract (stateless signature-at-persist). It intentionally does not implement runtime behavior.
 
 The following gaps are **expected** after PR1 merge. They are **not** PR1 defects; each maps to a later PR in Part IV.
 
-1. **EOA persistence enforcement is not implemented yet.** This is **PR5**. No EOA CP persistence path may remain callable without `wallet_control_proof_id`. Existing `POST /api/cpm/v1/policies` must be blocked, migrated or made compliant for EOA flows.
+1. **EOA persistence enforcement is not implemented yet.** This is **PR4**. No EOA CP persistence path may remain callable without a valid `signed_message` + `signature`. Existing `POST /api/cpm/v1/policies` must be blocked, migrated or made compliant for EOA flows.
 
 2. **OpenAPI is not implemented yet.** This is **PR2** and is the **mandatory gate** before backend implementation.
 
-3. **`CPM_REDIS_URL` is decided and documented.** **PR3** will implement runtime config loading, `ChallengeStore` / `ProofStore`, Redis adapter, TTL, namespace and fail-closed behavior. Deploy wiring may land with PR3 or an adjacent deploy change.
+3. **Canonical message builder and EIP-191 verifier are not implemented yet.** **PR3** will implement message canonicalization, signature verification and test vectors.
 
-4. **Frontend and CLI still use legacy or mock persistence flows.** **PR6** and **PR7** will migrate them to the frozen CP-PERSIST V1 flow. Session auth and wallet challenge are **orthogonal**: session auth identifies the user; wallet challenge proves control of the EOA for the persist action.
+4. **Frontend and CLI still use legacy or mock persistence flows.** **PR5** and **PR6** will migrate them to the frozen CP-PERSIST V1 flow. Session auth and wallet signature are **orthogonal**: session auth identifies the user; wallet signature proves control of the EOA for the persist action.
 
 5. **CP-PERSIST V1 is signed off independently through this document** (Part VI frozen decisions). [`workplans/WORKPLAN_API.md`](../workplans/WORKPLAN_API.md) remains a broader API workplan and may keep its global proposal status.
 
-Do not expose PR3–PR4 endpoints to product users without **PR5** enforcement unless they are feature-flagged or otherwise unreachable from product flows.
+**Not a V1 gap:** Redis, `CPM_REDIS_URL`, `ChallengeStore` / `ProofStore` or `wallet_control_proof_id` — these are **V2 optional** hardening, not required for CP-PERSIST V1.
 
 ---
 
@@ -211,11 +271,11 @@ Update and delete semantics may be refined in later PRs, but the model must not 
 
 ---
 
-## Interface-independent challenge requirement
+## Interface-independent wallet authorization requirement
 
-Wallet control challenge is mandatory regardless of the interface used.
+Wallet signed authorization is mandatory for EOA CP persistence regardless of the interface used.
 
-The following interfaces must all go through the same backend-enforced challenge flow:
+The following interfaces must all go through the same backend-enforced persist contract:
 
 - Web UI.
 - CLI.
@@ -227,11 +287,23 @@ The Web UI may provide a MetaMask-based signing experience.
 
 The CLI may use a local wallet, hardware wallet, private key signer, external signer or wallet provider.
 
-However, both UI and CLI must call the same CPM challenge APIs and must receive the same backend authorization before CP persistence.
+UI and CLI **must** call `POST /api/cpm/v1/wallet-challenges` to obtain the canonical message before signing, then **must** submit `signed_message` + `signature` to `POST /api/cpm/v1/drafts/{draft_id}/persist`.
+
+The client **must** obtain the canonical authorization message from CPM before signing by calling:
+
+```http
+POST /api/cpm/v1/wallet-challenges
+```
+
+This helper is **stateless**: it validates draft / scan / wallet bindings and returns the canonical message to sign, but it stores nothing server-side.
+
+At persist time, CPM does not rely on stored challenge state. CPM verifies that the submitted `signed_message` exactly matches the canonical message expected for the wallet, chain, scan, draft, action and validity window (see §12 binding model), then verifies the EIP-191 / `personal_sign` signature. User and tenant scope are enforced separately via session/JWT and draft/scan ownership.
+
+Advanced clients must not invent an alternative message format. They may only sign the canonical message returned by CPM.
 
 The frontend must never be considered the source of trust.
 
-The backend must reject CP persistence when no valid wallet control proof exists.
+The backend must reject EOA CP persistence when no valid signed wallet authorization is verified at persist time.
 
 ---
 
@@ -273,9 +345,29 @@ Rationale:
 
 ---
 
-### Step 4 — Wallet challenge preparation
+### Step 4 — Canonical message preparation
 
-Before persisting a CP for an EOA wallet, the user must produce an off-chain wallet signature proving control of the wallet.
+Before persisting a CP for an EOA wallet, the client must obtain the **canonical authorization message** from CPM for the user to sign.
+
+This is not implemented.
+
+The client **must** obtain the canonical authorization message from CPM before signing by calling:
+
+```http
+POST /api/cpm/v1/wallet-challenges
+```
+
+This helper is **stateless**: it validates draft / scan / wallet bindings and returns the canonical message to sign, but it stores nothing server-side.
+
+At persist time, CPM does not rely on stored challenge state. CPM verifies that the submitted `signed_message` exactly matches the canonical message expected for the wallet, chain, scan, draft, action and validity window (see §12 binding model), then verifies the EIP-191 / `personal_sign` signature. User and tenant scope are enforced separately via session/JWT and draft/scan ownership.
+
+Advanced clients must not invent an alternative message format. They may only sign the canonical message returned by CPM.
+
+---
+
+### Step 5 — Wallet signature
+
+The user signs the canonical message locally with the EOA wallet using **EIP-191 / `personal_sign`**.
 
 This is not implemented.
 
@@ -286,175 +378,59 @@ The signature is off-chain:
 - no on-chain state is modified
 - the private key never leaves the wallet
 
-However, because the signature authorizes a backend-side action — persisting an official CP for a wallet — CPM must verify the proof before accepting the persistence request.
+For the Web UI, this is typically done through MetaMask or another injected wallet provider.
 
+For the CLI, this may be done through a local EOA signer, hardware wallet, external wallet provider or another signing adapter.
 
-The CPM backend creates a challenge containing:
-
-- wallet address
-- chain id
-- scan id
-- draft id
-- action
-- nonce
-- expiration time
-
-The client asks the wallet to sign this exact message.
-
-The signed message is then submitted back to CPM for verification.
-
-This:
-- is simple to test
-- avoids message-format drift between UI and CLI
-- gives CPM a clear anti-replay model
-- makes persistence authorization fully backend-enforced
+The private key must never be sent to the backend.
 
 ---
 
-### Step 5 — Wallet signature
+### Step 6 — CP persistence with signed authorization
 
-The user signs the challenge message.
-
-This is not implemented.
-
-
-For the Web UI, this will typically be done through MetaMask or another injected wallet provider.
-
-For the CLI, this may be done through:
-
-- a local EOA signer
-- a hardware wallet
-- an external wallet provider
-- a private key stored outside CAFE
-- another signing adapter
-
-The private key must never be sent to the backend.  
-
-The backend only receives:
-
-- challenge identifier
-- wallet address
-- chain id
-- signature
-- optional signature metadata
-
----
-
-### Step 6 — Challenge verification
-
-The client submits the signed challenge.
+The client calls the normative persist endpoint with the signed authorization.
 
 This is not implemented yet.
 
-The signature is off-chain:
-
-* no blockchain transaction is sent
-* no gas is paid
-* no on-chain state is modified
-* the private key never leaves the wallet
-
-However, because the signature authorizes a backend-side action — persisting an official Crypto Policy for a wallet — CPM must verify the proof before accepting the persistence request.
-
-The backend verifies:
-
-* challenge exists
-* challenge is not expired
-* challenge was created by the same authenticated user
-* challenge belongs to the same tenant or organization
-* challenge was not already consumed
-* `wallet_address` matches the challenge
-* `chain_id` matches the challenge
-* recovered EOA address matches `wallet_address`
-* `draft_id` still exists
-* `draft_id` is linked to the same `scan_id`
-* `scan_id` is linked to the same `wallet_address`
-* action is `persist_crypto_policy`
-
-If verification succeeds, CPM creates a short-lived persistence authorization.
-
-Example response:
+```http
+POST /api/cpm/v1/drafts/{draft_id}/persist
+```
 
 ```json
 {
-  "wallet_control_proof_id": "uuid",
   "wallet_address": "0xabc...",
   "chain_id": 1,
-  "draft_id": "uuid",
   "scan_id": "uuid",
-  "action": "persist_crypto_policy",
-  "verified_at": "2026-06-10T12:25:00Z",
-  "expires_at": "2026-06-10T12:35:00Z"
+  "signed_message": "string",
+  "signature": "0x..."
 }
 ```
 
-The `wallet_control_proof_id` is not a permanent delegation.
+A CLI-like persistence flow already exists in `cafe-deploy/scripts/test-discovery-v1-wallet-scans-to-cpm.sh`, but it does not implement wallet control proof yet. The existing flow must be treated as pre-`CP_PERSIST` behavior and upgraded before being considered compliant.
 
-It is a short-lived authorization to persist the specific draft for the specific wallet and scan.
+The backend verifies at persist time (clients are **not** trusted):
 
-The `wallet_control_proof_id` must not be stored in the durable database as a reusable authorization.
-
-Recommended first implementation:
-
-```text
-Store `wallet_control_proof_id` in the CPM ephemeral store with a 10-minute TTL.
-```
-
-The ephemeral proof must be:
-
-* short-lived
-* single-use
-* bound to the authenticated user
-* bound to the tenant or organization
-* bound to the wallet address
-* bound to the chain id
-* bound to the scan id
-* bound to the draft id
-* bound to the action `persist_crypto_policy`
-
-At persist time, the ephemeral proof must be atomically consumed or reserved in the CPM ephemeral store **before** CP creation. If CP creation fails, the proof remains consumed and the user must sign again.
-
-The raw signature must not be stored in the ephemeral store or in the durable database for V1.
-
-The persisted CP may store minimal audit metadata, for example:
-
-```text
-ownership_status = verified
-wallet_control_method = eoa_signature
-wallet_control_verified_at = <timestamp>
-```
-
-The persisted CP must not store the ephemeral proof, raw signature or reusable proof artifacts.
-
----
-
-### Step 7 — CP persistence
-
-The user persists the draft into an official CP.
-
-A CLI-like persistence flow already exists in `cafe-deploy/scripts/test-discovery-v1-wallet-scans-to-cpm.sh`, but it does not implement the wallet control challenge yet.
-
-The existing flow must therefore be treated as pre-`CP_PERSIST` behavior and must be upgraded before being considered compliant.
-
-The backend verifies:
-
-- authenticated user
-- draft exists
-- draft belongs to the user or tenant scope
+- authenticated **user** and **tenant** via existing session/JWT (server-side — not fields in the signed message)
+- draft exists and belongs to the authenticated user/tenant scope (server-side ownership)
 - draft is not already persisted
-- draft is linked to an EOA wallet
-- `wallet_control_proof_id` exists
-- proof is valid
-- proof is not expired
-- proof is not already consumed
-- proof is bound to the same `draft_id`
-- proof is bound to the same `scan_id`
-- proof is bound to the same `wallet_address`
-- proof is bound to the same `chain_id`
-- proof action is `persist_crypto_policy`
+- draft is linked to `scan_id`
+- scan is linked to `wallet_address`
+- wallet type is `eoa`
+- `signed_message` **exactly matches** the canonical message CPM expects for **wallet**, **chain**, **scan**, **draft**, **`action = persist_crypto_policy`** and **validity window** (`issued_at`, `expires_at`) — see §12 binding model
+- `expires_at` is not in the past
+- `issued_at` is not in the future beyond allowed clock skew (**30 seconds** recommended, aligned with CPM session clock skew)
+- validity window (`expires_at` − `issued_at`) is not greater than **10 minutes**
+- signature is EIP-191 / `personal_sign` compatible
+- recovered signer address equals normalized `wallet_address`
+- request fields match draft / scan / wallet bindings
 
-If all checks pass, CPM **atomically consumes or reserves the proof in the CPM ephemeral store**, then creates the persisted policy from the draft.
+If all checks pass, CPM creates the persisted policy from the draft in a **transactional persist-once** operation.
 
-If CP creation fails after the proof has been consumed, the proof **remains consumed**. The user must create a new challenge and sign again.
+If CP creation fails before the draft is marked persisted, the user may **retry with the same signature** while it is still valid (V1 acceptable behavior).
+
+The raw signature must not be stored in the durable database. The persisted CP may store minimal audit metadata only (`ownership_status`, `wallet_control_method`, `wallet_control_verified_at`).
+
+`POST /api/cpm/v1/policies` must **not** persist an EOA CP without this signed authorization flow.
 
 ---
 
@@ -472,20 +448,17 @@ If CP creation fails after the proof has been consumed, the proof **remains cons
    -> no proof required
    -> draft is unverified and non-actionable
 
-4. User requests wallet challenge
-   -> challenge bound to wallet, chain, scan, draft, user, tenant, action
+4. Client obtains canonical message from CPM
+   -> POST /api/cpm/v1/wallet-challenges (mandatory; stateless helper, stores nothing)
 
-5. User signs challenge
-   -> UI or CLI, same backend contract
+5. User signs message locally (EIP-191 / personal_sign)
+   -> UI, CLI, MetaMask, hardware wallet or other signer
 
-6. Backend verifies signature
-   -> creates short-lived wallet_control_proof_id
+6. Client persists draft
+   -> POST /api/cpm/v1/drafts/{draft_id}/persist with signed_message + signature
 
-7. User persists draft
-   -> POST /api/cpm/v1/drafts/{draft_id}/persist with wallet_control_proof_id
-
-8. CPM atomically consumes proof, then creates persisted CP
-   -> if CP creation fails, proof stays consumed; user must re-sign
+7. Backend verifies session, bindings, message freshness and EIP-191 signature
+   -> transactional persist-once; replay after success -> DRAFT_ALREADY_PERSISTED
 ```
 
 ---
@@ -508,15 +481,15 @@ The UI must not display an unverified draft as an active wallet policy.
 
 When the user clicks “Persist policy” or equivalent, the UI must:
 
-1. request a challenge from CPM (`POST /api/cpm/v1/wallet-challenges`)
+1. obtain the canonical message from CPM (`POST /api/cpm/v1/wallet-challenges` — mandatory before sign)
 2. ask the wallet provider to sign the message (EIP-191 / `personal_sign`)
-3. submit the signature to CPM (`POST /api/cpm/v1/wallet-challenges/verify`)
-4. receive a `wallet_control_proof_id`
-5. call `POST /api/cpm/v1/drafts/{draft_id}/persist` with the proof
+3. call `POST /api/cpm/v1/drafts/{draft_id}/persist` with `signed_message` + `signature`
+
+The UI must **not** rely on `POST /api/cpm/v1/wallet-challenges/verify` as a V1 security step (not part of the V1 contract).
 
 If the wallet signature fails, the CP remains a draft.
 
-If CP creation fails after the proof was consumed, the UI must prompt the user to sign a new challenge.
+If CP creation fails before the draft is marked persisted, the UI may retry persist with the **same signature** while it is still valid.
 
 ### CLI
 
@@ -524,7 +497,7 @@ The current CLI is `cafe-frontend/scripts/cafe.sh`; it is based on the API.
 
 The current CLI must be enhanced to manage CPM persistence workflows.
 
-The CLI must follow the same backend workflow.
+The CLI must follow the same backend workflow as the UI and direct API.
 
 The CLI must not provide a `--force` or `--skip-wallet-proof` option for CP persistence.
 
@@ -541,34 +514,31 @@ cafe cpm wallet-challenge create \
   --scan-id <scan_id> \
   --draft-id <draft_id>
 
-cafe wallet sign \
-  --challenge-id <challenge_id>
-
-cafe cpm wallet-challenge verify \
-  --challenge-id <challenge_id> \
-  --wallet 0xabc... \
-  --chain-id 1 \
-  --signature 0x...
+cafe wallet sign --message-file <canonical_message.txt>
 
 cafe cpm draft persist \
   --draft-id <draft_id> \
-  --wallet-control-proof-id <wallet_control_proof_id>
+  --wallet 0xabc... \
+  --chain-id 1 \
+  --scan-id <scan_id> \
+  --signed-message-file <canonical_message.txt> \
+  --signature 0x...
 ```
 
-The signing mechanism may vary, but the backend verification must remain identical.
+The signing mechanism may vary, but the backend verification at persist time must remain identical.
 
 ### Direct API
 
 Direct API users must follow the same sequence.
 
-Calling the persistence endpoint without a valid `wallet_control_proof_id` must return an error.
+Calling the persistence endpoint without a valid `signed_message` and `signature` must return an error.
 
 Expected error:
 
 ```json
 {
   "error": "WALLET_CONTROL_PROOF_REQUIRED",
-  "message": "Persisting a Crypto Policy for a wallet requires a valid wallet control proof."
+  "message": "Persisting a Crypto Policy for a wallet requires a valid signed wallet authorization."
 }
 ```
 
@@ -576,54 +546,41 @@ Expected error:
 
 ## Error semantics
 
-### Challenge creation errors
+### Stateless message helper errors (`POST /api/cpm/v1/wallet-challenges`)
 
-
-| Case                      | HTTP status | Error code                |
-| ------------------------- | ----------- | ------------------------- |
-| Missing wallet address    | 400         | `WALLET_ADDRESS_REQUIRED` |
-| Invalid wallet address    | 400         | `INVALID_WALLET_ADDRESS`  |
-| Missing chain id          | 400         | `CHAIN_ID_REQUIRED`       |
-| Unknown draft             | 404         | `DRAFT_NOT_FOUND`         |
-| Unknown scan              | 404         | `SCAN_NOT_FOUND`          |
-| Draft and scan mismatch   | 409         | `DRAFT_SCAN_MISMATCH`     |
-| Draft and wallet mismatch | 409         | `DRAFT_WALLET_MISMATCH`   |
-| Unsupported wallet type   | 422         | `UNSUPPORTED_WALLET_TYPE` |
-| Ephemeral store unavailable | 503       | `WALLET_CONTROL_PROOF_STORE_UNAVAILABLE` |
-
+| Case                        | HTTP status | Error code                |
+| --------------------------- | ----------- | ------------------------- |
+| Missing wallet address      | 400         | `WALLET_ADDRESS_REQUIRED` |
+| Invalid wallet address      | 400         | `INVALID_WALLET_ADDRESS`  |
+| Missing chain id            | 400         | `CHAIN_ID_REQUIRED`       |
+| Unknown draft               | 404         | `DRAFT_NOT_FOUND`         |
+| Unknown scan                | 404         | `SCAN_NOT_FOUND`          |
+| Draft and scan mismatch     | 409         | `DRAFT_SCAN_MISMATCH`     |
+| Draft and wallet mismatch   | 409         | `DRAFT_WALLET_MISMATCH`   |
+| Unsupported wallet type     | 422         | `UNSUPPORTED_WALLET_TYPE` |
 
 For the first implementation, only `wallet_type = eoa` is supported for persistence.
 
-### Challenge verification errors
+### Persistence errors (`POST /api/cpm/v1/drafts/{draft_id}/persist`)
 
+| Case                              | HTTP status | Error code                              |
+| --------------------------------- | ----------- | --------------------------------------- |
+| Missing signed_message/signature  | 400         | `WALLET_CONTROL_PROOF_REQUIRED` *(missing `signed_message` or `signature`)* |
+| Invalid signature                 | 401         | `INVALID_WALLET_SIGNATURE`              |
+| Recovered address mismatch        | 401         | `WALLET_SIGNATURE_ADDRESS_MISMATCH`     |
+| Expired signed message            | 410         | `WALLET_AUTHORIZATION_EXPIRED`          |
+| `issued_at` too far in the future | 400         | `WALLET_AUTHORIZATION_NOT_YET_VALID`    |
+| Message validity window too long  | 400         | `WALLET_AUTHORIZATION_VALIDITY_TOO_LONG` |
+| Message field mismatch (draft)    | 409         | `WALLET_AUTHORIZATION_DRAFT_MISMATCH` |
+| Message field mismatch (scan)     | 409         | `WALLET_AUTHORIZATION_SCAN_MISMATCH`  |
+| Message field mismatch (wallet)   | 409         | `WALLET_AUTHORIZATION_WALLET_MISMATCH`  |
+| Message field mismatch (chain)    | 409         | `WALLET_AUTHORIZATION_CHAIN_MISMATCH`   |
+| Message field mismatch (action)   | 409         | `WALLET_AUTHORIZATION_ACTION_MISMATCH`  |
+| Unsupported wallet type           | 422         | `UNSUPPORTED_WALLET_TYPE`               |
+| Draft already persisted           | 409         | `DRAFT_ALREADY_PERSISTED`               |
+| Draft not found                   | 404         | `DRAFT_NOT_FOUND`                       |
 
-| Case                       | HTTP status | Error code                          |
-| -------------------------- | ----------- | ----------------------------------- |
-| Unknown challenge          | 404         | `CHALLENGE_NOT_FOUND`               |
-| Expired challenge          | 410         | `CHALLENGE_EXPIRED`                 |
-| Consumed challenge         | 409         | `CHALLENGE_ALREADY_CONSUMED`        |
-| Invalid signature          | 401         | `INVALID_WALLET_SIGNATURE`          |
-| Recovered address mismatch | 401         | `WALLET_SIGNATURE_ADDRESS_MISMATCH` |
-| Wrong user or tenant       | 403         | `CHALLENGE_OUT_OF_SCOPE`            |
-| Ephemeral store unavailable | 503        | `WALLET_CONTROL_PROOF_STORE_UNAVAILABLE` |
-
-
-### Persistence errors
-
-
-| Case                        | HTTP status | Error code                              |
-| --------------------------- | ----------- | --------------------------------------- |
-| Missing proof               | 400         | `WALLET_CONTROL_PROOF_REQUIRED`         |
-| Unknown proof               | 404         | `WALLET_CONTROL_PROOF_NOT_FOUND`        |
-| Expired proof               | 410         | `WALLET_CONTROL_PROOF_EXPIRED`          |
-| Consumed proof              | 409         | `WALLET_CONTROL_PROOF_ALREADY_CONSUMED` |
-| Proof does not match draft  | 409         | `WALLET_CONTROL_PROOF_DRAFT_MISMATCH`   |
-| Proof does not match wallet | 409         | `WALLET_CONTROL_PROOF_WALLET_MISMATCH`  |
-| Proof does not match scan   | 409         | `WALLET_CONTROL_PROOF_SCAN_MISMATCH`    |
-| Unsupported wallet type     | 422         | `UNSUPPORTED_WALLET_TYPE`               |
-| Draft already persisted     | 409         | `DRAFT_ALREADY_PERSISTED`               |
-| Ephemeral store unavailable | 503         | `WALLET_CONTROL_PROOF_STORE_UNAVAILABLE` |
-
+**V2 note:** `POST /api/cpm/v1/wallet-challenges/verify` and proof-handle errors (`WALLET_CONTROL_PROOF_*`) are **not** part of CP-PERSIST V1.
 
 ---
 
@@ -631,7 +588,7 @@ For the first implementation, only `wallet_type = eoa` is supported for persiste
 
 ## 10. Backend enforcement
 
-The wallet challenge requirement must be enforced by CPM backend.
+The wallet signature requirement must be enforced by the CPM backend at persist time.
 
 The frontend is not trusted.
 
@@ -639,9 +596,9 @@ The CLI is not trusted.
 
 Any direct API caller is not trusted.
 
-The persistence handler must reject requests without a valid backend-side wallet control proof.
+The persistence handler must reject EOA persist requests without a valid EIP-191 / `personal_sign` signature over the canonical authorization message.
 
-`POST /api/cpm/v1/policies` must **not** allow EOA Crypto Policy persistence without a valid `wallet_control_proof_id`. Legacy or pre-CP_PERSIST callers of this route must receive `WALLET_CONTROL_PROOF_REQUIRED` (or an equivalent blocking error) for EOA wallet flows.
+`POST /api/cpm/v1/policies` must **not** allow EOA Crypto Policy persistence without valid signed authorization. Legacy or pre-CP_PERSIST callers of this route must receive `WALLET_CONTROL_PROOF_REQUIRED` (or an equivalent blocking error) for EOA wallet flows.
 
 The only normative EOA persist route is:
 
@@ -649,36 +606,50 @@ The only normative EOA persist route is:
 POST /api/cpm/v1/drafts/{draft_id}/persist
 ```
 
-Persist ordering (frozen):
+Persist ordering (frozen for stateless V1):
 
 ```text
-1. Validate draft, proof bindings and EOA scope.
-2. Atomically consume or reserve the proof in the CPM ephemeral store.
-3. Create the persisted CP from the draft.
-4. If step 3 fails, the proof remains consumed; the user must sign a new challenge.
+1. Validate session auth, draft ownership, draft-not-already-persisted, scan/wallet bindings and EOA scope.
+2. Validate signed_message content, freshness (max 10 minutes) and EIP-191 signature; recover signer address.
+3. Create the persisted CP from the draft in a transactional persist-once operation.
+4. If step 3 fails before the draft is marked persisted, the client may retry with the same signature while still valid.
 ```
 
 Required invariant:
 
 ```text
-No persisted CP for an EOA wallet can be created without a valid wallet_control_proof_id.
+No persisted CP for an EOA wallet can be created without a valid signed wallet authorization verified at persist time.
 ```
 
 Recommended test name:
 
 ```text
-TestPersistPolicyRequiresWalletControlProofForEOA
+TestPersistPolicyRequiresWalletSignatureForEOA
 ```
 
 ---
 
 ## 11. Proposed CPM API contract
 
-### 11.1 Create challenge
+### 11.1 Canonical message helper (mandatory before sign)
 
 ```http
 POST /api/cpm/v1/wallet-challenges
 ```
+
+**V1 role:** mandatory stateless helper — clients must obtain the canonical message from CPM before signing. Stores nothing server-side.
+
+The client **must** obtain the canonical authorization message from CPM before signing by calling:
+
+```http
+POST /api/cpm/v1/wallet-challenges
+```
+
+This helper is **stateless**: it validates draft / scan / wallet bindings and returns the canonical message to sign, but it stores nothing server-side.
+
+At persist time, CPM does not rely on stored challenge state. CPM verifies that the submitted `signed_message` exactly matches the canonical message expected for the wallet, chain, scan, draft, action and validity window (see §12 binding model), then verifies the EIP-191 / `personal_sign` signature. User and tenant scope are enforced separately via session/JWT and draft/scan ownership.
+
+Advanced clients must not invent an alternative message format. They may only sign the canonical message returned by CPM.
 
 Request:
 
@@ -696,52 +667,22 @@ Response:
 
 ```json
 {
-  "challenge_id": "uuid",
   "message": "string",
-  "nonce": "string",
   "wallet_address": "0xabc...",
   "chain_id": 1,
   "scan_id": "uuid",
   "draft_id": "uuid",
   "action": "persist_crypto_policy",
+  "issued_at": "date-time",
   "expires_at": "date-time"
 }
 ```
 
-### 11.2 Verify challenge
+### 11.2 Not in V1: `POST /api/cpm/v1/wallet-challenges/verify`
 
-```http
-POST /api/cpm/v1/wallet-challenges/verify
-```
+`POST /api/cpm/v1/wallet-challenges/verify` is **not** part of the CP-PERSIST V1 security path. Signature verification happens at persist time. A future **V2** optional endpoint may support pre-validation UX only.
 
-Request:
-
-```json
-{
-  "challenge_id": "uuid",
-  "wallet_address": "0xabc...",
-  "chain_id": 1,
-  "signature": "0x..."
-}
-```
-
-Response:
-
-```json
-{
-  "wallet_control_proof_id": "uuid",
-  "wallet_address": "0xabc...",
-  "chain_id": 1,
-  "scan_id": "uuid",
-  "draft_id": "uuid",
-  "action": "persist_crypto_policy",
-  "method": "eoa_signature",
-  "verified_at": "date-time",
-  "expires_at": "date-time"
-}
-```
-
-### 11.3 Persist draft
+### 11.3 Persist draft (normative)
 
 ```http
 POST /api/cpm/v1/drafts/{draft_id}/persist
@@ -753,7 +694,11 @@ Request:
 
 ```json
 {
-  "wallet_control_proof_id": "uuid"
+  "wallet_address": "0xabc...",
+  "chain_id": 1,
+  "scan_id": "uuid",
+  "signed_message": "string",
+  "signature": "0x..."
 }
 ```
 
@@ -773,7 +718,7 @@ Response:
 }
 ```
 
-`POST /api/cpm/v1/policies` is **not** the CP persistence endpoint for this workflow. For EOA wallets, it must **not** create a persisted CP without `wallet_control_proof_id` and must return `WALLET_CONTROL_PROOF_REQUIRED` (or an equivalent blocking error).
+`POST /api/cpm/v1/policies` is **not** the CP persistence endpoint for this workflow. For EOA wallets, it must **not** create a persisted CP without signed authorization and must return `WALLET_CONTROL_PROOF_REQUIRED` (or an equivalent blocking error).
 
 ---
 
@@ -781,9 +726,9 @@ Response:
 
 **Decision (frozen for CP-PERSIST V1):** EIP-191 / `personal_sign`-compatible signed message.
 
-The message should be deterministic and human-readable.
+The message must be deterministic, human-readable and canonical.
 
-Recommended message structure:
+Normative message structure:
 
 ```text
 CAFE Crypto Policy Persistence
@@ -794,17 +739,34 @@ Wallet: <wallet_address>
 Chain ID: <chain_id>
 Scan ID: <scan_id>
 Draft ID: <draft_id>
-Challenge ID: <challenge_id>
-Nonce: <nonce>
 Issued At: <issued_at>
 Expiration Time: <expires_at>
 
 By signing this message, I prove control of the wallet and authorize CAFE to persist the selected Crypto Policy draft for this wallet.
 ```
 
-The exact message must be stored server-side in an ephemeral store with TTL, not in the durable database.
+**Binding model (signed message vs server-side):**
 
-The backend must verify the signature against the exact stored message, not against a reconstructed message that might differ in formatting.
+| Enforced via signed message | Enforced server-side only |
+| --- | --- |
+| `wallet_address` | `user_id` (session/JWT) |
+| `chain_id` | `tenant_id` (session/JWT) |
+| `scan_id` | draft ownership (user/tenant scope) |
+| `draft_id` | scan ownership / authorization (user/tenant scope) |
+| `action` (`persist_crypto_policy`) | EOA wallet type |
+| `issued_at`, `expires_at` | draft not already persisted |
+
+The signed message **does not** include `user_id` or `tenant_id`. CPM binds the authorization to a user/tenant by requiring a valid session and verifying that the target draft and scan belong to that principal before accepting persist.
+
+**V1 stateless rules:**
+
+- The backend does **not** store the message server-side in V1.
+- Clients **must** obtain the canonical message from `POST /api/cpm/v1/wallet-challenges` before signing; advanced clients must not invent an alternative message format.
+- At persist time, CPM does not rely on stored challenge state. CPM verifies that `signed_message` **exactly matches** the canonical message expected for wallet, chain, scan, draft, action and validity window (§12 binding model), then verifies the EIP-191 signature. User/tenant scope is enforced separately via session/JWT and draft/scan ownership.
+- Maximum validity window: **10 minutes** (`expires_at` − `issued_at`).
+- `issued_at` must not be in the future beyond allowed clock skew (**30 seconds** recommended).
+- `expires_at` must not be in the past at persist time.
+- `Challenge ID` / `Nonce` fields are **optional in V1**; freshness is enforced via `issued_at` / `expires_at`.
 
 The backend must verify signatures using EIP-191 `personal_sign` semantics in V1.
 
@@ -812,177 +774,36 @@ Future versions may support SIWE / EIP-4361 more formally.
 
 ---
 
-## 13. Ephemeral authorization model
+## 13. Stateless authorization model
 
-Wallet challenges and wallet control proofs are transient authorization artifacts.
+CP-PERSIST V1 uses a **stateless signed authorization message** submitted with the persist request.
 
-They must not be stored as durable database records.
+There is **no V1 server-side challenge store** and **no V1 server-side proof store**.
 
-### 13.0 CPM ephemeral store ownership and deployment
-
-**Decision (frozen for CP-PERSIST V1):**
+### 13.0 V1 authorization flow
 
 ```text
-CPM owns the wallet challenge/proof ephemeral store.
+1. Client obtains canonical message from CPM (`POST /api/cpm/v1/wallet-challenges` — mandatory).
+2. User signs locally (EIP-191 / personal_sign).
+3. Client submits signed_message + signature with POST /drafts/{draft_id}/persist.
+4. Backend verifies bindings, freshness, signature and transactional persist-once.
 ```
 
-The store is internal to the **CPM bounded context**. It must not depend on:
+**No V1 requirements for:** Redis, `CPM_REDIS_URL`, `ChallengeStore`, `ProofStore`, `wallet_control_proof_id`, backend-stored challenge or proof.
 
-- Discovery scan cache semantics or keyspaces;
-- the Discovery database;
-- Discovery internal domain structs;
-- any other service’s Redis usage patterns.
+### 13.1 Replay control (V1)
 
-CPM may depend on Discovery only through the HTTP/JWT contracts required by the product workflow (session validation, scan authorization). The challenge/proof store is **not** delegated to Discovery auth.
+Replay is **controlled**, not claimed impossible:
 
-**Redis is the recommended V1 adapter** for the CPM ephemeral store. Redis is an **implementation detail**, not a business dependency on Discovery or any other product domain.
+- short message validity window (max 10 minutes);
+- strict binding to `draft_id`, `scan_id`, `wallet_address`, `chain_id`, `action`;
+- transactional **draft can be persisted once** — replay after success returns `DRAFT_ALREADY_PERSISTED`;
+- binding mismatches return explicit errors;
+- parallel duplicate submits: only one persist succeeds.
 
-Future implementation must use store abstractions first:
+If CP creation fails before the draft is marked persisted, retry with the **same signature** while valid is acceptable in V1.
 
-```text
-ChallengeStore
-ProofStore
-```
-
-Handlers must depend on these interfaces, not on a Redis client used directly in route code. A handler must not know which Redis instance backs the store — only the configured CPM ephemeral store.
-
-**Configuration (frozen target):**
-
-```text
-CPM_REDIS_URL
-```
-
-Examples:
-
-```text
-# Local dev — shared internal Redis on the Docker network (logical DB separation)
-CPM_REDIS_URL=redis://redis:6379/1
-
-# Production target — dedicated CPM Redis instance
-CPM_REDIS_URL=redis://redis-cpm:6379/0
-```
-
-Rules:
-
-- use the `redis://` URL scheme, not `http://`;
-- Redis must remain **internal to the Docker network** — do not publish Redis ports on the host for this use case;
-- changing from a shared internal instance to a dedicated CPM instance must be a **deployment-only** change (`CPM_REDIS_URL`), with **no** API or handler code change.
-
-**Mandatory key namespace** (even when using a separate logical DB index):
-
-```text
-cpm:wallet_challenge:<challenge_id>
-cpm:wallet_control_proof:<wallet_control_proof_id>
-```
-
-The `cpm:*` prefix is required to avoid collision with any other Redis usage on the same instance.
-
-**Dev vs production strategy:**
-
-```text
-Local dev / simple compose:
-  CPM may use the existing internal Redis instance via CPM_REDIS_URL.
-  Recommended local URL: redis://redis:6379/1
-  Namespace cpm:* remains mandatory.
-
-Production target:
-  CPM should use a dedicated Redis instance (for example redis-cpm).
-  Recommended prod URL: redis://redis-cpm:6379/0
-```
-
-A separate logical DB index (for example `/1`) is acceptable for local dev and simple staging. Production should use a dedicated CPM Redis instance or strictly operated instance/logical separation. Migrating from shared to dedicated Redis is a deployment change only.
-
-**Long-term architecture note:**
-
-```text
-CAFE may later extract persistence and auth management into dedicated services.
-Discovery is expected to become less stateful and should eventually avoid direct Redis/Postgres ownership.
-This does not change CP-PERSIST V1: the wallet challenge/proof store belongs to CPM and is accessed through a configurable CPM ephemeral store (CPM_REDIS_URL in V1).
-```
-
-**Other frozen V1 store rules:**
-
-- no durable database tables for challenges, proofs or raw signatures;
-- single-use proof semantics;
-- proof is atomically consumed or reserved in the CPM ephemeral store **before** CP creation (see §10);
-- if the ephemeral store is unavailable, challenge create, challenge verify and CP persist must **fail closed** with **503** `WALLET_CONTROL_PROOF_STORE_UNAVAILABLE` — no fallback may allow EOA CP persistence without wallet control proof.
-
-The durable database must only store the persisted CP and minimal audit metadata.
-
-### 13.1 Ephemeral wallet challenge
-
-Key format (Redis adapter):
-
-```text
-cpm:wallet_challenge:<challenge_id>
-```
-
-Fields:
-
-```text
-user_id
-tenant_id
-wallet_address
-chain_id
-scan_id
-draft_id
-action
-message
-nonce
-expires_at
-created_at
-```
-
-TTL:
-
-```text
-10 minutes
-```
-
-The challenge message is stored only to make signature verification deterministic and replay-safe.
-
-It must not be persisted in the durable database.
-
-### 13.2 Ephemeral wallet control proof
-
-Key format (Redis adapter):
-
-```text
-cpm:wallet_control_proof:<wallet_control_proof_id>
-```
-
-Fields:
-
-```text
-challenge_id
-user_id
-tenant_id
-wallet_address
-chain_id
-scan_id
-draft_id
-action
-method = eoa_signature
-verified_at
-expires_at
-consumed = false
-```
-
-TTL:
-
-```text
-10 minutes
-```
-
-The `wallet_control_proof_id` is a transient authorization handle.
-
-It must not be stored in the durable database as a reusable credential.
-
-At persist time, the proof must be **atomically consumed or reserved in the CPM ephemeral store before** the persisted CP is created. If CP creation fails after consume, the proof **remains consumed**.
-
-The raw signature must not be stored in the ephemeral store or in the durable database for V1.
-
-### 13.3 Durable persisted policy metadata
+### 13.2 Durable persisted policy metadata
 
 Persisted CP records may include:
 
@@ -1007,7 +828,21 @@ ownership_status = verified
 wallet_control_method = eoa_signature
 ```
 
-The persisted CP must not store the ephemeral proof, raw signature or reusable proof artifacts.
+The persisted CP must not store the raw signature or reusable proof artifacts.
+
+### 13.3 V2 optional hardening (not V1)
+
+Future optional enhancements may include:
+
+```text
+CPM-owned ephemeral store (Redis via CPM_REDIS_URL)
+ChallengeStore / ProofStore abstractions
+wallet_control_proof_id single-use handles
+POST /api/cpm/v1/wallet-challenges/verify as optional pre-validation UX
+delegation, admin workflows, strict one-time authorization tokens
+```
+
+V2 must not weaken V1 backend enforcement at persist time.
 
 ---
 
@@ -1023,47 +858,33 @@ For Ethereum-compatible chains:
 - use case-insensitive comparison unless checksum validation is explicitly enforced
 - optionally store checksum representation for display
 
-All comparisons between:
-
-- challenge wallet address
-- draft wallet address
-- scan wallet address
-- recovered signature address
-
-must use normalized address comparison.
+All comparisons between signed message wallet address, draft wallet address, scan wallet address and recovered signature address must use normalized address comparison.
 
 ---
 
 ## 15. Expiration and replay protection
 
-Challenge requirements:
+Signed authorization message requirements (V1):
 
 ```text
-challenge TTL: 10 minutes
-challenge nonce: random, unique, single-use
-challenge action: persist_crypto_policy
-challenge binding: user, tenant, wallet, chain, scan, draft
+max validity window: 10 minutes (expires_at - issued_at)
+expires_at must not be in the past at persist time
+issued_at must not be in the future beyond 30 seconds clock skew (recommended)
+action: persist_crypto_policy
+signed-message binding: wallet, chain, scan, draft, action, issued_at, expires_at
+server-side binding: user, tenant (session/JWT + draft/scan ownership)
+persist-once: transactional draft state
 ```
 
-Proof requirements:
+Replay protection must prevent (within threat model):
 
-```text
-proof TTL: 10 minutes
-proof usage: single-use
-proof binding: user, tenant, wallet, chain, scan, draft, action
-proof consume: atomically before CP creation; remains consumed if CP creation fails
-```
+- persisting the same draft twice (DRAFT_ALREADY_PERSISTED)
+- using a signature for another draft, wallet, chain or scan (binding mismatch errors)
+- using an expired signed message (WALLET_AUTHORIZATION_EXPIRED)
+- using a signature from another user’s draft (owner-scoped draft checks)
+- bypassing proof via POST /api/cpm/v1/policies for EOA flows
 
-Replay protection must prevent:
-
-- using a challenge twice
-- using a signature from another challenge
-- using a proof for another draft
-- using a proof for another wallet
-- using a proof for another chain
-- using a proof for another scan
-- using a proof from another user or tenant
-- using a proof after expiration
+Replay within the validity window before the first successful persist is absorbed by transactional persist-once semantics.
 
 ---
 
@@ -1085,15 +906,11 @@ The scan id must be included in the signed message.
 
 The chain id must be included in the signed message.
 
-The challenge must expire.
+The message must include `issued_at` and `expires_at`; `expires_at` must not be in the past at persist time; `issued_at` must not be in the future beyond **30 seconds** clock skew (recommended).
 
-The nonce must be random and unique.
+The persistence handler is the **final enforcement point** for wallet control proof in V1.
 
-The proof must be single-use.
-
-The persistence handler must be the final enforcement point.
-
-If the CPM ephemeral store is unavailable, CPM must fail closed with **503** `WALLET_CONTROL_PROOF_STORE_UNAVAILABLE` for challenge create, challenge verify and persist operations. No fallback may allow EOA CP persistence without wallet control proof.
+Clients are not trusted; the backend verifies the signed message and all server-side bindings.
 
 ---
 
@@ -1108,7 +925,7 @@ For which chain?
 From which draft?
 From which scan?
 Using which proof method?
-When was the wallet control proof verified?
+When was wallet control verified?
 When was the CP persisted?
 ```
 
@@ -1126,7 +943,7 @@ wallet_control_verified_at
 persisted_at
 ```
 
-The durable audit trail must not store a reusable `wallet_control_proof_id`, raw signature or durable proof artifacts.
+The durable audit trail must not store raw signature bytes or reusable proof handles.
 
 ---
 
@@ -1134,21 +951,21 @@ The durable audit trail must not store a reusable `wallet_control_proof_id`, raw
 
 The OpenAPI contract must document:
 
-- `POST /api/cpm/v1/wallet-challenges`
-- `POST /api/cpm/v1/wallet-challenges/verify`
-- `POST /api/cpm/v1/drafts/{draft_id}/persist`
-- request schemas
-- response schemas
+- `POST /api/cpm/v1/drafts/{draft_id}/persist` (normative; `signed_message` + `signature`)
+- `POST /api/cpm/v1/wallet-challenges` (mandatory stateless canonical message helper)
+- request / response schemas
 - error schemas
 - EOA-only limitation for the first release
-- `WALLET_CONTROL_PROOF_REQUIRED`
-- `WALLET_CONTROL_PROOF_STORE_UNAVAILABLE`
+- `WALLET_CONTROL_PROOF_REQUIRED` and wallet authorization errors (§ Error semantics)
 - `UNSUPPORTED_WALLET_TYPE`
+
+The OpenAPI contract must **not** document `POST /api/cpm/v1/wallet-challenges/verify` as a V1 security requirement.
 
 The OpenAPI description must explicitly state:
 
 ```text
-Wallet control challenge is required for CP persistence regardless of whether the caller is the Web UI, CLI or a direct API client.
+Wallet signed authorization is required for EOA CP persistence regardless of whether the caller is the Web UI, CLI or a direct API client.
+Signature verification happens at POST /drafts/{draft_id}/persist.
 ```
 
 ---
@@ -1160,28 +977,21 @@ Wallet control challenge is required for CP persistence regardless of whether th
 Required tests:
 
 ```text
-Create challenge for EOA draft succeeds
-Create challenge fails for unknown draft
-Create challenge fails for draft / scan mismatch
-Create challenge fails for wallet mismatch
-Verify challenge succeeds with valid EOA signature
-Verify challenge fails with invalid signature
-Verify challenge fails with expired challenge
-Verify challenge fails with consumed challenge
-Verify challenge fails when recovered address mismatches wallet
-Persist draft fails without wallet_control_proof_id
-Persist draft fails with expired proof
-Persist draft fails with consumed proof
-Persist draft fails with proof for another draft
-Persist draft fails with proof for another wallet
-Persist draft succeeds with valid proof
-Persist draft atomically consumes proof before CP creation
-Persist draft leaves proof consumed if CP creation fails after consume
-POST /api/cpm/v1/policies blocks EOA persist without wallet_control_proof_id
-Persist draft blocks all other persistence paths that do not provide wallet_control_proof_id
-Persist draft rejects legacy or pre-CP_PERSIST CLI-like flows without proof
+Stateless helper returns canonical message for valid EOA draft bindings
+Stateless helper fails for unknown draft / scan / wallet mismatch
+Persist draft fails without signed_message and signature
+Persist draft fails with invalid signature
+Persist draft fails with expired signed message
+Persist draft fails when issued_at is too far in the future (> 30s clock skew)
+Persist draft fails with validity window > 10 minutes
+Persist draft fails with message/draft/scan/wallet/chain/action mismatch
+Persist draft fails when recovered address mismatches wallet
+Persist draft succeeds with valid signature
+Persist draft returns DRAFT_ALREADY_PERSISTED on replay after success
+Persist draft allows retry with same signature if CP creation fails before draft marked persisted
+POST /api/cpm/v1/policies blocks EOA persist without signed authorization
 Persisted CP includes ownership metadata
-Challenge create/verify/persist return 503 when ephemeral store is unavailable
+Persisted CP does not store raw signature
 ```
 
 ### 19.2 API tests
@@ -1191,23 +1001,23 @@ Required API test scenarios:
 ```text
 UI-like flow:
   create draft
-  create challenge
-  verify signature
-  persist draft
+  POST /api/cpm/v1/wallet-challenges (mandatory)
+  sign message locally
+  persist draft with signed_message + signature
 
 CLI-like flow:
   create draft
-  create challenge
-  verify externally-produced signature
+  POST /api/cpm/v1/wallet-challenges (mandatory)
+  sign externally
   persist draft
 
 Direct API negative flow:
   create draft
-  call persist without proof
+  call persist without signature
   expect WALLET_CONTROL_PROOF_REQUIRED
 
 Legacy/pre-CP_PERSIST negative flow:
-  use an existing persistence path or script without challenge proof
+  use an existing persistence path or script without signed authorization
   expect WALLET_CONTROL_PROOF_REQUIRED
 ```
 
@@ -1219,9 +1029,9 @@ Required non-regression tests:
 Discovery scan still works without wallet proof
 CP explore still works without wallet proof
 Draft creation still works without wallet proof
-Only persistence requires wallet proof
+Only persistence requires wallet signed authorization
 TLS targets cannot be persisted as CP targets
-Existing CP persistence paths cannot bypass wallet proof
+Existing CP persistence paths cannot bypass wallet proof for EOA
 ```
 
 ---
@@ -1243,7 +1053,7 @@ Goal:
 ```text
 A wallet can be scanned, explored and drafted without proving ownership.
 An EOA Crypto Policy cannot be persisted without a backend-verified wallet control proof.
-The challenge flow is mandatory for Web UI, CLI and direct API usage.
+Signed wallet authorization is mandatory for EOA CP persistence for Web UI, CLI and direct API usage.
 ```
 
 Out of scope for this epic:
@@ -1270,14 +1080,14 @@ These stories are already implemented and must remain true during CP-PERSIST imp
 
 | ID | Story | Priority | PR(s) | Status |
 | --- | --- | --- | --- | --- |
-| **CP-PERSIST-S4** | As a wallet owner using the Web UI, I want to sign an off-chain challenge with my EOA wallet so I can persist my CP without sending an on-chain transaction. | Must | PR2–PR6 | ⚪ planned |
-| **CP-PERSIST-S5** | As a wallet owner using the CLI, I want to sign externally and submit the proof through the same CPM APIs so the CLI cannot bypass backend enforcement. | Must | PR2–PR5, PR7 | ⚪ planned |
-| **CP-PERSIST-S6** | As an API integrator, I want a clear `WALLET_CONTROL_PROOF_REQUIRED` error when I call persist without a valid proof. | Must | PR2, PR5 | ⚪ planned |
-| **CP-PERSIST-S7** | As a security officer, I want wallet control proofs to be ephemeral, single-use, TTL-bound and bound to user, tenant, wallet, chain, scan and draft. | Must | PR3–PR5 | ⚪ planned |
-| **CP-PERSIST-S8** | As an auditor, I want persisted CPs to record minimal ownership verification metadata without storing reusable credentials. | Should | PR5 | ⚪ planned |
+| **CP-PERSIST-S4** | As a wallet owner using the Web UI, I want to sign an off-chain authorization with my EOA wallet so I can persist my CP without sending an on-chain transaction. | Must | PR2–PR5 | ⚪ planned |
+| **CP-PERSIST-S5** | As a wallet owner using the CLI, I want to sign externally and submit the signed authorization through the same CPM persist API so the CLI cannot bypass backend enforcement. | Must | PR2–PR4, PR6 | ⚪ planned |
+| **CP-PERSIST-S6** | As an API integrator, I want a clear `WALLET_CONTROL_PROOF_REQUIRED` error when I call persist without a valid signed authorization. | Must | PR2, PR4 | ⚪ planned |
+| **CP-PERSIST-S7** | As a security officer, I want wallet signed authorizations to be time-bound and cryptographically bound to wallet, chain, scan, draft and action (via signed message), with user/tenant enforced server-side via session and draft/scan ownership, and replay controlled at persist time. | Must | PR3–PR4 | ⚪ planned |
+| **CP-PERSIST-S8** | As an auditor, I want persisted CPs to record minimal ownership verification metadata without storing reusable credentials or raw signatures. | Should | PR4 | ⚪ planned |
 | **CP-PERSIST-S9** | As a developer, I want contract-first documentation and OpenAPI before implementation so UI, CLI and API clients share one backend contract. | Must | PR1, PR2 | 🟡 in progress |
-| **CP-PERSIST-S10** | As a product owner, I want end-to-end documentation and validation so scan / explore / draft remain open while persist requires proof. | Should | PR8 | ⚪ planned |
-| **CP-PERSIST-S11** | As a platform owner, I want CPM backend to be the only enforcement point for CP persistence so that UI, CLI, scripts or direct API calls cannot bypass wallet control proof. | Must | PR5 | ⚪ planned |
+| **CP-PERSIST-S10** | As a product owner, I want end-to-end documentation and validation so scan / explore / draft remain open while persist requires proof. | Should | PR7 | ⚪ planned |
+| **CP-PERSIST-S11** | As a platform owner, I want CPM backend to be the only enforcement point for CP persistence so that UI, CLI, scripts or direct API calls cannot bypass wallet signed authorization. | Must | PR4 | ⚪ planned |
 
 ---
 
@@ -1292,12 +1102,12 @@ Stories: **CP-PERSIST-S9**
 ```text
 [x] Add CP_PERSIST.md with functional and technical rules
 [x] Document EOA-only first scope
-[x] Document interface-independent challenge requirement
-[x] Document recommended API contract and ephemeral proof model
-[x] Document CPM-owned ephemeral store, CPM_REDIS_URL and store abstractions (§13.0)
+[x] Document interface-independent wallet authorization requirement
+[x] Document stateless signature-at-persist API contract (§11, §13)
+[x] Document mandatory CPM-issued canonical message helper (POST /wallet-challenges)
 [x] Document PR sequence in Part IV
 [x] Update WORKPLAN_API.md cross-links and CP-PERSIST route notes
-[x] Update README cross-links and planned CPM_REDIS_URL note
+[x] Update README cross-links for stateless CP-PERSIST V1
 ```
 
 PR1 doc deliverables above are complete in this branch; story **S9** / **T1** remain **`in progress`** until the PR is reviewed and merged.
@@ -1307,116 +1117,93 @@ PR1 doc deliverables above are complete in this branch; story **S9** / **T1** re
 Stories: **CP-PERSIST-S6**, **CP-PERSIST-S9**
 
 ```text
-[ ] Add OpenAPI for POST /api/cpm/v1/drafts/{draft_id}/persist
+[ ] Add OpenAPI for POST /api/cpm/v1/drafts/{draft_id}/persist (signed_message + signature)
+[ ] Add OpenAPI for POST /api/cpm/v1/wallet-challenges (mandatory stateless canonical message helper)
 [ ] Document that POST /api/cpm/v1/policies is not the CP persistence endpoint
-[ ] Ensure legacy/pre-CP_PERSIST persistence paths cannot bypass proof
-[ ] Add wallet challenge create / verify schemas
-[ ] Add persist-draft request / response schema with wallet_control_proof_id
-[ ] Add error codes (WALLET_CONTROL_PROOF_REQUIRED, WALLET_CONTROL_PROOF_STORE_UNAVAILABLE, challenge errors)
+[ ] Ensure legacy/pre-CP_PERSIST persistence paths cannot bypass signed authorization
+[ ] Add error codes (WALLET_CONTROL_PROOF_REQUIRED, WALLET_AUTHORIZATION_*, binding errors)
 [ ] Mark persistence as EOA-only for the first release
+[ ] Do not document /wallet-challenges/verify as V1 security requirement
 [ ] Document that UI, CLI and direct API share the same contract
 ```
 
-### CP-PERSIST-T3 — Ephemeral challenge store (PR3)
-
-Stories: **CP-PERSIST-S7**
-
-```text
-[ ] Document CPM-owned ephemeral store and CPM_REDIS_URL (§13.0)
-[ ] Define ChallengeStore and ProofStore abstractions (handlers must not use Redis directly)
-[ ] Implement Redis adapter behind ChallengeStore and ProofStore (CPM_REDIS_URL)
-[ ] Use mandatory key namespace cpm:wallet_challenge:* and cpm:wallet_control_proof:*
-[ ] TTL = 10 minutes for challenges and proofs
-[ ] Implement single-use and atomic consume-or-reserve semantics for proofs
-[ ] Fail closed with 503 WALLET_CONTROL_PROOF_STORE_UNAVAILABLE if store is unavailable
-[ ] No durable DB tables for wallet_challenges or wallet_control_proofs
-[ ] No raw signature storage in ephemeral store or durable DB
-[ ] Add tests for store unavailable / expired / already consumed
-[ ] Add unit tests
-```
-
-### CP-PERSIST-T4 — EOA signature verification (PR4)
+### CP-PERSIST-T3 — Canonical message and EIP-191 verifier (PR3)
 
 Stories: **CP-PERSIST-S4**, **CP-PERSIST-S5**, **CP-PERSIST-S7**
 
 ```text
-[ ] Implement POST /api/cpm/v1/wallet-challenges
-[ ] Implement POST /api/cpm/v1/wallet-challenges/verify
+[ ] Implement canonical message builder per §12
+[ ] Implement mandatory stateless POST /api/cpm/v1/wallet-challenges (no server storage)
 [ ] Implement EOA signature verifier and address normalization
-[ ] Verify exact stored challenge message, not reconstructed message
-[ ] Support EIP-191 / personal_sign verification
-[ ] Normalize signature recovery edge cases, including v = 27/28 vs 0/1 if needed
+[ ] Support EIP-191 / personal_sign verification at persist time
+[ ] Enforce max 10-minute validity window on signed messages
+[ ] Reject issued_at too far in the future (30s clock skew)
 [ ] Add deterministic signature test vectors
-[ ] Add tests for wrong wallet, wrong chain_id, wrong draft_id, wrong scan_id
-[ ] Bind proof to user, tenant, wallet, chain, scan, draft and action
-[ ] Mark challenge consumed after successful verification
-[ ] Do not store raw signature in ephemeral store or durable DB
-[ ] Return 503 WALLET_CONTROL_PROOF_STORE_UNAVAILABLE when ephemeral store is unavailable
+[ ] Add tests for wrong wallet, chain_id, draft_id, scan_id, expired message, future issued_at
+[ ] Canonical message binds wallet, chain, scan, draft, action, issued_at, expires_at only (not user_id/tenant_id)
+[ ] Do not store raw signature in durable DB
 [ ] Add unit tests and API tests
 ```
 
-### CP-PERSIST-T5 — Persistence enforcement (PR5)
+### CP-PERSIST-T4 — Persist enforcement (PR4)
 
 Stories: **CP-PERSIST-S6**, **CP-PERSIST-S7**, **CP-PERSIST-S8**, **CP-PERSIST-S11**
 
 ```text
-[ ] Implement POST /api/cpm/v1/drafts/{draft_id}/persist with wallet_control_proof_id
-[ ] Block EOA persistence via POST /api/cpm/v1/policies without wallet_control_proof_id (block, migrate or make compliant)
-[ ] Reject missing, mismatched, expired or consumed proofs
-[ ] Atomically consume or reserve proof in CPM ephemeral store before CP creation
-[ ] No fallback if ephemeral store is unavailable — fail closed with 503
-[ ] If CP creation fails after consume, leave proof consumed; user must re-sign
-[ ] Store ownership metadata on persisted CP (no raw signature or reusable proof artifacts)
-[ ] All existing EOA CP persistence paths must require wallet control proof
+[ ] Implement POST /api/cpm/v1/drafts/{draft_id}/persist with signed_message + signature
+[ ] Block EOA persistence via POST /api/cpm/v1/policies without signed authorization
+[ ] Reject missing, invalid, expired, not-yet-valid (future issued_at) or mismatched signed authorizations
+[ ] Enforce server-side user/tenant via session/JWT + draft/scan ownership (not via signed message fields)
+[ ] Transactional persist-once semantics (DRAFT_ALREADY_PERSISTED on replay)
+[ ] Allow retry with same signature if CP creation fails before draft marked persisted
+[ ] Store ownership metadata on persisted CP (no raw signature)
+[ ] All existing EOA CP persistence paths must require signed authorization
 [ ] Add regression test for the current CLI-like/pre-CP_PERSIST flow
 [ ] Add unit tests and API tests
 ```
 
-### CP-PERSIST-T6 — Web UI integration (PR6)
+### CP-PERSIST-T5 — Web UI integration (PR5)
 
 Stories: **CP-PERSIST-S4**
 
 ```text
-[ ] Migrate from /wallet-challenge/start|verify to /wallet-challenges and /wallet-challenges/verify
-[ ] Request challenge from CPM on persist action
+[ ] Call POST /api/cpm/v1/wallet-challenges for canonical message (mandatory before sign)
 [ ] Integrate MetaMask or injected wallet provider for EIP-191 / personal_sign
-[ ] Submit signature and receive wallet_control_proof_id
-[ ] Call POST /api/cpm/v1/drafts/{draft_id}/persist with proof (not POST /policies)
-[ ] Display draft / unverified / ready to sign / verified / persisted states
-[ ] Handle signature rejection and CP creation failure after consumed proof (re-sign flow)
+[ ] Call POST /api/cpm/v1/drafts/{draft_id}/persist with signed_message + signature
+[ ] Do not use POST /wallet-challenges/verify as V1 security step
+[ ] Display draft / unverified / ready to sign / persisted states
+[ ] Handle signature rejection; retry persist with same signature if still valid
 [ ] Add frontend tests
 ```
 
-### CP-PERSIST-T7 — CLI integration (PR7)
+### CP-PERSIST-T6 — CLI integration (PR6)
 
 Stories: **CP-PERSIST-S5**
 
 ```text
-[ ] Add cafe cpm wallet-challenge create -> POST /api/cpm/v1/wallet-challenges
-[ ] Add cafe cpm wallet-challenge verify -> POST /api/cpm/v1/wallet-challenges/verify
-[ ] Add cafe cpm draft persist -> POST /api/cpm/v1/drafts/{draft_id}/persist
+[ ] Add cafe cpm wallet-challenge create -> POST /api/cpm/v1/wallet-challenges (mandatory)
+[ ] Add cafe cpm draft persist -> POST /api/cpm/v1/drafts/{draft_id}/persist with signature
 [ ] Support external EIP-191 / personal_sign signing
 [ ] Reject --force or --skip-wallet-proof options
-[ ] Upgrade test-discovery-v1-wallet-scans-to-cpm.sh to challenge + persist flow
+[ ] Upgrade test-discovery-v1-wallet-scans-to-cpm.sh to sign + persist flow
 [ ] Document CLI workflow (cpm-developer.md or equivalent)
 [ ] Add CLI tests where applicable
 ```
 
-### CP-PERSIST-T8 — Documentation and E2E validation (PR8)
+### CP-PERSIST-T7 — Documentation and E2E validation (PR7)
 
 Stories: **CP-PERSIST-S10**, **CP-PERSIST-S1**, **CP-PERSIST-S2**, **CP-PERSIST-S3**
 
 ```text
 [ ] Confirm README and WORKPLAN_API remain aligned with the implemented V1 contract
 [ ] Update cafe-frontend/docs/cpm-developer.md with frozen V1 contract
-[ ] Document scan vs explore vs draft vs persist (frozen routes §33–§41)
-[ ] Document EOA-only scope, CPM-owned ephemeral store, CPM_REDIS_URL, cpm:* namespace
-[ ] Document 10-minute TTL, single-use proof, consume-before-create
-[ ] Document 503 WALLET_CONTROL_PROOF_STORE_UNAVAILABLE, no fallback persist, and re-sign flow
+[ ] Document scan vs explore vs draft vs persist (frozen routes §33–§42)
+[ ] Document stateless V1, mandatory CPM-issued canonical message, 10-minute signed message validity
+[ ] Document replay policy and transactional persist-once semantics
 [ ] Add end-to-end test notes and manual test scenario
 [ ] Add troubleshooting section
 [ ] Confirm Discovery / explore / draft still work without proof (S1–S3)
-[ ] Confirm all persistence paths require wallet control proof (UI, CLI, smoke, API)
+[ ] Confirm all persistence paths require signed wallet authorization
 [ ] Confirm test-discovery-v1-wallet-scans-to-cpm.sh is compliant
 ```
 
@@ -1428,17 +1215,16 @@ Stories: **CP-PERSIST-S10**, **CP-PERSIST-S1**, **CP-PERSIST-S2**, **CP-PERSIST-
 | --- | --- | --- | --- | --- |
 | **CP-PERSIST-T1** / **S9** | PR1 | `cafe-crypto-policy-mgt` | — | 🟡 in progress (doc complete; awaiting merge) |
 | **CP-PERSIST-T2** / **S6**, **S9** | PR2 | `cafe-crypto-policy-mgt` | PR1 | ⚪ planned |
-| **CP-PERSIST-T3** / **S7** | PR3 | `cafe-crypto-policy-mgt` | PR2 | ⚪ planned |
-| **CP-PERSIST-T4** / **S4**, **S5**, **S7** | PR4 | `cafe-crypto-policy-mgt` | PR3 | ⚪ planned |
-| **CP-PERSIST-T5** / **S6**, **S7**, **S8**, **S11** | PR5 | `cafe-crypto-policy-mgt` | PR4 | ⚪ planned |
-| **CP-PERSIST-T6** / **S4** | PR6 | `cafe-frontend` | PR5 | ⚪ planned |
-| **CP-PERSIST-T7** / **S5** | PR7 | `cafe-frontend` (`cafe.sh`), `cafe-deploy` (smoke) | PR5 | ⚪ planned |
-| **CP-PERSIST-T8** / **S10**, **S1–S3** | PR8 | multi-repo | PR6, PR7 | ⚪ planned |
+| **CP-PERSIST-T3** / **S4**, **S5**, **S7** | PR3 | `cafe-crypto-policy-mgt` | PR2 | ⚪ planned |
+| **CP-PERSIST-T4** / **S6**, **S7**, **S8**, **S11** | PR4 | `cafe-crypto-policy-mgt` | PR3 | ⚪ planned |
+| **CP-PERSIST-T5** / **S4** | PR5 | `cafe-frontend` | PR4 | ⚪ planned |
+| **CP-PERSIST-T6** / **S5** | PR6 | `cafe-frontend` (`cafe.sh`), `cafe-deploy` (smoke) | PR4 | ⚪ planned |
+| **CP-PERSIST-T7** / **S10**, **S1–S3** | PR7 | multi-repo | PR5, PR6 | ⚪ planned |
 
 Recommended delivery order:
 
 ```text
-PR1 → PR2 → PR3 → PR4 → PR5 → (PR6 and PR7 in parallel) → PR8
+PR1 → PR2 → PR3 → PR4 → (PR5 and PR6 in parallel) → PR7
 ```
 
 ---
@@ -1456,33 +1242,32 @@ cafe-crypto-policy-mgt
 Goal:
 
 - Add this document as `CP_PERSIST.md`.
-- Document functional rules.
+- Document functional rules and stateless signature-at-persist V1 model.
 - Document EOA-only first scope.
-- Document challenge requirement for UI, CLI and direct API.
-- Document recommended API contract.
-- Document PR sequence.
+- Document wallet authorization requirement for UI, CLI and direct API.
+- Document recommended API contract and PR sequence.
 
 Deliverables:
 
 ```text
-CP_PERSIST.md
+CP_PERSIST.md (stateless V1)
 WORKPLAN_API.md cross-links and CP-PERSIST route / EOA persist clarifications
-README cross-links and planned CPM_REDIS_URL note
+README cross-links for stateless CP-PERSIST V1
 ```
 
 No implementation in this PR.
 
-**Expected implementation gaps after this PR:** see [Expected implementation gaps (after PR1)](#expected-implementation-gaps-after-pr1). Reviewers must not treat current runtime behavior (proof-free `POST /api/cpm/v1/policies`, missing OpenAPI, no Redis store, legacy frontend paths) as documentation defects.
+**Expected implementation gaps after this PR:** see [Expected implementation gaps (after PR1)](#expected-implementation-gaps-after-pr1). Reviewers must not treat current runtime behavior (proof-free `POST /api/cpm/v1/policies`, missing OpenAPI, no signature-at-persist verification, legacy frontend paths) as documentation defects.
 
 Expected commit title:
 
 ```text
-docs(cpm): define wallet control proof for CP persistence
+docs(cpm): adopt stateless CP-PERSIST V1 signature-at-persist model
 ```
 
 ---
 
-## 21. PR2 — OpenAPI contract for EOA wallet challenge
+## 21. PR2 — OpenAPI contract for stateless CP-PERSIST
 
 Repository:
 
@@ -1492,45 +1277,43 @@ cafe-crypto-policy-mgt
 
 Goal:
 
-- Add OpenAPI definitions for wallet challenge creation and verification.
-- Add OpenAPI definitions for `POST /api/cpm/v1/drafts/{draft_id}/persist`.
-- Document that `POST /api/cpm/v1/policies` is not the CP persistence endpoint for this workflow.
-- Add error codes.
+- Add OpenAPI for `POST /api/cpm/v1/drafts/{draft_id}/persist` (`signed_message` + `signature`).
+- Add OpenAPI for mandatory stateless `POST /api/cpm/v1/wallet-challenges`.
+- Document that `POST /api/cpm/v1/policies` is not the CP persistence endpoint.
+- Add wallet authorization error codes.
 - Mark persistence as EOA-only for the first release.
 
 Deliverables:
 
 ```text
 OpenAPI schemas
-Challenge request / response schema
-Challenge verification request / response schema
-Persist draft request / response schema
-Existing persistence route behavior
+Canonical message helper request / response schema
+Persist draft request / response schema (signed_message + signature)
 Error schema updates
 ```
 
 Acceptance criteria:
 
 ```text
-OpenAPI documents POST /api/cpm/v1/wallet-challenges and /wallet-challenges/verify.
-OpenAPI documents POST /api/cpm/v1/drafts/{draft_id}/persist.
-OpenAPI documents that CP persistence requires wallet control proof.
+OpenAPI documents POST /api/cpm/v1/drafts/{draft_id}/persist with signed_message and signature.
+OpenAPI documents POST /api/cpm/v1/wallet-challenges as mandatory stateless canonical message helper.
+OpenAPI does not require POST /api/cpm/v1/wallet-challenges/verify for V1.
+OpenAPI documents that EOA CP persistence requires wallet signed authorization.
 OpenAPI documents that POST /api/cpm/v1/policies must not persist EOA CP without proof.
-OpenAPI documents 10-minute TTL, single-use proof and EIP-191 / personal_sign for V1.
-OpenAPI documents WALLET_CONTROL_PROOF_STORE_UNAVAILABLE (503) when the CPM ephemeral store is unavailable.
-OpenAPI documents that challenge is required for UI, CLI and API.
+OpenAPI documents 10-minute max signed message validity and EIP-191 / personal_sign.
+OpenAPI documents that UI, CLI and direct API share the same contract.
 OpenAPI documents that only EOA is supported in this release.
 ```
 
 Expected commit title:
 
 ```text
-docs(openapi): add EOA wallet challenge contract for CP persistence
+docs(openapi): add stateless EOA wallet authorization contract for CP persistence
 ```
 
 ---
 
-## 22. PR3 — CPM backend ephemeral challenge store
+## 22. PR3 — Canonical message builder and EIP-191 verifier
 
 Repository:
 
@@ -1538,115 +1321,51 @@ Repository:
 cafe-crypto-policy-mgt
 ```
 
-Depends on: **PR2** (frozen key format, TTL and store semantics documented in OpenAPI or internal config).
+Depends on: **PR2**.
 
 Goal:
 
-- Implement the **CPM-owned** ephemeral store for wallet challenges and proofs (§13.0, §38, §39).
-- Introduce `ChallengeStore` and `ProofStore` abstractions; handlers must not use a Redis client directly.
-- Provide a **Redis adapter** configured via `CPM_REDIS_URL` (recommended V1 implementation detail).
-- Use mandatory `cpm:*` key namespace and a **10-minute** TTL.
-- Implement single-use and atomic consume-or-reserve semantics for proofs (§37, §41).
-- Fail closed with **503** `WALLET_CONTROL_PROOF_STORE_UNAVAILABLE` when the store is unavailable (§40).
-- Do not add durable database tables for challenges, proofs or raw signatures.
+- Implement canonical message builder per §12.
+- Implement mandatory stateless `POST /api/cpm/v1/wallet-challenges` (validates bindings, returns canonical message; stores nothing).
+- Implement EIP-191 / `personal_sign` verifier and address normalization.
+- Enforce max 10-minute validity window on signed messages.
+- Reject `issued_at` too far in the future (30-second clock skew).
+- Canonical signed message binds **wallet, chain, scan, draft, action, timestamps** only — not `user_id` / `tenant_id`.
 
 Deliverables:
 
 ```text
-ChallengeStore and ProofStore interfaces
-Redis adapter (CPM_REDIS_URL, redis:// scheme)
-cpm:wallet_challenge:<challenge_id> and cpm:wallet_control_proof:<wallet_control_proof_id> key formats
-10-minute TTL constant
-atomic single-use / consume-or-reserve methods
-503 WALLET_CONTROL_PROOF_STORE_UNAVAILABLE mapping
-unit tests (available, expired, consumed, store unavailable)
-```
-
-Deployment note: wiring `CPM_REDIS_URL` in runtime compose/env is a **separate deploy change**, not part of this PR’s code contract. V1 local example: `redis://redis:6379/1`. Production target: `redis://redis-cpm:6379/0`.
-
-Acceptance criteria:
-
-```text
-CPM owns the ephemeral store; no dependency on Discovery cache or keyspaces.
-Handlers depend on ChallengeStore / ProofStore, not on Redis directly.
-Challenge can be created and retrieved through the CPM ephemeral store.
-Challenge expires automatically after 10 minutes.
-Challenge can be atomically marked as consumed or deleted.
-Proof can be created and retrieved through the CPM ephemeral store.
-Proof expires automatically after 10 minutes.
-Proof can be atomically consumed or reserved (used by PR5 persist handler).
-All store operations return 503 WALLET_CONTROL_PROOF_STORE_UNAVAILABLE when the store is unavailable.
-No durable DB migration is introduced for wallet_challenges or wallet_control_proofs.
-No raw signatures are stored in the ephemeral store or durable DB.
-```
-
-Expected commit title:
-
-```text
-feat(cpm): add ephemeral wallet challenge store
-```
-
----
-
-## 23. PR4 — CPM backend EOA signature verification
-
-Repository:
-
-```text
-cafe-crypto-policy-mgt
-```
-
-Depends on: **PR3** (challenge and proof stores).
-
-Goal:
-
-- Implement frozen V1 challenge routes (§35): `POST /api/cpm/v1/wallet-challenges` and `POST /api/cpm/v1/wallet-challenges/verify`.
-- Verify EIP-191 / `personal_sign` signatures against the **exact stored challenge message** (§36).
-- Recover signer address and compare to normalized wallet address.
-- On success, create a **single-use** `wallet_control_proof_id` in the CPM ephemeral store with **10-minute** TTL (§37, §39).
-- Mark the challenge as consumed after successful verification.
-- Do not store the raw signature in the ephemeral store or durable DB (§38).
-
-Deliverables:
-
-```text
-POST /api/cpm/v1/wallet-challenges handler
-POST /api/cpm/v1/wallet-challenges/verify handler
-deterministic EIP-191 human-readable challenge message builder
-EOA signature verifier (personal_sign)
-address normalization helper
-signature recovery edge-case handling (v = 27/28 vs 0/1)
-deterministic signature test vectors
-unit tests
-API tests
+Canonical message builder
+Mandatory stateless POST /api/cpm/v1/wallet-challenges handler
+EIP-191 / personal_sign verifier
+Address normalization helper
+Deterministic signature test vectors
+Unit tests and API tests
 ```
 
 Acceptance criteria:
 
 ```text
-POST /api/cpm/v1/wallet-challenges creates a challenge bound to user, tenant, wallet, chain, scan, draft and action.
-Challenge message follows §12 and is stored exactly in the CPM ephemeral store.
-Valid EIP-191 / personal_sign signature creates wallet_control_proof_id in the CPM ephemeral store (10-minute TTL, single-use).
-Invalid signature is rejected.
-Expired challenge is rejected.
-Consumed challenge is rejected.
+Stateless helper returns canonical message for valid bindings; stores nothing server-side.
+Invalid signature is rejected at persist verification time.
+Expired signed message is rejected.
+issued_at too far in the future (> 30s clock skew) is rejected.
+Validity window > 10 minutes is rejected.
 Recovered address mismatch is rejected.
-Verification uses the exact stored challenge message, not a reconstructed variant.
-Wrong wallet, wrong chain_id, wrong draft_id and wrong scan_id are rejected.
-Challenge is consumed after successful verification.
-Verify returns 503 WALLET_CONTROL_PROOF_STORE_UNAVAILABLE when the ephemeral store is unavailable.
-No raw signature is persisted in the ephemeral store or durable DB.
+Wrong wallet, chain_id, draft_id and scan_id are rejected.
+Canonical message includes wallet, chain, scan, draft, action, issued_at, expires_at — not user_id or tenant_id.
+No raw signature is persisted in durable DB.
 ```
 
 Expected commit title:
 
 ```text
-feat(cpm): verify EOA wallet challenge signatures
+feat(cpm): add canonical wallet message builder and EIP-191 verifier
 ```
 
 ---
 
-## 24. PR5 — Enforce wallet proof on CP persistence
+## 23. PR4 — Enforce wallet signed authorization on CP persistence
 
 Repository:
 
@@ -1654,55 +1373,49 @@ Repository:
 cafe-crypto-policy-mgt
 ```
 
-Depends on: **PR4** (challenge verify and proof creation).
+Depends on: **PR3**.
 
 Goal:
 
-- Implement `POST /api/cpm/v1/drafts/{draft_id}/persist` with `wallet_control_proof_id`.
-- Block EOA CP persistence via `POST /api/cpm/v1/policies` without `wallet_control_proof_id`.
-- Reject persistence without proof.
-- Reject mismatched, expired or consumed proofs.
-- Atomically consume or reserve the proof in the CPM ephemeral store **before** CP creation.
-- If CP creation fails after consume, leave the proof consumed; user must re-sign.
-- Store ownership metadata on persisted CP without raw signature or reusable proof artifacts.
-- Fail closed with **503** if the ephemeral store is unavailable — no fallback persist without proof.
+- Implement `POST /api/cpm/v1/drafts/{draft_id}/persist` with `signed_message` + `signature`.
+- Block EOA CP persistence via `POST /api/cpm/v1/policies` without signed authorization.
+- Transactional persist-once semantics; `DRAFT_ALREADY_PERSISTED` on replay after success.
+- Store ownership metadata without raw signature.
+- Enforce **user/tenant** via session/JWT and draft/scan ownership; enforce **wallet/chain/scan/draft/action/timestamps** via signed message exact match + EIP-191.
 
 Deliverables:
 
 ```text
 POST /api/cpm/v1/drafts/{draft_id}/persist implementation
-Proof validation and atomic consume-or-reserve via ProofStore
-EOA blocking on legacy POST /api/cpm/v1/policies (block, migrate or make compliant)
+Signature and binding validation at persist time
+EOA blocking on legacy POST /api/cpm/v1/policies
 Ownership metadata on persisted policy
-Unit tests
-API tests
+Unit tests and API tests
 ```
 
 Acceptance criteria:
 
 ```text
-EOA CP persistence without proof returns WALLET_CONTROL_PROOF_REQUIRED.
-All existing EOA CP persistence paths require wallet_control_proof_id.
-POST /api/cpm/v1/policies cannot persist an EOA CP without wallet_control_proof_id.
-EOA CP persistence with valid proof succeeds via POST /api/cpm/v1/drafts/{draft_id}/persist.
-Proof is consumed atomically in the CPM ephemeral store before CP creation.
-If CP creation fails after consume, proof remains consumed and cannot be reused.
-No fallback allows EOA CP persistence when the ephemeral store is unavailable.
-Valid proof cannot be reused for another draft, wallet or persist attempt.
-Persisted policy includes ownership_status = verified.
-Persisted policy includes wallet_control_method = eoa_signature.
-Persisted policy does not store raw signature or reusable proof artifacts.
+EOA CP persistence without signed authorization returns WALLET_CONTROL_PROOF_REQUIRED.
+POST /api/cpm/v1/policies cannot persist an EOA CP without signed authorization.
+EOA CP persistence with valid signature succeeds via POST /api/cpm/v1/drafts/{draft_id}/persist.
+Replay after successful persist returns DRAFT_ALREADY_PERSISTED.
+Client may retry with same signature if CP creation fails before draft marked persisted.
+Persisted policy includes ownership_status = verified and wallet_control_method = eoa_signature.
+Persisted policy does not store raw signature.
+Persist rejects when session user/tenant does not own the draft or scan, even if signature is valid.
+Signed message mismatch on wallet, chain, scan, draft, action or timestamps is rejected.
 ```
 
 Expected commit title:
 
 ```text
-feat(cpm): require wallet control proof to persist EOA policies
+feat(cpm): require wallet signed authorization to persist EOA policies
 ```
 
 ---
 
-## 25. PR6 — Web UI integration
+## 24. PR5 — Web UI integration
 
 Repository:
 
@@ -1710,143 +1423,101 @@ Repository:
 cafe-frontend
 ```
 
+Depends on: **PR4**.
+
 Goal:
 
-- Align frontend with frozen V1 contract (`/wallet-challenges`, `/drafts/{draft_id}/persist`).
+- Align frontend with stateless V1 contract.
+- Mandatory message helper; sign canonical message locally; persist with `signed_message` + `signature`.
 - Use MetaMask or injected wallet provider for EIP-191 / `personal_sign`.
-- Persist draft only after backend proof verification.
-- Display clear draft / verified / persisted states.
 
 Deliverables:
 
 ```text
-Challenge creation client (POST /api/cpm/v1/wallet-challenges)
-Wallet signing integration (EIP-191 / personal_sign)
-Challenge verification client (POST /api/cpm/v1/wallet-challenges/verify)
+Canonical message helper client (POST /wallet-challenges)
+Wallet signing integration
 Persist draft client (POST /api/cpm/v1/drafts/{draft_id}/persist)
-UI state labels and re-sign flow after consumed-proof CP failure
+UI state labels
 Frontend tests
 ```
 
 Acceptance criteria:
 
 ```text
-User cannot persist an EOA CP without signing the challenge.
-UI uses frozen V1 API paths, not legacy /wallet-challenge/start|verify or POST /policies persist.
-UI displays unverified drafts as non-actionable.
-UI displays persisted CP only after successful backend persistence.
-UI handles signature rejection and re-sign after consumed proof gracefully.
+User cannot persist an EOA CP without signing the canonical message.
+UI uses frozen V1 paths; not legacy /wallet-challenge/start|verify or POST /policies persist.
+UI does not depend on /wallet-challenges/verify for V1 security.
 ```
 
 Expected commit title:
 
 ```text
-feat(frontend): add EOA wallet challenge flow for CP persistence
+feat(frontend): add stateless EOA wallet authorization flow for CP persistence
 ```
 
 ---
 
-## 26. PR7 — CLI integration
+## 25. PR6 — CLI integration
 
 Repository:
 
 ```text
-cafe-frontend (cafe-frontend/scripts/cafe.sh)
+cafe-frontend (cafe.sh), cafe-deploy (smoke)
 ```
 
-Depends on: **PR5**. May run in parallel with **PR6**.
+Depends on: **PR4**. May run in parallel with **PR5**.
 
 Goal:
 
-- Extend `cafe.sh` with frozen V1 CPM wallet-challenge and persist commands (§35, §33).
-- Call `POST /api/cpm/v1/wallet-challenges` and `/wallet-challenges/verify` — not legacy `/wallet-challenge/start|verify`.
-- Persist via `POST /api/cpm/v1/drafts/{draft_id}/persist` with `wallet_control_proof_id` — not `POST /policies`.
-- Support external EIP-191 / `personal_sign` signing (local signer, hardware wallet, etc.).
-- Ensure the CLI cannot bypass backend proof requirements.
-- Upgrade `cafe-deploy/scripts/test-discovery-v1-wallet-scans-to-cpm.sh` to the compliant flow.
+- Extend `cafe.sh` with mandatory message helper and persist with signature.
+- Upgrade smoke script to compliant sign + persist flow.
 
 Deliverables:
 
 ```text
-cafe cpm wallet-challenge create  -> POST /api/cpm/v1/wallet-challenges
-cafe cpm wallet-challenge verify  -> POST /api/cpm/v1/wallet-challenges/verify
-cafe cpm draft persist            -> POST /api/cpm/v1/drafts/{draft_id}/persist
+cafe cpm wallet-challenge create (mandatory)
+cafe cpm draft persist with signed_message + signature
 no --force or --skip-wallet-proof flags
-CLI documentation (cpm-developer.md or equivalent)
-upgrade test-discovery-v1-wallet-scans-to-cpm.sh smoke
-CLI tests where applicable
-```
-
-Acceptance criteria:
-
-```text
-CLI follows the same challenge flow as the UI and direct API.
-CLI uses frozen V1 paths only.
-CLI persist fails without wallet_control_proof_id.
-CLI persist fails against POST /api/cpm/v1/policies for EOA without proof.
-CLI docs explain EIP-191 signing, 10-minute TTL and mandatory wallet proof.
-Smoke script test-discovery-v1-wallet-scans-to-cpm.sh passes with challenge + persist flow.
-User must re-run challenge flow if persist fails after proof consume.
+upgrade test-discovery-v1-wallet-scans-to-cpm.sh
+CLI documentation
 ```
 
 Expected commit title:
 
 ```text
-feat(cli): support EOA wallet challenge flow for CP persistence
+feat(cli): support stateless EOA wallet authorization for CP persistence
 ```
 
 ---
 
-## 27. PR8 — Documentation and end-to-end validation
+## 26. PR7 — Documentation and end-to-end validation
 
 Repositories:
 
 ```text
-cafe-crypto-policy-mgt
-cafe-deploy
-cafe-frontend
-cafe-discovery (cross-links only, if needed)
+cafe-crypto-policy-mgt, cafe-deploy, cafe-frontend
 ```
 
-Depends on: **PR6** and **PR7** (clients aligned with frozen V1 contract).
+Depends on: **PR5** and **PR6**.
 
 Goal:
 
-- Verify and finalize README / WORKPLAN_API cross-links after implementation (PR1 doc baseline is already in place).
-- Document the full frozen V1 workflow end-to-end (§33–§43) in user-facing and developer docs.
-- Validate non-regression: scan, explore and draft remain open; persist requires proof.
-- Validate that no client or smoke script can bypass wallet control proof.
+- Verify README / WORKPLAN alignment with implemented stateless V1.
+- E2E validation; non-regression S1–S3.
 
 Deliverables:
 
 ```text
-Confirm README and WORKPLAN_API remain aligned with implemented V1 contract and runtime behavior
-cafe-frontend/docs/cpm-developer.md update (V1 paths, EIP-191, re-sign after consumed proof)
-cafe-deploy smoke documentation update
-manual E2E test scenario (scan -> explore -> draft -> challenge -> verify -> persist)
-troubleshooting: WALLET_CONTROL_PROOF_REQUIRED, 503 store unavailable, expired/consumed proof, re-sign
-confirm test-discovery-v1-wallet-scans-to-cpm.sh is the canonical compliant smoke
-non-regression checklist for S1–S3 baseline stories
-```
-
-Acceptance criteria:
-
-```text
-Docs explain scan vs explore vs draft vs persist with frozen V1 routes.
-Docs document POST /api/cpm/v1/drafts/{draft_id}/persist as the only EOA persist route.
-Docs document that POST /api/cpm/v1/policies must not persist EOA CP without proof.
-Docs explain EIP-191 / personal_sign, 10-minute TTL, single-use proof and consume-before-create ordering.
-Docs explain UI, CLI and direct API all require the same challenge flow.
-Docs explain EOA-only first release and list unsupported wallet types.
-Docs explain 503 WALLET_CONTROL_PROOF_STORE_UNAVAILABLE and re-sign after consumed-proof CP failure.
-E2E smoke passes: scan, explore, draft without proof; persist only with valid wallet_control_proof_id.
-All persistence paths (UI, CLI, smoke scripts, direct API) require wallet control proof.
+cpm-developer.md update
+smoke documentation update
+manual E2E scenario: scan -> explore -> draft -> sign -> persist
+troubleshooting: WALLET_CONTROL_PROOF_REQUIRED, expired authorization, binding mismatch, DRAFT_ALREADY_PERSISTED
 ```
 
 Expected commit title:
 
 ```text
-docs: document EOA CP persistence workflow
+docs: validate stateless EOA CP persistence workflow end-to-end
 ```
 
 ---
@@ -1924,7 +1595,7 @@ Define audit requirements for institutional custody.
 
 # Part VI — Frozen decisions
 
-The following decisions are frozen for **CP-PERSIST V1**. **CP-PERSIST V1 is signed off independently through this document** — it does not require global acceptance of [`workplans/WORKPLAN_API.md`](../workplans/WORKPLAN_API.md). Implementation PRs must not reopen frozen decisions without an explicit spec revision.
+The following decisions are frozen for **CP-PERSIST V1** (stateless signature-at-persist). **CP-PERSIST V1 is signed off independently through this document** — it does not require global acceptance of [`workplans/WORKPLAN_API.md`](../workplans/WORKPLAN_API.md). Implementation PRs must not reopen frozen decisions without an explicit spec revision.
 
 ## 33. Persistence endpoint
 
@@ -1932,97 +1603,116 @@ The following decisions are frozen for **CP-PERSIST V1**. **CP-PERSIST V1 is sig
 POST /api/cpm/v1/drafts/{draft_id}/persist
 ```
 
-Request body: `{ "wallet_control_proof_id": "uuid" }` only.
+Request body (V1):
 
-Rationale: expresses the domain transition draft → persisted policy; authorization is easier to document and test than overloading `POST /policies`.
+```json
+{
+  "wallet_address": "0xabc...",
+  "chain_id": 1,
+  "scan_id": "uuid",
+  "signed_message": "string",
+  "signature": "0x..."
+}
+```
+
+Rationale: expresses draft → persisted policy transition; wallet authorization verified at persist time.
 
 ## 34. Legacy `POST /api/cpm/v1/policies`
 
 `POST /api/cpm/v1/policies` is **not** the CP persistence endpoint for this workflow.
 
-For EOA wallet flows, it must **not** create a persisted CP without `wallet_control_proof_id` and must return `WALLET_CONTROL_PROOF_REQUIRED` (or an equivalent blocking error).
+For EOA wallet flows, it must **not** create a persisted CP without valid signed wallet authorization and must return `WALLET_CONTROL_PROOF_REQUIRED` (or equivalent).
 
-## 35. Challenge API paths
+## 35. Message helper API path
+
+Clients **must** obtain the canonical authorization message from CPM before signing:
 
 ```text
-POST /api/cpm/v1/wallet-challenges
-POST /api/cpm/v1/wallet-challenges/verify
+POST /api/cpm/v1/wallet-challenges   # mandatory stateless helper — CPM-issued canonical message; stores nothing
 ```
 
-Legacy frontend paths such as `/wallet-challenge/start` and `/wallet-challenge/verify` are not part of the V1 contract.
+The client **must** obtain the canonical authorization message from CPM before signing by calling:
+
+```http
+POST /api/cpm/v1/wallet-challenges
+```
+
+This helper is **stateless**: it validates draft / scan / wallet bindings and returns the canonical message to sign, but it stores nothing server-side.
+
+At persist time, CPM does not rely on stored challenge state. CPM verifies that the submitted `signed_message` exactly matches the canonical message expected for the wallet, chain, scan, draft, action and validity window (see §12 binding model), then verifies the EIP-191 / `personal_sign` signature. User and tenant scope are enforced separately via session/JWT and draft/scan ownership.
+
+Advanced clients must not invent an alternative message format. They may only sign the canonical message returned by CPM.
+
+`POST /api/cpm/v1/wallet-challenges/verify` is **not** part of CP-PERSIST V1 security path (V2 optional UX only).
+
+Legacy frontend paths `/wallet-challenge/start` and `/wallet-challenge/verify` are not part of the V1 contract.
 
 ## 36. Challenge message and signature format
 
-V1 uses **EIP-191 / `personal_sign`** on a deterministic human-readable message (see §12).
+V1 uses **EIP-191 / `personal_sign`** on a deterministic human-readable canonical message (see §12).
+
+**Binding split (frozen):** the signed message binds **wallet, chain, scan, draft, action, issued_at, expires_at**. **User** and **tenant** are **not** in the signed message; CPM enforces them server-side via session/JWT and draft/scan ownership at persist time.
 
 SIWE / EIP-4361 remains out of scope for V1.
 
-## 37. Proof reuse policy
+## 37. Replay policy (stateless V1)
 
-`wallet_control_proof_id` is **single-use**.
+No Redis single-use proof in V1.
 
-A consumed proof cannot be reused for another draft, wallet, scan, chain, user or tenant.
+Replay is **controlled** by:
 
-## 38. Ephemeral storage model
+- max **10-minute** signed message validity window;
+- strict binding to `draft_id`, `scan_id`, `wallet_address`, `chain_id`, `action`;
+- transactional **draft persist once** (`DRAFT_ALREADY_PERSISTED` after success);
+- binding mismatch errors for cross-draft / cross-wallet / cross-scan attempts.
 
-```text
-CPM owns the wallet challenge/proof ephemeral store.
-Redis is the recommended V1 adapter (implementation detail, not a Discovery dependency).
-ChallengeStore and ProofStore abstractions; handlers must not use Redis directly.
-No durable database tables for challenges or proofs
-No raw signature storage in ephemeral store or durable DB for V1
-Mandatory key namespace: cpm:wallet_challenge:* and cpm:wallet_control_proof:*
-```
+Retry with the **same signature** after CP creation failure (before draft marked persisted) is acceptable in V1.
 
-The durable database stores only the persisted CP and minimal audit metadata.
-
-CPM must not depend on Discovery cache, Discovery database, Discovery internal structs or Discovery Redis key semantics.
-
-## 39. TTL
+## 38. No V1 server-side challenge/proof store
 
 ```text
-10 minutes
+CP-PERSIST V1 does not require Redis, CPM_REDIS_URL, ChallengeStore, ProofStore,
+wallet_control_proof_id, or backend-stored challenge/proof artifacts.
 ```
 
-Applies to both wallet challenges and wallet control proofs.
+Signature verification happens at `POST /drafts/{draft_id}/persist`.
 
-## 40. Ephemeral store unavailable
+No durable database tables for challenges or proofs. No durable raw signature storage.
 
-CPM must **fail closed** when the CPM ephemeral store is unavailable for challenge or proof operations.
+## 39. Signed message validity (TTL)
 
 ```text
-HTTP 503
-error: WALLET_CONTROL_PROOF_STORE_UNAVAILABLE
+Maximum validity window: 10 minutes (expires_at - issued_at)
+expires_at must not be in the past at persist time
+issued_at must not be in the future beyond 30 seconds clock skew (recommended)
 ```
 
-Applies to challenge create, challenge verify and persist. No fallback may allow EOA CP persistence without wallet control proof.
-
-## 41. Persist ordering: consume proof before CP creation
+## 40. Persist ordering (transactional persist-once)
 
 ```text
-1. Validate draft, proof bindings and EOA scope.
-2. Atomically consume or reserve the proof in the CPM ephemeral store.
-3. Create the persisted CP from the draft.
-4. If step 3 fails, the proof remains consumed; the user must create a new challenge and sign again.
+1. Validate session auth, draft ownership, bindings and EOA scope.
+2. Validate signed_message content, freshness and EIP-191 signature.
+3. Create persisted CP from draft in a transactional persist-once operation.
+4. If step 3 fails before draft is marked persisted, client may retry with same signature while valid.
 ```
 
-Do not create the CP first and consume the proof afterward. Re-signing off-chain is acceptable; replay or double persistence is not.
+## 41. V2 optional hardening (not V1)
 
-## 42. CPM_REDIS_URL
+Future optional enhancements (see §13.3):
 
 ```text
-CPM_REDIS_URL=redis://redis:6379/1        # local dev — shared internal instance, logical DB /1
-CPM_REDIS_URL=redis://redis-cpm:6379/0   # production target — dedicated CPM instance
+CPM_REDIS_URL, ChallengeStore, ProofStore, wallet_control_proof_id
+POST /api/cpm/v1/wallet-challenges/verify as optional pre-validation UX
 ```
 
-Use the `redis://` scheme. Redis must remain internal to the Docker network (no host port publish for this use case). Changing the URL must be a deployment-only migration path.
+V2 must not weaken persist-time verification.
 
-## 43. Long-term architecture
+## 42. Long-term architecture
 
 ```text
 CAFE may later extract persistence and auth management into dedicated services.
-Discovery is expected to become less stateful and should eventually avoid direct Redis/Postgres ownership.
-This does not change CP-PERSIST V1: the wallet challenge/proof store belongs to CPM and is accessed through CPM_REDIS_URL and store abstractions.
+Discovery is expected to become less stateful.
+CP-PERSIST V1 remains stateless at persist time; V2 store is optional hardening only.
 ```
 
 ---
@@ -2047,24 +1737,22 @@ The required invariant for the first release is:
 
 ```text
 An EOA wallet can be scanned, analyzed and drafted without wallet proof.
-An EOA Crypto Policy cannot be persisted without wallet control proof.
-The proof challenge is mandatory for UI, CLI and direct API usage.
-The backend CPM enforces the rule.
+An EOA Crypto Policy cannot be persisted without wallet signed authorization verified at persist time.
+The signed authorization is mandatory for UI, CLI and direct API usage.
+The backend CPM enforces the rule at POST /api/cpm/v1/drafts/{draft_id}/persist.
 ```
 
-First implementation target:
+First implementation target (stateless V1):
 
 ```text
 EOA only.
-POST /api/cpm/v1/wallet-challenges and /wallet-challenges/verify.
-POST /api/cpm/v1/drafts/{draft_id}/persist.
-EIP-191 / personal_sign challenge for V1.
-CPM-owned ephemeral store (Redis adapter via CPM_REDIS_URL; mandatory cpm:* namespace).
-10-minute TTL, single-use wallet_control_proof_id.
-ChallengeStore and ProofStore abstractions; handlers must not use Redis directly.
-Atomic proof consume before CP creation; re-sign if CP creation fails.
-503 WALLET_CONTROL_PROOF_STORE_UNAVAILABLE when ephemeral store is down; no fallback persist.
-POST /api/cpm/v1/policies must not persist EOA CP without proof.
-Other wallet types remain TODO.
+POST /api/cpm/v1/wallet-challenges (mandatory stateless canonical message helper).
+POST /api/cpm/v1/drafts/{draft_id}/persist with signed_message + signature.
+EIP-191 / personal_sign on canonical human-readable message.
+Max 10-minute signed message validity; replay controlled via bindings + persist-once.
+No V1 Redis, ProofStore, ChallengeStore or wallet_control_proof_id.
+POST /api/cpm/v1/policies must not persist EOA CP without signed authorization.
+Session auth (JWT) and wallet signature are orthogonal.
+Other wallet types remain TODO; V2 optional store-based hardening in §13.3 / §41.
 ```
 
