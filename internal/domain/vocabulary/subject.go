@@ -8,8 +8,6 @@ const (
 	SubjectTypeWallet SubjectType = "wallet"
 )
 
-func (t SubjectType) String() string { return string(t) }
-
 // IsValid reports whether s is a known exported subject type.
 func (t SubjectType) IsValid() bool {
 	switch t {
