@@ -9,6 +9,15 @@ info:
     Target HTTP contract for persisted policies, drafts, catalogue reads, and decision exploration
     per **WORKPLAN_API.md** §0.2, §2.3–2.4, §4.3–4.4, §5.1–5.2, §8.
 
+    **CP-PERSIST V1 (EOA wallet authorization):** normative spec [`docs/CP_PERSIST.md`](../docs/CP_PERSIST.md)
+    (OpenAPI PR2 — [`cafe-crypto-policy-mgt` PR #51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51)).
+    Wallet signed authorization is required for EOA CP persistence regardless of whether the caller is the
+    Web UI, CLI or a direct API client. Signature verification happens at
+    **`POST /drafts/{draft_id}/persist`**. Clients **must** call **`POST /wallet-challenges`** (stateless;
+    stores nothing) to obtain the CPM-issued canonical message before signing (EIP-191 / `personal_sign`).
+    Maximum signed message validity: **10 minutes**. **EOA-only** for this release.
+    **`POST /wallet-challenges/verify` is not a V1 security requirement.**
+
     **Public URL prefix:** `/api/cpm/v1`. Do **not** publish paths like `/api/cpm/v1/cpm/...` (no duplicated `cpm` segment).
 
     **Discovery scans (correlation):** `cafe-discovery/openapi/discovery-v1.yaml` (PR1a); shared key **`scan_id`**.
@@ -38,6 +47,11 @@ tags:
     description: Static catalogue reads (graph, templates, reference instances).
   - name: decisions
     description: Non-persisted decision exploration (`explore`).
+  - name: wallet-authorization
+    description: |
+      Stateless EOA wallet signed authorization for CP persistence (CP-PERSIST V1).
+      Mandatory canonical message helper and normative draft persist route.
+      UI, CLI and direct API share the same contract.
 
 security:
   - bearerAuth: []
@@ -211,8 +225,17 @@ paths:
           description: Unknown id (single-instance mode only).
     post:
       tags: [policies]
-      summary: Persist a policy instance
+      summary: Persist a policy instance (legacy / non-EOA paths)
       description: |
+        **Not the normative CP-PERSIST endpoint.** For EOA wallet flows, **`POST /drafts/{draft_id}/persist`**
+        with valid **`signed_message`** and **`signature`** is the only normative persistence route
+        ([`docs/CP_PERSIST.md`](../docs/CP_PERSIST.md), WORKPLAN_API.md §2.5).
+
+        **`POST /policies` must not create or update an EOA persisted CP without wallet signed authorization.**
+        Legacy or pre-CP_PERSIST callers attempting EOA persistence without proof receive
+        **`WALLET_CONTROL_PROOF_REQUIRED`** (blocking error). Fixture, catalog and explicitly non-EOA flows
+        may still use this route under explicit rules (WORKPLAN_API.md §2.4, §5.2).
+
         **`scan_id` is mandatory** for instances created from Discovery-bound flows (WORKPLAN_API.md §5.2).
         May be absent only for catalogue fixtures, manual drafts not yet bound, or explicit non-product tests
         — distinguish in validation and tests.
@@ -225,7 +248,7 @@ paths:
               $ref: "#/components/schemas/PolicyRecordWrite"
       responses:
         "200":
-          description: Created or updated instance as per implementation.
+          description: Created or updated instance as per implementation (non-EOA or explicit legacy/fixture flows).
           content:
             application/json:
               schema:
@@ -234,6 +257,21 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: |
+            EOA wallet persistence attempted without valid signed wallet authorization
+            (`WALLET_CONTROL_PROOF_REQUIRED`).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WalletAuthorizationErrorResponse"
+              examples:
+                proofRequired:
+                  value:
+                    code: WALLET_CONTROL_PROOF_REQUIRED
+                    message: Persisting a Crypto Policy for a wallet requires a valid signed wallet authorization.
+                    details: {}
+                    request_id: req_example
     delete:
       tags: [policies]
       summary: Delete persisted policy instance by id
@@ -352,6 +390,132 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /wallet-challenges:
+    post:
+      tags: [wallet-authorization]
+      summary: Obtain canonical wallet authorization message (stateless, mandatory before sign)
+      description: |
+        **CP-PERSIST V1 — mandatory stateless helper.** Clients (Web UI, CLI, direct API) **must** call
+        this route to obtain the CPM-issued canonical authorization message before signing with
+        EIP-191 / `personal_sign`. The helper validates draft / scan / wallet bindings and returns the
+        canonical message plus `issued_at` / `expires_at`, but **stores nothing** server-side.
+
+        Advanced clients must **not** invent an alternative message format.
+
+        **EOA-only** for this release (`wallet_type = eoa` implied; other wallet types →
+        `UNSUPPORTED_WALLET_TYPE`).
+
+        **`POST /wallet-challenges/verify` is not part of the V1 security path** — signature verification
+        happens at **`POST /drafts/{draft_id}/persist`**.
+      operationId: postWalletChallenges
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WalletChallengeRequest"
+            examples:
+              eoaPersist:
+                value:
+                  wallet_address: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0"
+                  chain_id: 1
+                  scan_id: 550e8400-e29b-41d4-a716-446655440000
+                  draft_id: 550e8400-e29b-41d4-a716-446655440001
+                  action: persist_crypto_policy
+      responses:
+        "200":
+          description: Canonical authorization message ready for EIP-191 / personal_sign.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WalletChallengeResponse"
+        "400":
+          $ref: "#/components/responses/WalletChallengeBadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/WalletChallengeNotFound"
+        "409":
+          $ref: "#/components/responses/WalletChallengeConflict"
+        "422":
+          $ref: "#/components/responses/UnsupportedWalletType"
+
+  /drafts/{draft_id}/persist:
+    post:
+      tags: [wallet-authorization, drafts]
+      summary: Persist draft to official CP (normative EOA route)
+      description: |
+        **Normative EOA CP persistence endpoint** (CP-PERSIST V1). Expresses the domain transition from
+        draft to persisted policy. The backend verifies at persist time (clients are **not** trusted):
+
+        - session auth and draft / scan ownership (user / tenant via JWT — **not** embedded in signed message)
+        - draft is not already persisted
+        - `signed_message` **exactly matches** the canonical message for wallet, chain, scan, draft,
+          `action = persist_crypto_policy` and validity window (`issued_at`, `expires_at`)
+        - EIP-191 / `personal_sign` signature recovers the expected EOA address
+        - max validity window **10 minutes**; `issued_at` not more than **30 seconds** in the future (clock skew)
+
+        Transactional **persist-once** semantics: replay after success → `DRAFT_ALREADY_PERSISTED`.
+        If CP creation fails before the draft is marked persisted, the client may retry with the **same
+        signature** while still valid.
+
+        Raw signature bytes must **not** be stored in the durable database.
+
+        Web UI, CLI and direct API **must** use this same contract.
+      operationId: postDraftPersist
+      parameters:
+        - name: draft_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Platform draft id (must match draft referenced in signed message).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DraftPersistRequest"
+            examples:
+              signedPersist:
+                value:
+                  wallet_address: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0"
+                  chain_id: 1
+                  scan_id: 550e8400-e29b-41d4-a716-446655440000
+                  signed_message: |
+                    CAFE Crypto Policy Persistence
+
+                    Domain: api.example.com
+                    Action: persist_crypto_policy
+                    Wallet: 0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0
+                    Chain ID: 1
+                    Scan ID: 550e8400-e29b-41d4-a716-446655440000
+                    Draft ID: 550e8400-e29b-41d4-a716-446655440001
+                    Issued At: 2026-06-10T12:00:00Z
+                    Expiration Time: 2026-06-10T12:10:00Z
+
+                    By signing this message, I prove control of the wallet and authorize CAFE to persist the selected Crypto Policy draft for this wallet.
+                  signature: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12"
+      responses:
+        "200":
+          description: Draft persisted to official CP (transactional persist-once).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DraftPersistResponse"
+        "400":
+          $ref: "#/components/responses/DraftPersistBadRequest"
+        "401":
+          $ref: "#/components/responses/DraftPersistUnauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/DraftPersistConflict"
+        "410":
+          $ref: "#/components/responses/WalletAuthorizationExpired"
+        "422":
+          $ref: "#/components/responses/UnsupportedWalletType"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -380,6 +544,65 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/StructuredErrorResponse"
+    WalletChallengeBadRequest:
+      description: |
+        Invalid wallet-challenge input (`WALLET_ADDRESS_REQUIRED`, `INVALID_WALLET_ADDRESS`,
+        `CHAIN_ID_REQUIRED`).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WalletAuthorizationErrorResponse"
+    WalletChallengeNotFound:
+      description: Unknown draft or scan (`DRAFT_NOT_FOUND`, `SCAN_NOT_FOUND`).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WalletAuthorizationErrorResponse"
+    WalletChallengeConflict:
+      description: |
+        Draft binding mismatch (`DRAFT_SCAN_MISMATCH`, `DRAFT_WALLET_MISMATCH`).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WalletAuthorizationErrorResponse"
+    DraftPersistBadRequest:
+      description: |
+        Missing or invalid persist authorization (`WALLET_CONTROL_PROOF_REQUIRED`,
+        `WALLET_AUTHORIZATION_NOT_YET_VALID`, `WALLET_AUTHORIZATION_VALIDITY_TOO_LONG`).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WalletAuthorizationErrorResponse"
+    DraftPersistUnauthorized:
+      description: |
+        Invalid or mismatched wallet signature (`INVALID_WALLET_SIGNATURE`,
+        `WALLET_SIGNATURE_ADDRESS_MISMATCH`).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WalletAuthorizationErrorResponse"
+    DraftPersistConflict:
+      description: |
+        Binding mismatch or already persisted (`WALLET_AUTHORIZATION_DRAFT_MISMATCH`,
+        `WALLET_AUTHORIZATION_SCAN_MISMATCH`, `WALLET_AUTHORIZATION_WALLET_MISMATCH`,
+        `WALLET_AUTHORIZATION_CHAIN_MISMATCH`, `WALLET_AUTHORIZATION_ACTION_MISMATCH`,
+        `DRAFT_ALREADY_PERSISTED`).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WalletAuthorizationErrorResponse"
+    WalletAuthorizationExpired:
+      description: Signed message past `expires_at` (`WALLET_AUTHORIZATION_EXPIRED`).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WalletAuthorizationErrorResponse"
+    UnsupportedWalletType:
+      description: Non-EOA wallet type for persistence (`UNSUPPORTED_WALLET_TYPE`).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WalletAuthorizationErrorResponse"
 
   schemas:
     ErrorResponse:
@@ -524,16 +747,6 @@ components:
           type: string
           format: date-time
 
-    PolicyDraft:
-      type: object
-      deprecated: true
-      description: Legacy placeholder — use DraftUpsertRequest / DraftRecord (CPM-DRAFT-1A).
-
-    PolicyDraftWrite:
-      type: object
-      deprecated: true
-      description: Legacy placeholder — use DraftUpsertRequest (CPM-DRAFT-1A).
-
     DecisionExploreRequest:
       type: object
       required: [policy_context, selection_request]
@@ -594,3 +807,183 @@ components:
         client_request_id:
           type: string
           description: Echo of optional client request id when provided.
+
+    WalletAuthorizationErrorResponse:
+      type: object
+      required: [code, message, details, request_id]
+      description: |
+        CP-PERSIST wallet authorization errors (AUTH-04 style; see `docs/CP_PERSIST.md` § Error semantics).
+        Legacy `POST /policies` EOA blocking may also return `WALLET_CONTROL_PROOF_REQUIRED`.
+      properties:
+        code:
+          $ref: "#/components/schemas/WalletAuthorizationErrorCode"
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+        request_id:
+          type: string
+
+    WalletAuthorizationErrorCode:
+      type: string
+      description: CP-PERSIST V1 error codes (EOA wallet authorization).
+      enum:
+        - WALLET_ADDRESS_REQUIRED
+        - INVALID_WALLET_ADDRESS
+        - CHAIN_ID_REQUIRED
+        - DRAFT_NOT_FOUND
+        - SCAN_NOT_FOUND
+        - DRAFT_SCAN_MISMATCH
+        - DRAFT_WALLET_MISMATCH
+        - UNSUPPORTED_WALLET_TYPE
+        - WALLET_CONTROL_PROOF_REQUIRED
+        - INVALID_WALLET_SIGNATURE
+        - WALLET_SIGNATURE_ADDRESS_MISMATCH
+        - WALLET_AUTHORIZATION_EXPIRED
+        - WALLET_AUTHORIZATION_NOT_YET_VALID
+        - WALLET_AUTHORIZATION_VALIDITY_TOO_LONG
+        - WALLET_AUTHORIZATION_DRAFT_MISMATCH
+        - WALLET_AUTHORIZATION_SCAN_MISMATCH
+        - WALLET_AUTHORIZATION_WALLET_MISMATCH
+        - WALLET_AUTHORIZATION_CHAIN_MISMATCH
+        - WALLET_AUTHORIZATION_ACTION_MISMATCH
+        - DRAFT_ALREADY_PERSISTED
+
+    WalletChallengeRequest:
+      type: object
+      required: [wallet_address, chain_id, scan_id, draft_id, action]
+      additionalProperties: false
+      description: |
+        Request canonical authorization message before EIP-191 / personal_sign (CP-PERSIST V1).
+        **EOA-only** for this release.
+      properties:
+        wallet_address:
+          type: string
+          description: EOA wallet address (normalized `0x` hex).
+          example: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0"
+        chain_id:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Target chain id for persistence.
+        scan_id:
+          type: string
+          format: uuid
+          description: Discovery wallet scan id bound to the draft.
+        draft_id:
+          type: string
+          description: Platform draft id to persist.
+        action:
+          type: string
+          enum: [persist_crypto_policy]
+          description: Fixed action for CP persistence authorization.
+
+    WalletChallengeResponse:
+      type: object
+      required:
+        - message
+        - wallet_address
+        - chain_id
+        - scan_id
+        - draft_id
+        - action
+        - issued_at
+        - expires_at
+      description: |
+        Canonical authorization message and metadata. `message` is the exact string the client must sign
+        (EIP-191 / personal_sign). Maximum validity window between `issued_at` and `expires_at` is
+        **10 minutes**.
+      properties:
+        message:
+          type: string
+          description: Human-readable canonical message per CP_PERSIST.md §12.
+        wallet_address:
+          type: string
+        chain_id:
+          type: integer
+          format: int64
+        scan_id:
+          type: string
+          format: uuid
+        draft_id:
+          type: string
+        action:
+          type: string
+          enum: [persist_crypto_policy]
+        issued_at:
+          type: string
+          format: date-time
+          description: Message issuance time (RFC3339 UTC).
+        expires_at:
+          type: string
+          format: date-time
+          description: Message expiration time (RFC3339 UTC; max 10 minutes after `issued_at`).
+
+    DraftPersistRequest:
+      type: object
+      required: [wallet_address, chain_id, scan_id, signed_message, signature]
+      additionalProperties: false
+      description: |
+        Signed wallet authorization for normative EOA CP persistence. `signed_message` must exactly match
+        the canonical message returned by `POST /wallet-challenges` for the same bindings and validity window.
+      properties:
+        wallet_address:
+          type: string
+          description: EOA wallet address (must match signed message and recovered signer).
+        chain_id:
+          type: integer
+          format: int64
+        scan_id:
+          type: string
+          format: uuid
+        signed_message:
+          type: string
+          description: Exact canonical message string signed with EIP-191 / personal_sign.
+        signature:
+          type: string
+          description: Hex-encoded EIP-191 signature (`0x` prefix).
+          pattern: "^0x[0-9a-fA-F]+$"
+
+    DraftPersistResponse:
+      type: object
+      required:
+        - policy_id
+        - draft_id
+        - scan_id
+        - wallet_address
+        - chain_id
+        - status
+        - ownership_status
+        - wallet_control_method
+        - persisted_at
+      description: |
+        Persisted CP acknowledgement. Does not include raw signature bytes.
+      properties:
+        policy_id:
+          type: string
+          description: Created persisted policy instance id.
+        draft_id:
+          type: string
+        scan_id:
+          type: string
+          format: uuid
+        wallet_address:
+          type: string
+        chain_id:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum: [persisted]
+        ownership_status:
+          type: string
+          enum: [verified]
+          description: Wallet control verified at persist time.
+        wallet_control_method:
+          type: string
+          enum: [eoa_signature]
+          description: EOA EIP-191 / personal_sign for V1.
+        persisted_at:
+          type: string
+          format: date-time

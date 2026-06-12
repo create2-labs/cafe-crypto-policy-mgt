@@ -2,7 +2,6 @@ package authz
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 )
 
@@ -42,54 +41,6 @@ type APIError struct {
 	Message   string         `json:"message"`
 	Details   map[string]any `json:"details"`
 	RequestID string         `json:"request_id,omitempty"`
-}
-
-func (e APIError) Validate() error {
-	if strings.TrimSpace(e.Code) == "" {
-		return errors.New("error code is required")
-	}
-	if strings.TrimSpace(e.Message) == "" {
-		return errors.New("error message is required")
-	}
-	return nil
-}
-
-type ScanAccessDecision string
-
-const (
-	ScanAccessDecisionAllow       ScanAccessDecision = "allow"
-	ScanAccessDecisionDeny        ScanAccessDecision = "deny"
-	ScanAccessDecisionUnavailable ScanAccessDecision = "unavailable"
-)
-
-type ScanAccessCheckRequest struct {
-	ScanID    string
-	Principal Principal
-	RequestID string
-}
-
-func (r ScanAccessCheckRequest) Validate() error {
-	if strings.TrimSpace(r.ScanID) == "" {
-		return errors.New("scan_id is required")
-	}
-	if err := r.Principal.Validate(); err != nil {
-		return fmt.Errorf("principal: %w", err)
-	}
-	return nil
-}
-
-type ScanAccessCheckResponse struct {
-	Decision ScanAccessDecision
-	Reason   string
-}
-
-func (r ScanAccessCheckResponse) Validate() error {
-	switch r.Decision {
-	case ScanAccessDecisionAllow, ScanAccessDecisionDeny, ScanAccessDecisionUnavailable:
-		return nil
-	default:
-		return fmt.Errorf("unsupported decision: %q", r.Decision)
-	}
 }
 
 func IsValidRouteClass(value string) bool {
