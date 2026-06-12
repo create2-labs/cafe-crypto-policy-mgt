@@ -14,7 +14,7 @@ Wallet control proof for CP persistence (EOA) is specified in [`docs/CP_PERSIST.
 
 **CP-PERSIST V1 (stateless):** clients **must** obtain the canonical authorization message from CPM via `POST /api/cpm/v1/wallet-challenges` before signing (stateless helper — stores nothing server-side). Normative persist is `POST /api/cpm/v1/drafts/{draft_id}/persist` with `signed_message` + `signature`. At persist time, CPM verifies the submitted message exactly matches the expected canonical message, then EIP-191 / `personal_sign`. Advanced clients must not invent an alternative message format. **No V1 Redis**, `CPM_REDIS_URL`, `ProofStore` or `wallet_control_proof_id`. Redis / proof handles are **V2 optional** hardening only (see `CP_PERSIST.md` §13.3).
 
-**Expected gaps after PR1 (docs-only):** EOA persist enforcement (PR4), OpenAPI (PR2), canonical message + verifier (PR3), frontend/CLI migration (PR5–PR6). Session auth (JWT) and wallet signature are orthogonal. See [Expected implementation gaps (after PR1)](./docs/CP_PERSIST.md#expected-implementation-gaps-after-pr1).
+**OpenAPI (CP-PERSIST PR2):** [`openapi/cpm-v1.yaml`](./openapi/cpm-v1.yaml) — merge via [PR #51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51). **Expected runtime gaps after PR2:** EOA persist enforcement (PR4), canonical message + verifier (PR3), frontend/CLI migration (PR5–PR6). Session auth (JWT) and wallet signature are orthogonal. See [Expected implementation gaps (after PR2)](./docs/CP_PERSIST.md#expected-implementation-gaps-after-pr2).
 
 ## Repository layout
 
@@ -248,7 +248,7 @@ CP-PERSIST V1 does **not** add new mandatory runtime environment variables. Wall
 
 **V2 optional (not V1):** `CPM_REDIS_URL` and ephemeral proof stores may be introduced later for advanced workflows — not required for CP-PERSIST V1.
 
-Other expected post-PR1 gaps are documented in [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md#expected-implementation-gaps-after-pr1).
+Other expected post-PR2 runtime gaps are documented in [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md#expected-implementation-gaps-after-pr2).
 
 Important:
 - **`CPM_AUTH_REQUIRED=false`** disables the entire auth middleware: user JWT routes and **`POST /internal/policies/references/scan`** are unauthenticated at CPM — use only in controlled local dev. **Staging/production** should keep **`CPM_AUTH_REQUIRED=true`** and set **`CAFE_POLICY_REFERENCE_INTERNAL_SERVICE_TOKEN`** (see `cafe-deploy` env templates and **WORKPLAN_API_PR** PR9).

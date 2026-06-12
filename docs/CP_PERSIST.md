@@ -5,7 +5,7 @@
    2. [Purpose](#purpose)
    3. [Scope](#scope)
    4. [Out of scope](#out-of-scope)
-   5. [Expected implementation gaps (after PR1)](#expected-implementation-gaps-after-pr1)
+   5. [Expected implementation gaps (after PR2)](#expected-implementation-gaps-after-pr2)
 2. [Part I — Functional specifications](#part-i--functional-specifications)
    1. [Definitions](#definitions)
       1. [Discovery scan](#discovery-scan)
@@ -113,6 +113,7 @@
 | Jun 10th, 2026 | O. Lodygensky | 0.9.2   | Mandatory CPM-issued canonical message via POST /wallet-challenges before sign |
 | Jun 10th, 2026 | O. Lodygensky | 0.9.3   | Clarify signed-message vs server-side binding model (PR3/PR4) |
 | Jun 10th, 2026 | O. Lodygensky | 0.9.4   | Mark PR1 merged; unblock PR2 tracking |
+| Jun 12th, 2026 | O. Lodygensky | 0.9.5   | Mark PR2 OpenAPI complete; link [`cafe-crypto-policy-mgt` PR #51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51) |
 
 
 ---
@@ -169,21 +170,19 @@ Important CAFE rule:
 
 ---
 
-## Expected implementation gaps (after PR1)
+## Expected implementation gaps (after PR2)
 
-PR1 is **docs-only** and freezes the CP-PERSIST V1 contract (stateless signature-at-persist). It intentionally does not implement runtime behavior.
+PR1 is **docs-only** and freezes the CP-PERSIST V1 contract (stateless signature-at-persist). **PR2** ([`cafe-crypto-policy-mgt` PR #51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51)) documents the normative OpenAPI contract in [`openapi/cpm-v1.yaml`](../openapi/cpm-v1.yaml). Neither PR1 nor PR2 implement runtime handlers.
 
-The following gaps are **expected** after PR1 merge. They are **not** PR1 defects; each maps to a later PR in Part IV.
+The following gaps are **expected** after PR2 merge. They are **not** documentation defects; each maps to a later PR in Part IV.
 
 1. **EOA persistence enforcement is not implemented yet.** This is **PR4**. No EOA CP persistence path may remain callable without a valid `signed_message` + `signature`. Existing `POST /api/cpm/v1/policies` must be blocked, migrated or made compliant for EOA flows.
 
-2. **OpenAPI is not implemented yet.** This is **PR2** and is the **mandatory gate** before backend implementation.
+2. **Canonical message builder and EIP-191 verifier are not implemented yet.** **PR3** will implement message canonicalization, signature verification and test vectors.
 
-3. **Canonical message builder and EIP-191 verifier are not implemented yet.** **PR3** will implement message canonicalization, signature verification and test vectors.
+3. **Frontend and CLI still use legacy or mock persistence flows.** **PR5** and **PR6** will migrate them to the frozen CP-PERSIST V1 flow. Session auth and wallet signature are **orthogonal**: session auth identifies the user; wallet signature proves control of the EOA for the persist action.
 
-4. **Frontend and CLI still use legacy or mock persistence flows.** **PR5** and **PR6** will migrate them to the frozen CP-PERSIST V1 flow. Session auth and wallet signature are **orthogonal**: session auth identifies the user; wallet signature proves control of the EOA for the persist action.
-
-5. **CP-PERSIST V1 is signed off independently through this document** (Part VI frozen decisions). [`workplans/WORKPLAN_API.md`](../workplans/WORKPLAN_API.md) remains a broader API workplan and may keep its global proposal status.
+4. **CP-PERSIST V1 is signed off independently through this document** (Part VI frozen decisions). [`workplans/WORKPLAN_API.md`](../workplans/WORKPLAN_API.md) remains a broader API workplan and may keep its global proposal status.
 
 **Not a V1 gap:** Redis, `CPM_REDIS_URL`, `ChallengeStore` / `ProofStore` or `wallet_control_proof_id` — these are **V2 optional** hardening, not required for CP-PERSIST V1.
 
@@ -1081,12 +1080,12 @@ These stories are already implemented and must remain true during CP-PERSIST imp
 
 | ID | Story | Priority | PR(s) | Status |
 | --- | --- | --- | --- | --- |
-| **CP-PERSIST-S4** | As a wallet owner using the Web UI, I want to sign an off-chain authorization with my EOA wallet so I can persist my CP without sending an on-chain transaction. | Must | PR2–PR5 | ⚪ planned |
-| **CP-PERSIST-S5** | As a wallet owner using the CLI, I want to sign externally and submit the signed authorization through the same CPM persist API so the CLI cannot bypass backend enforcement. | Must | PR2–PR4, PR6 | ⚪ planned |
-| **CP-PERSIST-S6** | As an API integrator, I want a clear `WALLET_CONTROL_PROOF_REQUIRED` error when I call persist without a valid signed authorization. | Must | PR2, PR4 | ⚪ planned |
+| **CP-PERSIST-S4** | As a wallet owner using the Web UI, I want to sign an off-chain authorization with my EOA wallet so I can persist my CP without sending an on-chain transaction. | Must | PR3–PR5 | ⚪ planned |
+| **CP-PERSIST-S5** | As a wallet owner using the CLI, I want to sign externally and submit the signed authorization through the same CPM persist API so the CLI cannot bypass backend enforcement. | Must | PR3–PR4, PR6 | ⚪ planned |
+| **CP-PERSIST-S6** | As an API integrator, I want a clear `WALLET_CONTROL_PROOF_REQUIRED` error when I call persist without a valid signed authorization. | Must | PR2, PR4 | 🟡 in progress (OpenAPI ✅ PR #51; runtime PR4) |
 | **CP-PERSIST-S7** | As a security officer, I want wallet signed authorizations to be time-bound and cryptographically bound to wallet, chain, scan, draft and action (via signed message), with user/tenant enforced server-side via session and draft/scan ownership, and replay controlled at persist time. | Must | PR3–PR4 | ⚪ planned |
 | **CP-PERSIST-S8** | As an auditor, I want persisted CPs to record minimal ownership verification metadata without storing reusable credentials or raw signatures. | Should | PR4 | ⚪ planned |
-| **CP-PERSIST-S9** | As a developer, I want contract-first documentation and OpenAPI before implementation so UI, CLI and API clients share one backend contract. | Must | PR1, PR2 | 🟡 in progress (PR1 ✅; PR2 pending) |
+| **CP-PERSIST-S9** | As a developer, I want contract-first documentation and OpenAPI before implementation so UI, CLI and API clients share one backend contract. | Must | PR1, PR2 | ✅ done |
 | **CP-PERSIST-S10** | As a product owner, I want end-to-end documentation and validation so scan / explore / draft remain open while persist requires proof. | Should | PR7 | ⚪ planned |
 | **CP-PERSIST-S11** | As a platform owner, I want CPM backend to be the only enforcement point for CP persistence so that UI, CLI, scripts or direct API calls cannot bypass wallet signed authorization. | Must | PR4 | ⚪ planned |
 
@@ -1111,22 +1110,24 @@ Stories: **CP-PERSIST-S9**
 [x] Update README cross-links for stateless CP-PERSIST V1
 ```
 
-**PR1 merged** — doc deliverables complete. Story **S9** remains **`in progress`** until **PR2** (OpenAPI) lands.
+**PR1 merged** — specification deliverables complete.
 
 ### CP-PERSIST-T2 — OpenAPI contract (PR2)
 
 Stories: **CP-PERSIST-S6**, **CP-PERSIST-S9**
 
 ```text
-[ ] Add OpenAPI for POST /api/cpm/v1/drafts/{draft_id}/persist (signed_message + signature)
-[ ] Add OpenAPI for POST /api/cpm/v1/wallet-challenges (mandatory stateless canonical message helper)
-[ ] Document that POST /api/cpm/v1/policies is not the CP persistence endpoint
-[ ] Ensure legacy/pre-CP_PERSIST persistence paths cannot bypass signed authorization
-[ ] Add error codes (WALLET_CONTROL_PROOF_REQUIRED, WALLET_AUTHORIZATION_*, binding errors)
-[ ] Mark persistence as EOA-only for the first release
-[ ] Do not document /wallet-challenges/verify as V1 security requirement
-[ ] Document that UI, CLI and direct API share the same contract
+[x] Add OpenAPI for POST /api/cpm/v1/drafts/{draft_id}/persist (signed_message + signature)
+[x] Add OpenAPI for POST /api/cpm/v1/wallet-challenges (mandatory stateless canonical message helper)
+[x] Document that POST /api/cpm/v1/policies is not the CP persistence endpoint
+[x] Ensure legacy/pre-CP_PERSIST persistence paths cannot bypass signed authorization
+[x] Add error codes (WALLET_CONTROL_PROOF_REQUIRED, WALLET_AUTHORIZATION_*, binding errors)
+[x] Mark persistence as EOA-only for the first release
+[x] Do not document /wallet-challenges/verify as V1 security requirement
+[x] Document that UI, CLI and direct API share the same contract
 ```
+
+**PR2** — OpenAPI contract in [`openapi/cpm-v1.yaml`](../openapi/cpm-v1.yaml); merge via [`cafe-crypto-policy-mgt` PR #51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51). No runtime handlers in this PR.
 
 ### CP-PERSIST-T3 — Canonical message and EIP-191 verifier (PR3)
 
@@ -1212,15 +1213,15 @@ Stories: **CP-PERSIST-S10**, **CP-PERSIST-S1**, **CP-PERSIST-S2**, **CP-PERSIST-
 
 ## Tracking table
 
-| Task / Story | PR | Repository | Depends on | Status |
-| --- | --- | --- | --- | --- |
-| **CP-PERSIST-T1** / **S9** | PR1 | `cafe-crypto-policy-mgt` | — | ✅ done |
-| **CP-PERSIST-T2** / **S6**, **S9** | PR2 | `cafe-crypto-policy-mgt` | PR1 | 🟡 in progress |
-| **CP-PERSIST-T3** / **S4**, **S5**, **S7** | PR3 | `cafe-crypto-policy-mgt` | PR2 | ⚪ planned |
-| **CP-PERSIST-T4** / **S6**, **S7**, **S8**, **S11** | PR4 | `cafe-crypto-policy-mgt` | PR3 | ⚪ planned |
-| **CP-PERSIST-T5** / **S4** | PR5 | `cafe-frontend` | PR4 | ⚪ planned |
-| **CP-PERSIST-T6** / **S5** | PR6 | `cafe-frontend` (`cafe.sh`), `cafe-deploy` (smoke) | PR4 | ⚪ planned |
-| **CP-PERSIST-T7** / **S10**, **S1–S3** | PR7 | multi-repo | PR5, PR6 | ⚪ planned |
+| Task / Story | PR | Git PR | Repository | Depends on | Status |
+| --- | --- | --- | --- | --- | --- |
+| **CP-PERSIST-T1** / **S9** | PR1 | — | `cafe-crypto-policy-mgt` | — | ✅ done |
+| **CP-PERSIST-T2** / **S6**, **S9** | PR2 | [#51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51) | `cafe-crypto-policy-mgt` | PR1 | ✅ done |
+| **CP-PERSIST-T3** / **S4**, **S5**, **S7** | PR3 | — | `cafe-crypto-policy-mgt` | PR2 | ⚪ planned |
+| **CP-PERSIST-T4** / **S6**, **S7**, **S8**, **S11** | PR4 | — | `cafe-crypto-policy-mgt` | PR3 | ⚪ planned |
+| **CP-PERSIST-T5** / **S4** | PR5 | — | `cafe-frontend` | PR4 | ⚪ planned |
+| **CP-PERSIST-T6** / **S5** | PR6 | — | `cafe-frontend` (`cafe.sh`), `cafe-deploy` (smoke) | PR4 | ⚪ planned |
+| **CP-PERSIST-T7** / **S10**, **S1–S3** | PR7 | — | multi-repo | PR5, PR6 | ⚪ planned |
 
 Recommended delivery order:
 
@@ -1260,7 +1261,7 @@ README cross-links for stateless CP-PERSIST V1
 
 No implementation in this PR.
 
-**Expected implementation gaps after this PR:** see [Expected implementation gaps (after PR1)](#expected-implementation-gaps-after-pr1). Reviewers must not treat current runtime behavior (proof-free `POST /api/cpm/v1/policies`, missing OpenAPI, no signature-at-persist verification, legacy frontend paths) as documentation defects.
+**Expected implementation gaps after this PR:** see [Expected implementation gaps (after PR2)](#expected-implementation-gaps-after-pr2) (OpenAPI gap closed in **PR2** — [#51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51)). Reviewers must not treat current runtime behavior (proof-free `POST /api/cpm/v1/policies`, no signature-at-persist verification, legacy frontend paths) as PR1 documentation defects.
 
 Expected commit title:
 
@@ -1272,7 +1273,9 @@ docs(cpm): adopt stateless CP-PERSIST V1 signature-at-persist model
 
 ## 21. PR2 — OpenAPI contract for stateless CP-PERSIST
 
-**Status:** 🟡 next (unblocked by PR1).
+**Status:** ✅ done — merge via [`cafe-crypto-policy-mgt` PR #51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51).
+
+OpenAPI contract in [`openapi/cpm-v1.yaml`](../openapi/cpm-v1.yaml). Runtime handlers and enforcement remain **PR3**–**PR4**.
 
 Repository:
 
