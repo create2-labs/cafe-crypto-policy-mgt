@@ -747,16 +747,6 @@ components:
           type: string
           format: date-time
 
-    PolicyDraft:
-      type: object
-      deprecated: true
-      description: Legacy placeholder — use DraftUpsertRequest / DraftRecord (CPM-DRAFT-1A).
-
-    PolicyDraftWrite:
-      type: object
-      deprecated: true
-      description: Legacy placeholder — use DraftUpsertRequest (CPM-DRAFT-1A).
-
     DecisionExploreRequest:
       type: object
       required: [policy_context, selection_request]
