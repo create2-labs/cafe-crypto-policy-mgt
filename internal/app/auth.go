@@ -36,6 +36,8 @@ type authConfig struct {
 	DiscoveryHTTPTimeoutSec int
 	// AssessmentNATSPublish publishes the policy.assessment.requested payload; nil → 503 on the route.
 	AssessmentNATSPublish func(ctx context.Context, subject string, payload []byte) error
+	// WalletAuthDomain is embedded in canonical wallet authorization messages (CP-PERSIST §12).
+	WalletAuthDomain string
 }
 
 type routeSpec struct {

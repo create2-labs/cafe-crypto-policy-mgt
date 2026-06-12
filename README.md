@@ -14,7 +14,7 @@ Wallet control proof for CP persistence (EOA) is specified in [`docs/CP_PERSIST.
 
 **CP-PERSIST V1 (stateless):** clients **must** obtain the canonical authorization message from CPM via `POST /api/cpm/v1/wallet-challenges` before signing (stateless helper — stores nothing server-side). Normative persist is `POST /api/cpm/v1/drafts/{draft_id}/persist` with `signed_message` + `signature`. At persist time, CPM verifies the submitted message exactly matches the expected canonical message, then EIP-191 / `personal_sign`. Advanced clients must not invent an alternative message format. **No V1 Redis**, `CPM_REDIS_URL`, `ProofStore` or `wallet_control_proof_id`. Redis / proof handles are **V2 optional** hardening only (see `CP_PERSIST.md` §13.3).
 
-**OpenAPI (CP-PERSIST PR2):** [`openapi/cpm-v1.yaml`](./openapi/cpm-v1.yaml) — merge via [PR #51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51). **Expected runtime gaps after PR2:** EOA persist enforcement (PR4), canonical message + verifier (PR3), frontend/CLI migration (PR5–PR6). Session auth (JWT) and wallet signature are orthogonal. See [Expected implementation gaps (after PR2)](./docs/CP_PERSIST.md#expected-implementation-gaps-after-pr2).
+**OpenAPI (CP-PERSIST PR2):** [`openapi/cpm-v1.yaml`](./openapi/cpm-v1.yaml) — merge via [PR #51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51). **PR3 (CP-PERSIST-T3):** `internal/walletauth` canonical message builder + EIP-191 verifier; stateless `POST /api/cpm/v1/wallet-challenges` handler (stores nothing). **Remaining runtime gaps:** EOA persist enforcement (PR4), frontend/CLI migration (PR5–PR6). Session auth (JWT) and wallet signature are orthogonal. See [Expected implementation gaps (after PR2)](./docs/CP_PERSIST.md#expected-implementation-gaps-after-pr2).
 
 ## Repository layout
 
@@ -27,6 +27,7 @@ Wallet control proof for CP persistence (EOA) is specified in [`docs/CP_PERSIST.
 | `internal/domain/policy` | Policy domain contracts (`PolicySelectionRequest`, `PolicyGraphCatalog`, `CryptoPolicyTemplate`, `CryptoPolicyInstance`, `CryptoPolicyValidationResult`, `CryptoPolicyAssessmentResult`, `PolicyCompatibilityResult` + `PolicyCompatibilityEvaluator`, and PR13 `PolicyDecision` models/evaluator) |
 | `internal/api` | PR17 read-only HTTP APIs for policy inspection and decision exploration |
 | `internal/persistence` | Owner-scoped in-memory persistence (`OwnerScopedStore`) for drafts and persisted policy records exposed under `/api/cpm/v1/*` |
+| `internal/walletauth` | CP-PERSIST V1 canonical wallet authorization message builder and EIP-191 / `personal_sign` verifier (PR3) |
 | `docs/` | Integration narratives — [`docs/CPM_OPTION_A_INTEGRATED.md`](./docs/CPM_OPTION_A_INTEGRATED.md) (Option A v1 flow); [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md) (EOA wallet control proof for CP persistence) |
 | `scripts/` | Operational helpers — [`scripts/test-imm-ops-1.sh`](./scripts/test-imm-ops-1.sh) (IMM-OPS-1 explore observability smoke); Option A v1 smoke lives in [`cafe-deploy`](https://github.com/create2-labs/cafe-deploy/scripts/test-discovery-v1-wallet-scans-to-cpm.sh) |
 | `internal/metrics` | Prometheus registry and CPM application counters (IMM-OPS-1) |

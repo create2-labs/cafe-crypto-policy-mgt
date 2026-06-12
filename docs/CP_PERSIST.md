@@ -114,6 +114,7 @@
 | Jun 10th, 2026 | O. Lodygensky | 0.9.3   | Clarify signed-message vs server-side binding model (PR3/PR4) |
 | Jun 10th, 2026 | O. Lodygensky | 0.9.4   | Mark PR1 merged; unblock PR2 tracking |
 | Jun 12th, 2026 | O. Lodygensky | 0.9.5   | Mark PR2 OpenAPI complete; link [`cafe-crypto-policy-mgt` PR #51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51) |
+| Jun 12th, 2026 | O. Lodygensky | 0.9.6   | Mark PR3 canonical message + EIP-191 verifier implemented (CP-PERSIST-T3) |
 
 
 ---
@@ -178,7 +179,7 @@ The following gaps are **expected** after PR2 merge. They are **not** documentat
 
 1. **EOA persistence enforcement is not implemented yet.** This is **PR4**. No EOA CP persistence path may remain callable without a valid `signed_message` + `signature`. Existing `POST /api/cpm/v1/policies` must be blocked, migrated or made compliant for EOA flows.
 
-2. **Canonical message builder and EIP-191 verifier are not implemented yet.** **PR3** will implement message canonicalization, signature verification and test vectors.
+2. **Canonical message builder and EIP-191 verifier** — implemented in **PR3** (`internal/walletauth`, `POST /api/cpm/v1/wallet-challenges`). Persist-time enforcement remains **PR4**.
 
 3. **Frontend and CLI still use legacy or mock persistence flows.** **PR5** and **PR6** will migrate them to the frozen CP-PERSIST V1 flow. Session auth and wallet signature are **orthogonal**: session auth identifies the user; wallet signature proves control of the EOA for the persist action.
 
@@ -1134,17 +1135,17 @@ Stories: **CP-PERSIST-S6**, **CP-PERSIST-S9**
 Stories: **CP-PERSIST-S4**, **CP-PERSIST-S5**, **CP-PERSIST-S7**
 
 ```text
-[ ] Implement canonical message builder per §12
-[ ] Implement mandatory stateless POST /api/cpm/v1/wallet-challenges (no server storage)
-[ ] Implement EOA signature verifier and address normalization
-[ ] Support EIP-191 / personal_sign verification at persist time
-[ ] Enforce max 10-minute validity window on signed messages
-[ ] Reject issued_at too far in the future (30s clock skew)
-[ ] Add deterministic signature test vectors
-[ ] Add tests for wrong wallet, chain_id, draft_id, scan_id, expired message, future issued_at
-[ ] Canonical message binds wallet, chain, scan, draft, action, issued_at, expires_at only (not user_id/tenant_id)
-[ ] Do not store raw signature in durable DB
-[ ] Add unit tests and API tests
+[x] Implement canonical message builder per §12
+[x] Implement mandatory stateless POST /api/cpm/v1/wallet-challenges (no server storage)
+[x] Implement EOA signature verifier and address normalization
+[x] Support EIP-191 / personal_sign verification at persist time
+[x] Enforce max 10-minute validity window on signed messages
+[x] Reject issued_at too far in the future (30s clock skew)
+[x] Add deterministic signature test vectors
+[x] Add tests for wrong wallet, chain_id, draft_id, scan_id, expired message, future issued_at
+[x] Canonical message binds wallet, chain, scan, draft, action, issued_at, expires_at only (not user_id/tenant_id)
+[x] Do not store raw signature in durable DB
+[x] Add unit tests and API tests
 ```
 
 ### CP-PERSIST-T4 — Persist enforcement (PR4)
@@ -1217,7 +1218,7 @@ Stories: **CP-PERSIST-S10**, **CP-PERSIST-S1**, **CP-PERSIST-S2**, **CP-PERSIST-
 | --- | --- | --- | --- | --- | --- |
 | **CP-PERSIST-T1** / **S9** | PR1 | — | `cafe-crypto-policy-mgt` | — | ✅ done |
 | **CP-PERSIST-T2** / **S6**, **S9** | PR2 | [#51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51) | `cafe-crypto-policy-mgt` | PR1 | ✅ done |
-| **CP-PERSIST-T3** / **S4**, **S5**, **S7** | PR3 | — | `cafe-crypto-policy-mgt` | PR2 | ⚪ planned |
+| **CP-PERSIST-T3** / **S4**, **S5**, **S7** | PR3 | — | `cafe-crypto-policy-mgt` | PR2 | ✅ done |
 | **CP-PERSIST-T4** / **S6**, **S7**, **S8**, **S11** | PR4 | — | `cafe-crypto-policy-mgt` | PR3 | ⚪ planned |
 | **CP-PERSIST-T5** / **S4** | PR5 | — | `cafe-frontend` | PR4 | ⚪ planned |
 | **CP-PERSIST-T6** / **S5** | PR6 | — | `cafe-frontend` (`cafe.sh`), `cafe-deploy` (smoke) | PR4 | ⚪ planned |
@@ -1275,7 +1276,7 @@ docs(cpm): adopt stateless CP-PERSIST V1 signature-at-persist model
 
 **Status:** ✅ done — merge via [`cafe-crypto-policy-mgt` PR #51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51).
 
-OpenAPI contract in [`openapi/cpm-v1.yaml`](../openapi/cpm-v1.yaml). Runtime handlers and enforcement remain **PR3**–**PR4**.
+OpenAPI contract in [`openapi/cpm-v1.yaml`](../openapi/cpm-v1.yaml). **PR3** handler for `POST /wallet-challenges` is implemented; persist enforcement remains **PR4**.
 
 Repository:
 
@@ -1322,6 +1323,8 @@ docs(openapi): add stateless EOA wallet authorization contract for CP persistenc
 ---
 
 ## 22. PR3 — Canonical message builder and EIP-191 verifier
+
+**Status:** ✅ implemented (CP-PERSIST-T3). Merge target: PR #52 stack.
 
 Repository:
 
