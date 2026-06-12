@@ -11,7 +11,9 @@ const (
 	walletAuthCodeDraftScanMismatch   = "DRAFT_SCAN_MISMATCH"
 	walletAuthCodeDraftWalletMismatch = "DRAFT_WALLET_MISMATCH"
 	walletAuthCodeUnsupportedWallet   = "UNSUPPORTED_WALLET_TYPE"
-	walletAuthCodeActionRequired      = "WALLET_AUTHORIZATION_ACTION_MISMATCH"
+	walletAuthCodeActionRequired        = "WALLET_AUTHORIZATION_ACTION_MISMATCH"
+	walletAuthCodeControlProofRequired  = "WALLET_CONTROL_PROOF_REQUIRED"
+	walletAuthCodeDraftAlreadyPersisted = "DRAFT_ALREADY_PERSISTED"
 )
 
 func writeWalletAuthorizationError(w http.ResponseWriter, r *http.Request, obs *authObservability, status int, code string, message string) {

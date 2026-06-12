@@ -12,7 +12,7 @@
 
 **Option A (définition produit) :** [`CPM_post_v_1_option_a_scan_context.md`](./CPM_post_v_1_option_a_scan_context.md). **Narratif intégré (jalons mergés) :** [`docs/CPM_OPTION_A_INTEGRATED.md`](../docs/CPM_OPTION_A_INTEGRATED.md) — plan de PR [`CPM_OPTION_A_PR_PLAN.md`](./CPM_OPTION_A_PR_PLAN.md) ; index PR mergées [`WORKPLAN_API_PR.md`](./WORKPLAN_API_PR.md).
 
-**CP-PERSIST (wallet control proof, EOA) :** [`docs/CP_PERSIST.md`](../docs/CP_PERSIST.md) — **stateless signature-at-persist V1**. **CP-PERSIST V1 is signed off independently** through that document (Part VI). This workplan may keep its **global proposal status**. **Architecture (English) :** clients **must** call `POST /api/cpm/v1/wallet-challenges` to obtain the CPM-issued canonical message before signing (**stateless** helper — no Redis, no DB write). Normative EOA persist: `POST /api/cpm/v1/drafts/{draft_id}/persist` with `signed_message` + `signature`; backend verifies exact canonical message match + EIP-191 at persist time. Advanced clients must not invent an alternative message format. **`POST /wallet-challenges/verify` is not V1.** No V1 `CPM_REDIS_URL`, `ChallengeStore` or `ProofStore` (V2 optional). Session JWT and wallet signature are orthogonal. **OpenAPI CP-PERSIST PR2 :** [`openapi/cpm-v1.yaml`](../openapi/cpm-v1.yaml) — merge [`cafe-crypto-policy-mgt` PR #51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51). **PR3 (CP-PERSIST-T3) :** `internal/walletauth` + stateless `POST /api/cpm/v1/wallet-challenges` handler deployed. **Remaining runtime gaps :** persist enforcement (PR4), clients (PR5–PR6) — see [`CP_PERSIST.md`](../docs/CP_PERSIST.md#expected-implementation-gaps-after-pr2).
+**CP-PERSIST (wallet control proof, EOA) :** [`docs/CP_PERSIST.md`](../docs/CP_PERSIST.md) — **stateless signature-at-persist V1**. **CP-PERSIST V1 is signed off independently** through that document (Part VI). This workplan may keep its **global proposal status**. **Architecture (English) :** clients **must** call `POST /api/cpm/v1/wallet-challenges` to obtain the CPM-issued canonical message before signing (**stateless** helper — no Redis, no DB write). Normative EOA persist: `POST /api/cpm/v1/drafts/{draft_id}/persist` with `signed_message` + `signature`; backend verifies exact canonical message match + EIP-191 at persist time. Advanced clients must not invent an alternative message format. **`POST /wallet-challenges/verify` is not V1.** No V1 `CPM_REDIS_URL`, `ChallengeStore` or `ProofStore` (V2 optional). Session JWT and wallet signature are orthogonal. **OpenAPI CP-PERSIST PR2 :** [`openapi/cpm-v1.yaml`](../openapi/cpm-v1.yaml) — merge [`cafe-crypto-policy-mgt` PR #51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51). **PR3 (CP-PERSIST-T3) :** `internal/walletauth` + stateless `POST /api/cpm/v1/wallet-challenges` handler deployed. **PR4 (CP-PERSIST-T4) :** `POST /drafts/{draft_id}/persist` + EOA blocking on legacy `POST /policies`. **Remaining runtime gaps :** clients (PR5–PR6), E2E docs (PR7) — see [`CP_PERSIST.md`](../docs/CP_PERSIST.md#expected-implementation-gaps-after-pr4).
 
 ---
 
@@ -49,7 +49,7 @@ Si le service CPM est publié sous **`/api/cpm/v1`** (le segment **`cpm`** n’a
 | **POST**, **GET**, **DELETE** | `/api/cpm/v1/policies` — instances persistées (**`GET`** / **`DELETE`** avec query **`id`** ; **`GET`** liste owner-scoped avec query **`scan_id`** — **pas** **`id`** + **`scan_id`** ensemble — **§5.2**). **Not** the normative EOA CP-PERSIST write path — see **§2.5**. |
 | **POST**, **GET**, **DELETE** | `/api/cpm/v1/drafts` — brouillons (**`DELETE`** avec query **`id`** — **§2.4**, **§4.4**) |
 | **POST** *(OpenAPI PR2 [#51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51); handler **PR3** ✅)* | `/api/cpm/v1/wallet-challenges` — **mandatory** stateless canonical message helper (stores nothing; client must call before sign) |
-| **POST** *(OpenAPI PR2 [#51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51); handlers PR3–PR4)* | `/api/cpm/v1/drafts/{draft_id}/persist` — **normative EOA CP persistence** (`signed_message` + `signature`) |
+| **POST** *(OpenAPI PR2 [#51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51); handler **PR4** ✅)* | `/api/cpm/v1/drafts/{draft_id}/persist` — **normative EOA CP persistence** (`signed_message` + `signature`) |
 
 **Remarque :** pas de chemin du type **`/api/cpm/v1/cpm/policies`**. Les **réponses d’erreur** référencent les **instances** persistées comme **`…/policies`** sous ce préfixe (ex. **`409`** scan — **§4.2**).
 
@@ -255,7 +255,7 @@ Série **IMM-6b-1…8** — [`cafe-discovery/IMMUTABILITE_PR.md`](../../cafe-dis
 ### 2.4 Instances de crypto policy persistées 
 
 - **Chemins canoniques** : **`POST` \| `GET` \| `DELETE`** sur la ressource **instances** — **§0.2** (`/api/cpm/v1/policies`) ou **§0.3** (`alias CPM de transition policies`) ; **brouillons** **`…/drafts`** (**§0.2** / **§0.3**). JWT + scope propriétaire (`cafe-crypto-policy-mgt`, `internal/app/owner_routes.go`).
-- **CP-PERSIST (EOA, English):** **`POST /api/cpm/v1/policies` is not the normative EOA persistence endpoint.** EOA CP persistence must use **`POST /api/cpm/v1/drafts/{draft_id}/persist`** with valid **`signed_message`** and **`signature`** (**§2.5**; OpenAPI in [`openapi/cpm-v1.yaml`](../openapi/cpm-v1.yaml) — PR #51; handlers PR3–PR4). **`POST /api/cpm/v1/policies` must not create or update an EOA persisted CP without wallet signed authorization.** The existing **`POST …/policies`** route may remain for legacy, fixture, catalog or explicitly non-EOA flows until migrated; product EOA flows must not treat it as proof-free persist.
+- **CP-PERSIST (EOA, English):** **`POST /api/cpm/v1/policies` is not the normative EOA persistence endpoint.** EOA CP persistence must use **`POST /api/cpm/v1/drafts/{draft_id}/persist`** with valid **`signed_message`** and **`signature`** (**§2.5**; OpenAPI PR #51; handlers PR3–**PR4** ✅). **`POST /api/cpm/v1/policies` must not create or update an EOA persisted CP without wallet signed authorization** (enforced in PR4). The existing **`POST …/policies`** route may remain for legacy, fixture, catalog or explicitly non-EOA flows; product EOA flows must not treat it as proof-free persist.
 - **`DELETE …/policies?id=…`** (suffixe après préfixe **§0**) : **`204`** si l’instance existait et est supprimée ; **`404`** si inconnue / hors scope / **déjà supprimée** (**idempotence** — **§5.4.9**). **Même query **`id`** que **`GET`**. Pas de **`409`** sur cette route dans ce plan.
 - **`DELETE …/drafts?id=…`** : **`204`** si le brouillon existait et est supprimé ; **`404`** si inconnu / hors scope / **déjà supprimé** (**idempotence** — **§5.4.9**). **Même query **`id`** que **`GET …/drafts?id=…`**. Supprime le brouillon plateforme pour satisfaire **W1** et débloquer **`POST …/scan`** (parcours **§2.2**). Ne supprime **pas** le scan Discovery référencé.
 - Le corps d’écriture **`POST`** inclut **`id`**, **`scan_id`** (liaison **`scan_result`** Discovery / **Option A** CPM lorsque applicable), **`payload`** — affiner uniquement les **règles métier** (ex. **`scan_id` obligatoire** pour certains flux) et l’AUTH scan (AUTH-02).
@@ -271,16 +271,16 @@ Normative spec: [`docs/CP_PERSIST.md`](../docs/CP_PERSIST.md).
 - **Not V1:** `POST /api/cpm/v1/wallet-challenges/verify` (V2 optional UX only).
 - **Session vs wallet:** Discovery JWT = who is the user/tenant; wallet signature = technical control of the EOA for this persist action.
 
-**CP-PERSIST public routes** (OpenAPI documented in PR #51; **handlers not yet deployed** — implementation PR3–PR4; listed in **§0.2**):
+**CP-PERSIST public routes** (OpenAPI PR #51; handlers **PR3–PR4** ✅; listed in **§0.2**):
 
 - `POST /api/cpm/v1/wallet-challenges` — mandatory stateless canonical message helper
 - `POST /api/cpm/v1/drafts/{draft_id}/persist` — **normative EOA CP persistence**
 
-**EOA persist rule (frozen):** `POST /api/cpm/v1/policies` is **not** the normative persistence endpoint for EOA CP-PERSIST workflows. It must **not** create or update an EOA persisted CP without wallet signed authorization.
+**EOA persist rule (frozen):** `POST /api/cpm/v1/policies` is **not** the normative persistence endpoint for EOA CP-PERSIST workflows. It must **not** create or update an EOA persisted CP without wallet signed authorization (enforced in PR4).
 
 **Sign-off scope (English):** CP-PERSIST V1 decisions are frozen in [`CP_PERSIST.md`](../docs/CP_PERSIST.md) Part VI, independently of this document's global proposal status.
 
-**Expected implementation gaps after PR3 (English):** PR1 is docs-only; PR2 ([#51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51)) is OpenAPI-only; **PR3** implements canonical message + EIP-191 verifier and `POST /wallet-challenges`. Runtime still lacks EOA persist enforcement (**PR4**) and compliant frontend/CLI flows (**PR5**–**PR6**). Full list: [`CP_PERSIST.md`](../docs/CP_PERSIST.md#expected-implementation-gaps-after-pr2).
+**Expected implementation gaps after PR4 (English):** Backend enforcement is deployed (PR3 + PR4). Remaining gaps: compliant frontend/CLI flows (**PR5**–**PR6**) and E2E documentation (**PR7**). Full list: [`CP_PERSIST.md`](../docs/CP_PERSIST.md#expected-implementation-gaps-after-pr4).
 
 ---
 
@@ -440,7 +440,7 @@ La coordination release (frontend, scripts, intégrations) reste nécessaire, ma
 |--------|---------------------|
 | Rôle | **`POST` \| `GET` \| `DELETE …/policies`** (instances, query **`id`** pour **GET**/**DELETE**) ; **`POST` \| `GET` \| `DELETE …/drafts`** (brouillons, query **`id`** pour **GET**/**DELETE**). Préfixes **§0.2** (`/api/cpm/v1/`) ou **§0.3** (`alias CPM de transition `). |
 | Corps **`POST`** | **`{ id, scan_id?, payload }`** — règles **`scan_id`** / **AUTH-02** : **§2.4**, OpenAPI. **EOA CP-PERSIST:** not the normative persist path — use **`POST …/drafts/{draft_id}/persist`** + **`signed_message`** + **`signature`** (**§2.5**). **`POST …/policies` must not persist EOA CP without signed authorization.** |
-| **`POST …/drafts/{draft_id}/persist`** *(OpenAPI [#51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51); handlers PR3–PR4)* | **EOA normative persist** — **`signed_message` + `signature`** (+ binding fields) ; spec [`CP_PERSIST.md`](../docs/CP_PERSIST.md) ; [`openapi/cpm-v1.yaml`](../openapi/cpm-v1.yaml). |
+| **`POST …/drafts/{draft_id}/persist`** *(OpenAPI [#51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51); handler **PR4** ✅)* | **EOA normative persist** — **`signed_message` + `signature`** (+ binding fields) ; spec [`CP_PERSIST.md`](../docs/CP_PERSIST.md) ; [`openapi/cpm-v1.yaml`](../openapi/cpm-v1.yaml). |
 | **`DELETE …/policies?id=…`** | **`204`** \| **`404`** uniquement (**idempotence** **§5.4.9**) ; **pas** de **`409`**. Ne supprime **pas** le **`scan_result`** Discovery (**§2.4**). |
 | **`DELETE …/drafts?id=…`** | **`204`** \| **`404`** uniquement (**idempotence** **§5.4.9**) ; ne supprime **pas** le scan Discovery. Débloque **W1** pour **`POST …/scan`** après suppression du brouillon plateforme (**§2.2**). |
 | Relecture par **`scan_id`** | **`GET …/policies?id=…`** (une instance) ; **`GET …/policies?scan_id=…`** (liste) — **§5.2** ; combinaison **`id`** + **`scan_id`** → **`400`**. |
@@ -549,7 +549,7 @@ Aucun autre verbe d’exploration n’est ajouté dans cette remise à plat. Si 
 - **`GET …/policies?id=...`**
 - **`DELETE …/policies?id=...`**
 
-**CP-PERSIST (EOA, English):** for EOA wallet control proof workflows, **`POST /api/cpm/v1/policies` is not the normative persistence endpoint.** EOA CP persistence must use **`POST /api/cpm/v1/drafts/{draft_id}/persist`** with valid **`signed_message`** and **`signature`** (**§2.5**, planned). **`POST /api/cpm/v1/policies` must not create or update an EOA persisted CP without wallet signed authorization.** Legacy **`POST …/policies`** may remain for fixture, catalog or non-EOA cases under explicit rules below; product EOA flows must not bypass proof.
+**CP-PERSIST (EOA, English):** for EOA wallet control proof workflows, **`POST /api/cpm/v1/policies` is not the normative persistence endpoint.** EOA CP persistence must use **`POST /api/cpm/v1/drafts/{draft_id}/persist`** with valid **`signed_message`** and **`signature`** (**§2.5**, PR4 ✅). **`POST /api/cpm/v1/policies` must not create or update an EOA persisted CP without wallet signed authorization** (enforced PR4). Legacy **`POST …/policies`** may remain for fixture, catalog or non-EOA cases under explicit rules below; product EOA flows must not bypass proof.
 
 **Décision :** **`scan_id`** est **obligatoire** pour toute instance persistée issue d’un flux **Discovery → CPM**.
 
@@ -853,8 +853,8 @@ POST   /api/cpm/v1/drafts
 GET    /api/cpm/v1/drafts?id=...
 DELETE /api/cpm/v1/drafts?id=...
 
-POST   /api/cpm/v1/wallet-challenges              # OpenAPI PR2 #51 — mandatory stateless helper — handlers PR3–PR4
-POST   /api/cpm/v1/drafts/{draft_id}/persist      # OpenAPI PR2 #51 — normative EOA persist — handlers PR3–PR4
+POST   /api/cpm/v1/wallet-challenges              # OpenAPI PR2 #51 — mandatory stateless helper — handler PR3 ✅
+POST   /api/cpm/v1/drafts/{draft_id}/persist      # OpenAPI PR2 #51 — normative EOA persist — handler PR4 ✅
 ```
 
 La variante **§0.3** reste **uniquement** un mécanisme de **transition ingress / déploiement**. Elle ne doit **pas** être documentée comme contrat produit **long terme**.
@@ -912,8 +912,8 @@ Le document est **acceptable** lorsque les éléments ci-dessous sont **validés
   - `POST /api/cpm/v1/drafts`
   - `GET /api/cpm/v1/drafts?id=...`
   - `DELETE /api/cpm/v1/drafts?id=...`
-  - `POST /api/cpm/v1/wallet-challenges` *(OpenAPI CP-PERSIST PR2 [#51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51) — mandatory stateless helper — handlers PR3–PR4)*
-  - `POST /api/cpm/v1/drafts/{draft_id}/persist` *(OpenAPI CP-PERSIST PR2 [#51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51) — normative; signed_message + signature — handlers PR3–PR4)*
+  - `POST /api/cpm/v1/wallet-challenges` *(OpenAPI CP-PERSIST PR2 [#51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51) — mandatory stateless helper — handler PR3 ✅)*
+  - `POST /api/cpm/v1/drafts/{draft_id}/persist` *(OpenAPI CP-PERSIST PR2 [#51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51) — normative; signed_message + signature — handler PR4 ✅)*
 
 - La variante rollout **§0.3** est **confirmée** comme **transition ingress / déploiement** uniquement, **sans** statut de contrat produit pérenne.
 - La **suppression** de **§0.3** après bascule vers **§0.2** est **acceptée** (chemins **non** servis, **non** documentés comme supportés — **§0**).

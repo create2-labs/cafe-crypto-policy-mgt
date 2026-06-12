@@ -141,6 +141,10 @@ func handleOwnerPOSTPolicies(w http.ResponseWriter, r *http.Request, store *pers
 		writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: err.Error()})
 		return
 	}
+	if policyPayloadRequiresEOAWalletProof(req.Payload) {
+		writeWalletAuthorizationError(w, r, obs, http.StatusForbidden, walletAuthCodeControlProofRequired, errMsgWalletControlProofRequired)
+		return
+	}
 	scanIDToStore, err := validatePolicyPersistBinding(req)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: err.Error()})
