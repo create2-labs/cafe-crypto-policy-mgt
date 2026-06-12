@@ -12,6 +12,7 @@ const (
 	errMsgIDRequired                   = "id is required"
 	errMsgNotFound                     = "not found"
 	errMsgInternalServerError          = "internal server error"
+	errMsgWalletControlProofRequired   = "Persisting a Crypto Policy for a wallet requires a valid signed wallet authorization."
 	errMsgScanNotFound                 = "scan not found"
 	errMsgScanAuthorizationUnavailable = "scan authorization unavailable"
 

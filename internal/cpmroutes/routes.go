@@ -17,6 +17,8 @@ const (
 	PoliciesAssessmentRequest = PoliciesPrefix + "/assessment/request"
 
 	Drafts = V1Base + "/drafts"
+	// DraftPersist is the normative EOA CP persistence route (CP-PERSIST V1 PR4).
+	DraftPersist = Drafts + "/{draft_id}/persist"
 	// WalletChallenges is the mandatory stateless canonical message helper (CP-PERSIST V1 PR3).
 	WalletChallenges = V1Base + "/wallet-challenges"
 	// WalletTargetContext is the owner-scoped IMM-9b lookup for proactive wallet scan UI (FE-IMM-2).
@@ -52,6 +54,7 @@ func AuthenticatedRoutes() []AuthenticatedRoute {
 		{Method: http.MethodGet, Path: Drafts},
 		{Method: http.MethodDelete, Path: Drafts},
 		{Method: http.MethodPost, Path: WalletChallenges},
+		{Method: http.MethodPost, Path: DraftPersist},
 		{Method: http.MethodGet, Path: WalletTargetContext},
 		{Method: http.MethodPost, Path: Policies},
 		{Method: http.MethodGet, Path: Policies},

@@ -14,7 +14,7 @@ Wallet control proof for CP persistence (EOA) is specified in [`docs/CP_PERSIST.
 
 **CP-PERSIST V1 (stateless):** clients **must** obtain the canonical authorization message from CPM via `POST /api/cpm/v1/wallet-challenges` before signing (stateless helper — stores nothing server-side). Normative persist is `POST /api/cpm/v1/drafts/{draft_id}/persist` with `signed_message` + `signature`. At persist time, CPM verifies the submitted message exactly matches the expected canonical message, then EIP-191 / `personal_sign`. Advanced clients must not invent an alternative message format. **No V1 Redis**, `CPM_REDIS_URL`, `ProofStore` or `wallet_control_proof_id`. Redis / proof handles are **V2 optional** hardening only (see `CP_PERSIST.md` §13.3).
 
-**OpenAPI (CP-PERSIST PR2):** [`openapi/cpm-v1.yaml`](./openapi/cpm-v1.yaml) — merge via [PR #51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51). **PR3 (CP-PERSIST-T3):** `internal/walletauth` canonical message builder + EIP-191 verifier; stateless `POST /api/cpm/v1/wallet-challenges` handler (stores nothing). **Remaining runtime gaps:** EOA persist enforcement (PR4), frontend/CLI migration (PR5–PR6). Session auth (JWT) and wallet signature are orthogonal. See [Expected implementation gaps (after PR2)](./docs/CP_PERSIST.md#expected-implementation-gaps-after-pr2).
+**OpenAPI (CP-PERSIST PR2):** [`openapi/cpm-v1.yaml`](./openapi/cpm-v1.yaml) — merge via [PR #51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51). **PR3 (CP-PERSIST-T3):** `internal/walletauth` canonical message builder + EIP-191 verifier; stateless `POST /api/cpm/v1/wallet-challenges` handler (stores nothing). **PR4 (CP-PERSIST-T4):** normative `POST /api/cpm/v1/drafts/{draft_id}/persist`, EOA blocking on legacy `POST /api/cpm/v1/policies`, transactional persist-once. **Remaining runtime gaps:** frontend/CLI migration (PR5–PR6), E2E docs (PR7). Session auth (JWT) and wallet signature are orthogonal. See [Expected implementation gaps (after PR4)](./docs/CP_PERSIST.md#expected-implementation-gaps-after-pr4).
 
 ## Repository layout
 
@@ -27,7 +27,7 @@ Wallet control proof for CP persistence (EOA) is specified in [`docs/CP_PERSIST.
 | `internal/domain/policy` | Policy domain contracts (`PolicySelectionRequest`, `PolicyGraphCatalog`, `CryptoPolicyTemplate`, `CryptoPolicyInstance`, `CryptoPolicyValidationResult`, `CryptoPolicyAssessmentResult`, `PolicyCompatibilityResult` + `PolicyCompatibilityEvaluator`, and PR13 `PolicyDecision` models/evaluator) |
 | `internal/api` | PR17 read-only HTTP APIs for policy inspection and decision exploration |
 | `internal/persistence` | Owner-scoped in-memory persistence (`OwnerScopedStore`) for drafts and persisted policy records exposed under `/api/cpm/v1/*` |
-| `internal/walletauth` | CP-PERSIST V1 canonical wallet authorization message builder and EIP-191 / `personal_sign` verifier (PR3) |
+| `internal/walletauth` | CP-PERSIST V1 canonical wallet authorization message builder and EIP-191 / `personal_sign` verifier (PR3); used at persist time by PR4 handlers |
 | `docs/` | Integration narratives — [`docs/CPM_OPTION_A_INTEGRATED.md`](./docs/CPM_OPTION_A_INTEGRATED.md) (Option A v1 flow); [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md) (EOA wallet control proof for CP persistence) |
 | `scripts/` | Operational helpers — [`scripts/test-imm-ops-1.sh`](./scripts/test-imm-ops-1.sh) (IMM-OPS-1 explore observability smoke); Option A v1 smoke lives in [`cafe-deploy`](https://github.com/create2-labs/cafe-deploy/scripts/test-discovery-v1-wallet-scans-to-cpm.sh) |
 | `internal/metrics` | Prometheus registry and CPM application counters (IMM-OPS-1) |
@@ -243,13 +243,13 @@ Environment variables:
 - `CAFE_POLICY_REFERENCE_INTERNAL_SERVICE_TOKEN` (required when `CPM_AUTH_REQUIRED=true` for `POST /internal/policies/references/scan`; shared secret for Discovery → CPM scan-reference check — WORKPLAN PR5)
 - `CPM_AUTH_CLOCK_SKEW_SEC` (default: `30`)
 
-### CP-PERSIST (not yet implemented)
+### CP-PERSIST runtime
 
-CP-PERSIST V1 does **not** add new mandatory runtime environment variables. Wallet authorization is verified at persist time from the request body (`signed_message`, `signature`). See [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md).
+CP-PERSIST V1 does **not** add new mandatory runtime environment variables. Wallet authorization is verified at persist time from the request body (`signed_message`, `signature`) on `POST /api/cpm/v1/drafts/{draft_id}/persist` (PR4). Optional `CPM_WALLET_AUTH_DOMAIN` (or request host fallback) is embedded in canonical messages from `POST /api/cpm/v1/wallet-challenges`. See [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md).
 
 **V2 optional (not V1):** `CPM_REDIS_URL` and ephemeral proof stores may be introduced later for advanced workflows — not required for CP-PERSIST V1.
 
-Other expected post-PR2 runtime gaps are documented in [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md#expected-implementation-gaps-after-pr2).
+Remaining client-side gaps (Web UI, CLI, legacy deploy scripts) are documented in [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md#expected-implementation-gaps-after-pr4). Backend smoke: [`cafe-deploy/scripts/test-cpm-cp-persist-t4-draft-persist.sh`](https://github.com/create2-labs/cafe-deploy/blob/main/scripts/test-cpm-cp-persist-t4-draft-persist.sh).
 
 Important:
 - **`CPM_AUTH_REQUIRED=false`** disables the entire auth middleware: user JWT routes and **`POST /internal/policies/references/scan`** are unauthenticated at CPM — use only in controlled local dev. **Staging/production** should keep **`CPM_AUTH_REQUIRED=true`** and set **`CAFE_POLICY_REFERENCE_INTERNAL_SERVICE_TOKEN`** (see `cafe-deploy` env templates and **WORKPLAN_API_PR** PR9).

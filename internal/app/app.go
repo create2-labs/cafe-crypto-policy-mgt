@@ -86,6 +86,7 @@ func handlerWithOwnerStore(serviceName string, store *api.ReadStore, ownerStore 
 	registerPoliciesAssessmentRequestRoute(mux, authCfg)
 	registerOwnerScopedRoutes(mux, ownerStore, obs)
 	registerWalletChallengeRoutes(mux, ownerStore, authCfg, obs)
+	registerDraftPersistRoutes(mux, ownerStore, authCfg, obs)
 	registerPolicyReferenceInternalRoute(mux, ownerStore)
 	registerPolicyWalletTargetReferenceInternalRoute(mux, ownerStore)
 	protected, err := withAuthentication(mux, authCfg)

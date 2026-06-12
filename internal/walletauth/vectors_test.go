@@ -1,6 +1,7 @@
 package walletauth_test
 
 import (
+	"encoding/hex"
 	"testing"
 	"time"
 
@@ -32,7 +33,7 @@ func signPersonalMessage(t *testing.T, message string) string {
 	if sig[64] < 27 {
 		sig[64] += 27
 	}
-	return walletauth.NormalizeSignatureHex(sig)
+	return "0x" + hex.EncodeToString(sig)
 }
 
 func vectorMessage(t *testing.T, issued, expires time.Time) string {

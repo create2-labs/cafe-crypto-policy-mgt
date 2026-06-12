@@ -27,7 +27,7 @@ type VerifyInput struct {
 // VerifyAuthorization validates signed_message freshness, bindings and EIP-191 signature.
 func VerifyAuthorization(in VerifyInput) error {
 	if strings.TrimSpace(in.SignedMessage) == "" || strings.TrimSpace(in.Signature) == "" {
-		return verificationError("WALLET_CONTROL_PROOF_REQUIRED", "signed wallet authorization is required")
+		return verificationError(CodeWalletControlProofRequired, "signed wallet authorization is required")
 	}
 
 	parsed, err := ParseMessage(in.SignedMessage)
@@ -173,10 +173,5 @@ func addressesEqual(a, b string) bool {
 		return strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
 	}
 	return na == nb
-}
-
-// NormalizeSignatureHex returns a 0x-prefixed lowercase hex signature for test vectors.
-func NormalizeSignatureHex(signature []byte) string {
-	return "0x" + hex.EncodeToString(signature)
 }
 

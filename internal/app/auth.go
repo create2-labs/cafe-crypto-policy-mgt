@@ -380,7 +380,7 @@ func validateRouteInventory(routes []routeSpec) error {
 
 func classifyRoute(method string, path string) string {
 	for _, route := range routeInventory {
-		if route.Method == method && route.Path == path {
+		if route.Method == method && cpmroutes.PathMatches(route.Path, path) {
 			return route.Class
 		}
 	}

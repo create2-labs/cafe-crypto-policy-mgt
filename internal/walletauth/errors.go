@@ -4,6 +4,7 @@ import "errors"
 
 // Verification error codes align with CP_PERSIST.md error semantics (persist-time checks).
 const (
+	CodeWalletControlProofRequired      = "WALLET_CONTROL_PROOF_REQUIRED"
 	CodeInvalidWalletSignature          = "INVALID_WALLET_SIGNATURE"
 	CodeWalletSignatureAddressMismatch  = "WALLET_SIGNATURE_ADDRESS_MISMATCH"
 	CodeWalletAuthorizationExpired      = "WALLET_AUTHORIZATION_EXPIRED"
