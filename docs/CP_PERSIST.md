@@ -1172,6 +1172,10 @@ Stories: **CP-PERSIST-S6**, **CP-PERSIST-S7**, **CP-PERSIST-S8**, **CP-PERSIST-S
 
 **PR4** — handlers in `internal/app/draft_persist_routes.go`, `internal/persistence/owner_scoped_store.go` (`PersistDraftOnce`); smoke `cafe-deploy/scripts/test-cpm-cp-persist-t4-draft-persist.sh`.
 
+
+Merged via [cafe-crypto-policy-mgt PR #53](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/53)
+
+
 ### CP-PERSIST-T5 — Web UI integration (PR5)
 
 Stories: **CP-PERSIST-S4**
@@ -1226,8 +1230,8 @@ Stories: **CP-PERSIST-S10**, **CP-PERSIST-S1**, **CP-PERSIST-S2**, **CP-PERSIST-
 | --------------------------------------------------- | --- | --------------------------------------------------------------------- | -------------------------------------------------- | ---------- | --------- |
 | **CP-PERSIST-T1** / **S9**                          | PR1 | —                                                                     | `cafe-crypto-policy-mgt`                           | —          | ✅ done    |
 | **CP-PERSIST-T2** / **S6**, **S9**                  | PR2 | [#51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51) | `cafe-crypto-policy-mgt`                           | PR1        | ✅ done    |
-| **CP-PERSIST-T3** / **S4**, **S5**, **S7**          | PR3 | [#52](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/52)                                                                   | `cafe-crypto-policy-mgt`                           | PR2        | ✅ done    |
-| **CP-PERSIST-T4** / **S6**, **S7**, **S8**, **S11** | PR4 | —                                                                     | `cafe-crypto-policy-mgt`, `cafe-deploy` (smoke)    | PR3        | ✅ done    |
+| **CP-PERSIST-T3** / **S4**, **S5**, **S7**          | PR3 | [#52](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/52)                                                                   | `cafe-crypto-policy-mgt`                           | PR2        | ✅ doNe    |
+| **CP-PERSIST-T4** / **S6**, **S7**, **S8**, **S11** | PR4 | [#53](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/53)                                                                    | `cafe-crypto-policy-mgt`, `cafe-deploy` (smoke)    | PR3        | ✅ done    |
 | **CP-PERSIST-T5** / **S4**                          | PR5 | —                                                                     | `cafe-frontend`                                    | PR4        | ⚪ planned |
 | **CP-PERSIST-T6** / **S5**                          | PR6 | —                                                                     | `cafe-frontend` (`cafe.sh`), `cafe-deploy` (smoke) | PR4        | ⚪ planned |
 | **CP-PERSIST-T7** / **S10**, **S1–S3**              | PR7 | —                                                                     | multi-repo                                         | PR5, PR6   | ⚪ planned |
