@@ -174,18 +174,6 @@ func (s *OwnerScopedStore) ListPersistedPoliciesForScan(principal authz.Principa
 	return out, nil
 }
 
-// CountPersistedPoliciesForScan returns how many persisted policy instances belong to
-// principal and reference the given scan_id (trimmed exact match on PolicyRecord.ScanID).
-// Drafts are not counted — only persisted policies in the owner-scoped policy map.
-// Semantics match len(ListPersistedPoliciesForScan(...)) for the same principal and scan_id.
-func (s *OwnerScopedStore) CountPersistedPoliciesForScan(principal authz.Principal, scanID string) (int, error) {
-	list, err := s.ListPersistedPoliciesForScan(principal, scanID)
-	if err != nil {
-		return 0, err
-	}
-	return len(list), nil
-}
-
 // DeletePolicy removes a persisted policy instance by id for principal. ErrPolicyNotFound if
 // missing; ErrForbidden if owned by another principal (callers may map to 404).
 func (s *OwnerScopedStore) DeletePolicy(principal authz.Principal, id string) error {

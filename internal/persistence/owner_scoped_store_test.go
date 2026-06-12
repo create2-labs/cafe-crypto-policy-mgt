@@ -65,8 +65,8 @@ func TestOwnerScopedStoreRequiresPrincipal(t *testing.T) {
 	if _, err := store.SavePolicy(invalid, "policy-x", "", nil); !errors.Is(err, ErrPrincipalRequired) {
 		t.Fatalf("expected principal required for SavePolicy, got %v", err)
 	}
-	if _, err := store.CountPersistedPoliciesForScan(invalid, "550e8400-e29b-41d4-a716-446655440000"); !errors.Is(err, ErrPrincipalRequired) {
-		t.Fatalf("expected principal required for CountPersistedPoliciesForScan, got %v", err)
+	if _, err := store.ListPersistedPoliciesForScan(invalid, "550e8400-e29b-41d4-a716-446655440000"); !errors.Is(err, ErrPrincipalRequired) {
+		t.Fatalf("expected principal required for ListPersistedPoliciesForScan, got %v", err)
 	}
 	if err := store.DeleteDraft(invalid, "draft-x"); !errors.Is(err, ErrPrincipalRequired) {
 		t.Fatalf("expected principal required for DeleteDraft, got %v", err)
@@ -79,7 +79,7 @@ func TestOwnerScopedStoreCountPoliciesForScan(t *testing.T) {
 	scan1 := "11111111-1111-1111-1111-111111111111"
 	scan2 := "22222222-2222-2222-2222-222222222222"
 
-	if _, err := store.CountPersistedPoliciesForScan(userA, "   "); err == nil {
+	if _, err := store.ListPersistedPoliciesForScan(userA, "   "); err == nil {
 		t.Fatal("expected error for empty scan_id")
 	}
 
@@ -114,12 +114,12 @@ func mustSavePolicy(t *testing.T, store *OwnerScopedStore, p authz.Principal, id
 
 func assertPolicyCountForScan(t *testing.T, store *OwnerScopedStore, p authz.Principal, scanID string, want int) {
 	t.Helper()
-	n, err := store.CountPersistedPoliciesForScan(p, scanID)
+	list, err := store.ListPersistedPoliciesForScan(p, scanID)
 	if err != nil {
-		t.Fatalf("CountPersistedPoliciesForScan(%q): %v", scanID, err)
+		t.Fatalf("ListPersistedPoliciesForScan(%q): %v", scanID, err)
 	}
-	if n != want {
-		t.Fatalf("CountPersistedPoliciesForScan(%q): want %d, got %d", scanID, want, n)
+	if len(list) != want {
+		t.Fatalf("ListPersistedPoliciesForScan(%q): want %d policies, got %d", scanID, want, len(list))
 	}
 }
 
