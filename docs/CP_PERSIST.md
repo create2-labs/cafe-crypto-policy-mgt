@@ -112,6 +112,7 @@
 | Jun 10th, 2026 | O. Lodygensky | 0.9.1   | TOC Part VI range; wallet signed authorization wording; issued_at clock skew rule |
 | Jun 10th, 2026 | O. Lodygensky | 0.9.2   | Mandatory CPM-issued canonical message via POST /wallet-challenges before sign |
 | Jun 10th, 2026 | O. Lodygensky | 0.9.3   | Clarify signed-message vs server-side binding model (PR3/PR4) |
+| Jun 10th, 2026 | O. Lodygensky | 0.9.4   | Mark PR1 merged; unblock PR2 tracking |
 
 
 ---
@@ -1085,7 +1086,7 @@ These stories are already implemented and must remain true during CP-PERSIST imp
 | **CP-PERSIST-S6** | As an API integrator, I want a clear `WALLET_CONTROL_PROOF_REQUIRED` error when I call persist without a valid signed authorization. | Must | PR2, PR4 | ⚪ planned |
 | **CP-PERSIST-S7** | As a security officer, I want wallet signed authorizations to be time-bound and cryptographically bound to wallet, chain, scan, draft and action (via signed message), with user/tenant enforced server-side via session and draft/scan ownership, and replay controlled at persist time. | Must | PR3–PR4 | ⚪ planned |
 | **CP-PERSIST-S8** | As an auditor, I want persisted CPs to record minimal ownership verification metadata without storing reusable credentials or raw signatures. | Should | PR4 | ⚪ planned |
-| **CP-PERSIST-S9** | As a developer, I want contract-first documentation and OpenAPI before implementation so UI, CLI and API clients share one backend contract. | Must | PR1, PR2 | 🟡 in progress |
+| **CP-PERSIST-S9** | As a developer, I want contract-first documentation and OpenAPI before implementation so UI, CLI and API clients share one backend contract. | Must | PR1, PR2 | 🟡 in progress (PR1 ✅; PR2 pending) |
 | **CP-PERSIST-S10** | As a product owner, I want end-to-end documentation and validation so scan / explore / draft remain open while persist requires proof. | Should | PR7 | ⚪ planned |
 | **CP-PERSIST-S11** | As a platform owner, I want CPM backend to be the only enforcement point for CP persistence so that UI, CLI, scripts or direct API calls cannot bypass wallet signed authorization. | Must | PR4 | ⚪ planned |
 
@@ -1110,7 +1111,7 @@ Stories: **CP-PERSIST-S9**
 [x] Update README cross-links for stateless CP-PERSIST V1
 ```
 
-PR1 doc deliverables above are complete in this branch; story **S9** / **T1** remain **`in progress`** until the PR is reviewed and merged.
+**PR1 merged** — doc deliverables complete. Story **S9** remains **`in progress`** until **PR2** (OpenAPI) lands.
 
 ### CP-PERSIST-T2 — OpenAPI contract (PR2)
 
@@ -1213,8 +1214,8 @@ Stories: **CP-PERSIST-S10**, **CP-PERSIST-S1**, **CP-PERSIST-S2**, **CP-PERSIST-
 
 | Task / Story | PR | Repository | Depends on | Status |
 | --- | --- | --- | --- | --- |
-| **CP-PERSIST-T1** / **S9** | PR1 | `cafe-crypto-policy-mgt` | — | 🟡 in progress (doc complete; awaiting merge) |
-| **CP-PERSIST-T2** / **S6**, **S9** | PR2 | `cafe-crypto-policy-mgt` | PR1 | ⚪ planned |
+| **CP-PERSIST-T1** / **S9** | PR1 | `cafe-crypto-policy-mgt` | — | ✅ done |
+| **CP-PERSIST-T2** / **S6**, **S9** | PR2 | `cafe-crypto-policy-mgt` | PR1 | 🟡 in progress |
 | **CP-PERSIST-T3** / **S4**, **S5**, **S7** | PR3 | `cafe-crypto-policy-mgt` | PR2 | ⚪ planned |
 | **CP-PERSIST-T4** / **S6**, **S7**, **S8**, **S11** | PR4 | `cafe-crypto-policy-mgt` | PR3 | ⚪ planned |
 | **CP-PERSIST-T5** / **S4** | PR5 | `cafe-frontend` | PR4 | ⚪ planned |
@@ -1232,6 +1233,8 @@ PR1 → PR2 → PR3 → PR4 → (PR5 and PR6 in parallel) → PR7
 # Part IV — PR breakdown
 
 ## 20. PR1 — Contract-first CP persistence specification
+
+**Status:** ✅ merged (Jun 10, 2026).
 
 Repository:
 
@@ -1268,6 +1271,8 @@ docs(cpm): adopt stateless CP-PERSIST V1 signature-at-persist model
 ---
 
 ## 21. PR2 — OpenAPI contract for stateless CP-PERSIST
+
+**Status:** 🟡 next (unblocked by PR1).
 
 Repository:
 
