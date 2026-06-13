@@ -280,7 +280,7 @@ Normative spec: [`docs/CP_PERSIST.md`](../docs/CP_PERSIST.md).
 
 **Sign-off scope (English):** CP-PERSIST V1 decisions are frozen in [`CP_PERSIST.md`](../docs/CP_PERSIST.md) Part VI, independently of this document's global proposal status.
 
-**Expected implementation gaps after PR4 (English):** Backend enforcement is deployed (PR3 + PR4). Remaining gaps: compliant frontend/CLI flows (**PR5**–**PR6**) and E2E documentation (**PR7**). Full list: [`CP_PERSIST.md`](../docs/CP_PERSIST.md#expected-implementation-gaps-after-pr4).
+**Expected implementation gaps after PR4 (English):** Backend enforcement is deployed (PR3 + PR4). **Web UI** CP-PERSIST V1 is deployed in **`cafe-frontend` PR #84** (PR5). Remaining gaps: compliant **CLI** flow (**PR6**) and consolidated E2E documentation (**PR7**). Full list: [`CP_PERSIST.md`](../docs/CP_PERSIST.md#expected-implementation-gaps-after-pr4).
 
 ---
 
