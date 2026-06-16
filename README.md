@@ -165,8 +165,8 @@ CPM now exposes read-only APIs backed by local policy files loaded at startup. T
 Environment variables:
 
 - `CPM_POLICY_CATALOG_PATH` (default: `/app/policy/policy_graph_catalog_valid.json`)
-- `CPM_POLICY_TEMPLATE_PATHS` (comma-separated, default: `/app/policy/crypto_policy_template_valid.json`)
-- `CPM_POLICY_INSTANCE_PATHS` (comma-separated, default: `/app/policy/crypto_policy_instance_valid.json`)
+- `CPM_POLICY_TEMPLATE_PATHS` (comma-separated, default: `/app/policy/crypto_policy_template_valid.json,/app/policy/crypto_policy_template_pq_ready_progressive.json`)
+- `CPM_POLICY_INSTANCE_PATHS` (comma-separated, default: `/app/policy/crypto_policy_instance_valid.json,/app/policy/crypto_policy_instance_pq_ready_progressive.json`)
 
 Endpoints:
 

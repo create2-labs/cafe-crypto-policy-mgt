@@ -48,6 +48,29 @@ func TestLoadReadStoreAndRoutes(t *testing.T) {
 	}
 }
 
+func TestLoadReadStoreWithTwoTemplates(t *testing.T) {
+	store, err := LoadReadStore(ReadStoreOptions{
+		CatalogPath: fixturePath("policy_graph_catalog_valid.json"),
+		TemplatePaths: []string{
+			fixturePath("crypto_policy_template_valid.json"),
+			fixturePath("crypto_policy_template_pq_ready_progressive.json"),
+		},
+		InstancePaths: []string{
+			fixturePath("crypto_policy_instance_valid.json"),
+			fixturePath("crypto_policy_instance_pq_ready_progressive.json"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("LoadReadStore: %v", err)
+	}
+	if len(store.templates) != 2 {
+		t.Fatalf("templates: got %d want 2", len(store.templates))
+	}
+	if len(store.instances) != 2 {
+		t.Fatalf("instances: got %d want 2", len(store.instances))
+	}
+}
+
 func TestDecisionExplorePreservesDeployabilityDistinction(t *testing.T) {
 	store, err := LoadReadStore(ReadStoreOptions{
 		CatalogPath: fixturePath("policy_graph_catalog_valid.json"),

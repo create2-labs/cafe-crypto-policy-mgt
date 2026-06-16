@@ -1,0 +1,32 @@
+{
+  "id": "tpl_pq_ready_progressive",
+  "name": "PQ-ready progressive path",
+  "version": "v0.1",
+  "catalog_version": "v0.1",
+  "description": "Progressive hybrid-to-PQ-ready migration with staged signature upgrade.",
+  "target_posture": "hybrid",
+  "node_path": [
+    "NODE_EOA_ENTRY",
+    "NODE_SIG_EIP7932",
+    "NODE_TARGET_HYBRID"
+  ],
+  "default_selection": {
+    "target_chain_ids": [8453, 1, 8453],
+    "require_multichain": true,
+    "minimum_maturity": 0,
+    "allowed_provider_modes": ["third_party", "user_managed", "user_managed"],
+    "preferred_families": ["smart_account", "smart_account"],
+    "preferred_providers": ["provider_b", "provider_b", "provider_a"],
+    "approval_mode": "manual"
+  },
+  "constraints": {
+    "minimum_maturity": 0,
+    "require_multichain": true,
+    "target_chain_ids": [8453, 1, 8453]
+  },
+  "metadata": {
+    "owner_team": "cpm",
+    "target_posture": "hybrid",
+    "tags": ["pq_ready", "progressive", "hybrid"]
+  }
+}

@@ -48,11 +48,19 @@ func TestLoadFromEnvDefaults(t *testing.T) {
 	if cfg.PolicyCatalogPath != defaultPolicyCatalogPath {
 		t.Fatalf("expected default policy catalog path %q, got %q", defaultPolicyCatalogPath, cfg.PolicyCatalogPath)
 	}
-	if len(cfg.PolicyTemplatePaths) != 1 || cfg.PolicyTemplatePaths[0] != defaultPolicyTemplatePaths {
-		t.Fatalf("expected default policy template paths [%q], got %#v", defaultPolicyTemplatePaths, cfg.PolicyTemplatePaths)
+	if len(cfg.PolicyTemplatePaths) != 2 {
+		t.Fatalf("expected 2 default policy template paths, got %#v", cfg.PolicyTemplatePaths)
 	}
-	if len(cfg.PolicyInstancePaths) != 1 || cfg.PolicyInstancePaths[0] != defaultPolicyInstancePaths {
-		t.Fatalf("expected default policy instance paths [%q], got %#v", defaultPolicyInstancePaths, cfg.PolicyInstancePaths)
+	if cfg.PolicyTemplatePaths[0] != "/app/policy/crypto_policy_template_valid.json" ||
+		cfg.PolicyTemplatePaths[1] != "/app/policy/crypto_policy_template_pq_ready_progressive.json" {
+		t.Fatalf("unexpected default policy template paths: %#v", cfg.PolicyTemplatePaths)
+	}
+	if len(cfg.PolicyInstancePaths) != 2 {
+		t.Fatalf("expected 2 default policy instance paths, got %#v", cfg.PolicyInstancePaths)
+	}
+	if cfg.PolicyInstancePaths[0] != "/app/policy/crypto_policy_instance_valid.json" ||
+		cfg.PolicyInstancePaths[1] != "/app/policy/crypto_policy_instance_pq_ready_progressive.json" {
+		t.Fatalf("unexpected default policy instance paths: %#v", cfg.PolicyInstancePaths)
 	}
 	if cfg.DiscoveryHTTPBaseURL != "" {
 		t.Fatalf("expected empty discovery HTTP base default, got %q", cfg.DiscoveryHTTPBaseURL)
