@@ -117,6 +117,7 @@
 | Jun 12th, 2026 | O. Lodygensky | 0.9.6   | Mark PR3 canonical message + EIP-191 verifier implemented (CP-PERSIST-T3)                                                                                                                           |
 | Jun 12th, 2026 | O. Lodygensky | 0.9.7   | Mark PR4 EOA persist enforcement implemented (CP-PERSIST-T4); update gaps and smoke script references                                                                                               |
 | Jun 13th, 2026 | O. Lodygensky | 0.9.8   | Mark PR7 E2E documentation and validation complete (CP-PERSIST-T7); cross-repo runbooks and troubleshooting                                                                                          |
+| Jun 18th, 2026 | O. Lodygensky | 0.9.9   | Clarify V1 CP delete vs deactivate: delete requires owner scope only; deactivate / remediation rollback out of scope                                                                                |
 
 
 ---
@@ -259,12 +260,13 @@ The workflow must enforce the following separation:
 | Discovery scan         | allowed without wallet control proof                                            |
 | CP explore             | allowed without wallet control proof; non-persistent; non-actionable            |
 | CP draft               | allowed without wallet control proof; saved as unverified draft; non-actionable |
-| CP persist             | requires wallet control proof; creates an official wallet CP                    |
-| CP update              | requires wallet control proof or a still-valid authorization                    |
-| CP delete / deactivate | require wallet control proof since no prior valid delegation model exists       |
+| CP persist / replace   | requires wallet signed authorization; creates an official wallet CP                                                                 |
+| CP update              | requires wallet signed authorization or a still-valid authorization                                                                |
+| CP delete              | requires authenticated owner scope only; no wallet signature required in V1 because deletion only removes the user-owned CAFE recommendation |
+| CP deactivate / remediation rollback | out of scope for V1; authorization model to be defined later                                                           |
 
 
-Update and delete semantics may be refined in later PRs, but the model must not introduce a loophole where a user can persist or modify a CP for an EOA wallet without proving wallet control.
+Persist and update semantics may be refined in later PRs, but the model must not introduce a loophole where a user can persist or modify a CP for an EOA wallet without proving wallet control. **CP delete** in V1 is a product-level removal of the user-owned CAFE recommendation (`DELETE /api/cpm/v1/policies?id=…`); it does not assert a new wallet policy and does not perform any wallet or on-chain action. **Deactivate** is reserved for a future workflow where a policy is actually applied to or rolled back from wallet remediation — not the same as delete persisted CP.
 
 ---
 
