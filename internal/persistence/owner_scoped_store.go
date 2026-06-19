@@ -194,6 +194,13 @@ func (s *OwnerScopedStore) PersistDraftOnce(principal authz.Principal, draftID s
 		state.PolicyID = policyID
 	}
 
+	s.removeOtherPoliciesForScanLocked(
+		principal.UserID,
+		principal.TenantID,
+		draft.ScanID,
+		policyID,
+	)
+
 	persistedAt := verifiedAt
 	payload := policyPayloadFromDraft(draft.Payload, draftID, draft.ScanID, normWallet, in.ChainID, persistedAt)
 	record := PolicyRecord{
@@ -301,8 +308,9 @@ func (s *OwnerScopedStore) SavePolicy(principal authz.Principal, id string, scan
 }
 
 // ListPersistedPoliciesForScan returns persisted policy instances for principal that
-// reference scanID (trimmed exact match on PolicyRecord.ScanID). Order is stable by id.
-// Drafts are excluded — only entries in the owner-scoped policy map.
+// reference scanID (trimmed exact match on PolicyRecord.ScanID). Drafts are excluded.
+// Order is newest UpdatedAt first, then stable by id — at most one row is expected per
+// scan after CP-PERSIST replacement (PersistDraftOnce supersedes prior policies).
 func (s *OwnerScopedStore) ListPersistedPoliciesForScan(principal authz.Principal, scanID string) ([]PolicyRecord, error) {
 	if err := principal.Validate(); err != nil {
 		return nil, ErrPrincipalRequired
@@ -313,23 +321,46 @@ func (s *OwnerScopedStore) ListPersistedPoliciesForScan(principal authz.Principa
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	var ids []string
+	out := make([]PolicyRecord, 0, 1)
 	for id, rec := range s.policies {
 		if !sameOwner(rec.OwnerUserID, rec.TenantID, principal.UserID, principal.TenantID) {
 			continue
 		}
-		if strings.EqualFold(strings.TrimSpace(rec.ScanID), needle) {
-			ids = append(ids, id)
+		if !strings.EqualFold(strings.TrimSpace(rec.ScanID), needle) {
+			continue
 		}
-	}
-	sort.Strings(ids)
-	out := make([]PolicyRecord, 0, len(ids))
-	for _, id := range ids {
-		rec := s.policies[id]
+		rec.ID = id
 		rec.Payload = cloneMap(rec.Payload)
 		out = append(out, rec)
 	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].UpdatedAt.Equal(out[j].UpdatedAt) {
+			return out[i].ID < out[j].ID
+		}
+		return out[i].UpdatedAt.After(out[j].UpdatedAt)
+	})
 	return out, nil
+}
+
+// removeOtherPoliciesForScanLocked drops prior persisted CP rows for the same scan so
+// replacement persist enforces at most one recommended policy per scan (CPM V1).
+func (s *OwnerScopedStore) removeOtherPoliciesForScanLocked(userID, tenantID, scanID, keepPolicyID string) {
+	needle := strings.TrimSpace(scanID)
+	if needle == "" {
+		return
+	}
+	keep := strings.TrimSpace(keepPolicyID)
+	for id, rec := range s.policies {
+		if keep != "" && id == keep {
+			continue
+		}
+		if !sameOwner(rec.OwnerUserID, rec.TenantID, userID, tenantID) {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(rec.ScanID), needle) {
+			delete(s.policies, id)
+		}
+	}
 }
 
 // DeletePolicy removes a persisted policy instance by id for principal. ErrPolicyNotFound if

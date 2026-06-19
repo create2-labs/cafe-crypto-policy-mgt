@@ -105,3 +105,53 @@ func TestPersistDraftOnce_retryBeforeCompletionReusesPolicyID(t *testing.T) {
 		t.Fatalf("unexpected policy id %q", result.PolicyID)
 	}
 }
+
+func TestPersistDraftOnce_supersedesPriorPolicyForScan(t *testing.T) {
+	store := NewOwnerScopedStore()
+	user := authz.Principal{UserID: "user-a", Subject: "user-a", TenantID: "t1"}
+	scanID := "550e8400-e29b-41d4-a716-446655440000"
+	wallet := "0x742d35cc6634c0532925a3b844bc454e4438f44e"
+
+	if _, err := store.SavePolicy(user, "policy-old", scanID, map[string]any{
+		"policy_template_id": "tmpl-pq-ready-v2",
+		"policy_context":     map[string]any{"wallet_address": wallet, "wallet_type": "eoa"},
+	}); err != nil {
+		t.Fatalf("SavePolicy old: %v", err)
+	}
+
+	if _, err := store.SaveDraft(user, "draft-replace", scanID, map[string]any{
+		"policy_template_id": "tmpl-hybrid-classic-v1",
+		"policy_context":     map[string]any{"wallet_address": wallet, "wallet_type": "eoa"},
+	}); err != nil {
+		t.Fatalf("SaveDraft: %v", err)
+	}
+
+	result, err := store.PersistDraftOnce(user, "draft-replace", PersistDraftInput{
+		WalletAddress: wallet,
+		ChainID:       1,
+		VerifiedAt:    time.Date(2026, 6, 18, 12, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("PersistDraftOnce replacement: %v", err)
+	}
+	if result.PolicyID == "policy-old" {
+		t.Fatal("replacement persist should create a new policy id")
+	}
+
+	list, err := store.ListPersistedPoliciesForScan(user, scanID)
+	if err != nil {
+		t.Fatalf("ListPersistedPoliciesForScan: %v", err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("want exactly one persisted policy per scan after replacement, got %d", len(list))
+	}
+	if list[0].ID != result.PolicyID {
+		t.Fatalf("listed policy id = %q want %q", list[0].ID, result.PolicyID)
+	}
+	if _, err := store.GetPolicy(user, "policy-old"); !errors.Is(err, ErrPolicyNotFound) {
+		t.Fatalf("prior policy should be superseded, got %v", err)
+	}
+	if list[0].Payload["policy_template_id"] != "tmpl-hybrid-classic-v1" {
+		t.Fatalf("template = %#v", list[0].Payload["policy_template_id"])
+	}
+}
