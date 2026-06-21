@@ -4,49 +4,6 @@ Items deferred; not blocking current IMM work unless noted.
 
 ---
 
-## Open — CPM-OPS-3 — `GET /version` (platform observability, Discovery-aligned)
-
-**Context:** Platform Status (**US18** / **CPM-UI-7A** in [`cafe-frontend/CPM-specs-ui.md`](../cafe-frontend/CPM-specs-ui.md)) must show the deployed **CPM service version** next to Frontend and Discovery. Discovery already publishes version end-to-end:
-
-| Layer | Discovery (today) | CPM (today) |
-|-------|-------------------|-------------|
-| Service | `GET /version` → `{"version": "vX.Y.Z"}` | `GET /healthz`, `GET /metrics` only — **no `/version`** |
-| Build | `APP_VERSION` from Git tag in CI / Docker build | `CPM_VERSION` image tag exists in deploy ; not exposed on HTTP |
-| Edge | `location = /api/version` → `cafe-discovery-backend:8082/version` | no equivalent |
-| Frontend | `platformService.getBackendVersion()` → `/api/version` | — |
-
-**Goal:** same contract and flow for CPM — minimal, ops-friendly, no auth on version read.
-
-### Scope
-
-| Repo | Work |
-|------|------|
-| **`cafe-crypto-policy-mgt`** | Public `GET /version` (same route class as `/healthz` / `/metrics`); JSON body **`{"version": "<APP_VERSION>"}`**; `APP_VERSION` from Docker build arg (Git tag in CI, same pattern as Discovery) |
-| **`cafe-deploy`** | NGINX `location = /api/cpm/version` → `http://cafe-cpm:8080/version` (or dedicated sidecar port if mirroring Discovery `:8082` pattern — prefer simplest single-port if acceptable) |
-| **`cafe-frontend`** | **CPM-UI-7A** — tile + `platformService.getCpmVersion()` (after this item ships) |
-
-### Acceptance
-
-- `curl` via edge: `GET /api/cpm/version` returns `200` and `{"version": "v…"}` matching the running `cafe-cpm` image tag.
-- Response shape stable — frontend and Platform Status rely on `version` key (same as Discovery).
-- Documented in `README.md` (Version endpoint section, mirror Discovery README § Version flow).
-- Smoke or unit test on handler; deploy template updated.
-- **CPM-UI-7A** unblocked.
-
-### Suggested PRs
-
-| Repo | Titre (suggestion) |
-|------|-------------------|
-| `cafe-crypto-policy-mgt` | `feat(ops): expose GET /version for platform status (CPM-OPS-3)` |
-| `cafe-deploy` | `feat(nginx): proxy /api/cpm/version to cafe-cpm` |
-| `cafe-frontend` | `feat(platform): CPM version tile (CPM-UI-7A)` — after ops PRs |
-
-**Priorité:** when Platform Status version parity is needed; no IMM blocker.
-
-**Blocks:** **US18** / **CPM-UI-7A**.
-
----
-
 ## Open — Retirer entièrement le mode CPM mock (frontend)
 
 **Décision produit :** supprimer **tout** le mock CPM côté **`cafe-frontend`** — pas seulement le switch runtime `VITE_CPM_DATA_SOURCE=mock`, mais aussi **`mockCpmDataSource.ts`**, le placeholder `mock-discovery-scan-placeholder`, et l’UI / composables dédiés au parcours démo sans stack.

@@ -60,7 +60,20 @@ jobs:
           fi
           echo "rc_tag=$RC_TAG" >> $GITHUB_OUTPUT
 
+          # APP_VERSION for build-arg (exposed in GET /version — CPM-OPS-3)
+          if [[ -n "$RC_TAG" ]]; then
+            APP_VERSION="$RC_TAG"
+          else
+            APP_VERSION="dev-$SHORT_SHA"
+          fi
+          echo "app_version=$APP_VERSION" >> $GITHUB_OUTPUT
+
+          echo "short_sha=$SHORT_SHA"
+          echo "rc_tag=${RC_TAG:-<none>}"
+          echo "app_version=$APP_VERSION"
+
       - name: Document RC parity plan
         run: |
           echo "PR0 baseline: image repository/tag wiring and vulnerability scan policy will be finalized in follow-up PR."
           echo "This workflow intentionally captures trigger/guard/versioning logic parity with cafe-discovery."
+          echo "APP_VERSION for docker build: ${{ steps.version.outputs.app_version }}"

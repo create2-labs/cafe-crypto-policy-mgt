@@ -135,8 +135,37 @@ Tests in `internal/integration/nats/assessment_consumer_test.go` cover:
 | --- | --- | --- |
 | `GET /healthz` | Public | Liveness (`<service-name> ok`) |
 | `GET /metrics` | Public | Prometheus scrape (CPM application registry; IMM-OPS-1 explore counter) |
+| `GET /version` | Public | Deployed service version (`{"version": "…"}`; CPM-OPS-3, Discovery-aligned) |
 
 `GET /health` is not registered in CPM runtime.
+
+### Version endpoint (CPM-OPS-3)
+
+Public `GET /version` returns the running image version for Platform Status (**US18** / **CPM-UI-7A**):
+
+```bash
+curl http://localhost:8082/version
+```
+
+Response:
+
+```json
+{
+  "version": "v1.2.3"
+}
+```
+
+The response shape **must** remain `{"version": "..."}`; frontend and `cafe-deploy` rely on it (same contract as Discovery).
+
+#### Version flow (end-to-end)
+
+1. **GitHub Action** (`docker-rc.yml` / `docker-release.yml`): sets `APP_VERSION` from the Git tag or RC label (e.g. `v1.2.3`) and passes `--build-arg APP_VERSION=...` to `Dockerfile-cpm`.
+2. **Dockerfile**: embeds the resolved version in the binary via `-ldflags` (`internal/version`). Optional runtime override: env `APP_VERSION`.
+3. **CPM container**: serves `GET /version` on the main HTTP listener (`CPM_HTTP_ADDR`, default `:8082` locally, `:8080` in compose).
+4. **Infra** (`cafe-deploy`, follow-up PR): NGINX proxies `location = /api/cpm/version` → `http://cafe-cpm:8080/version`.
+5. **Frontend** (**CPM-UI-7A**, after deploy): `platformService.getCpmVersion()` calls `/api/cpm/version` and displays the CPM version on Platform Status.
+
+Edge routing for `/api/cpm/version` is tracked in [`cafe-deploy`](https://github.com/create2-labs/cafe-deploy); this repo owns the service endpoint only.
 
 ## Outbound CPM events 
 
@@ -269,6 +298,7 @@ Public routes:
 
 - `GET /healthz`
 - `GET /metrics`
+- `GET /version`
 
 Authenticated business routes:
 
@@ -444,7 +474,7 @@ Validates explore no-deployable-candidate observability (unit tests, HTTP smoke,
 
 **What the smoke test does**
 
-1. `GET /healthz` and `GET /metrics`
+1. `GET /healthz`, `GET /metrics`, and `GET /version`
 2. **No-candidate case** — `POST …/decisions/explore` with `target_chain_ids: [1, 2, 5]` while fixture instance `cpx_hybrid_prod` has `scope.chain_ids: [1, 8453]` → HTTP 200, empty `ranked_candidates`, `incompatible.chain_scope` in `rejected_candidates`
 3. Prints **CP scope vs request** (via `GET /policies/instances`): requested targets, instance `scope.chain_ids`, chains missing from scope — explains why observed and requested wallet chains can match while explore still rejects
 4. Asserts log `cpm.explore.no_deployable_candidate` and increment of `cpm_explore_no_deployable_candidate_total`

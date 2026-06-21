@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/metrics"
 	cpmmats "github.com/create2-labs/cafe-crypto-policy-mgt/internal/integration/nats"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/persistence"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/version"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -78,6 +80,11 @@ func handlerWithOwnerStore(serviceName string, store *api.ReadStore, ownerStore 
 	mux.HandleFunc(cpmroutes.Healthz, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(serviceName + " ok"))
+	})
+	mux.HandleFunc(cpmroutes.Version, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(version.Payload())
 	})
 	mux.Handle(cpmroutes.Metrics, promhttp.HandlerFor(metrics.Registry(), promhttp.HandlerOpts{}))
 	if err := api.RegisterReadRoutes(mux, store); err != nil {

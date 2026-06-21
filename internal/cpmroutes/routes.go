@@ -26,6 +26,8 @@ const (
 
 	Healthz  = "/healthz"
 	Metrics  = "/metrics"
+	// Version is the public ops endpoint for deployed service version (CPM-OPS-3).
+	Version = "/version"
 
 	// InternalPolicyReferenceScan is the service-token-gated lookup used by Discovery DELETE (PR5).
 	InternalPolicyReferenceScan = "/internal/policies/references/scan"
@@ -42,7 +44,7 @@ type AuthenticatedRoute struct {
 	Path   string
 }
 
-// AuthenticatedRoutes returns every authenticated CPM v1 route (excludes /healthz and internal).
+// AuthenticatedRoutes returns every authenticated CPM v1 route (excludes /healthz, /metrics, /version, and internal).
 func AuthenticatedRoutes() []AuthenticatedRoute {
 	return []AuthenticatedRoute{
 		{Method: http.MethodGet, Path: PoliciesCatalog},
