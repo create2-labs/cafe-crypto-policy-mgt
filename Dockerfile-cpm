@@ -10,13 +10,28 @@ RUN go test ./...
 FROM golang:1.26.4 AS build
 WORKDIR /app
 
+ARG APP_VERSION
 COPY go.mod ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/cafe-cpm ./cmd/cafe-cpm
+RUN RESOLVED_VERSION="${APP_VERSION}" && \
+    if [ -z "$RESOLVED_VERSION" ]; then \
+      if [ -d .git ]; then \
+        BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null | sed 's/[^a-zA-Z0-9]/-/g' || echo "dev") && \
+        SHORT_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo "") && \
+        RESOLVED_VERSION="${BRANCH}-${SHORT_SHA:-unknown}"; \
+      else \
+        RESOLVED_VERSION="dev"; \
+      fi; \
+    fi && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+      -ldflags "-X github.com/create2-labs/cafe-crypto-policy-mgt/internal/version.version=${RESOLVED_VERSION}" \
+      -o /out/cafe-cpm ./cmd/cafe-cpm
 
 FROM gcr.io/distroless/base-debian12:nonroot
+ARG APP_VERSION
+LABEL org.opencontainers.image.version="${APP_VERSION}"
 COPY --from=build /out/cafe-cpm /usr/local/bin/cafe-cpm
 COPY --from=build /app/internal/domain/policy/testdata /app/policy
 EXPOSE 8082
