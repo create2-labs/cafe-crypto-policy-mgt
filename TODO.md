@@ -4,6 +4,16 @@ Items deferred; not blocking current IMM work unless noted.
 
 ---
 
+## Livré (CPM-OPS-3 — `GET /version`, backend)
+
+Public **`GET /version`** → `{"version": "<APP_VERSION>"}` on the main API port (Go + `-ldflags`, decision **A** — contract aligned with Discovery, simplified mono-port implementation). See [`README.md`](README.md) § Version endpoint.
+
+**Still open (other repos):** `cafe-deploy` — `/api/cpm/version` ; **`cafe-frontend`** — CPM-UI-7A tile.
+
+**Convergence:** Discovery should adopt the same internal model — track **DISC-OPS-1** in [`cafe-discovery/TODO.md`](../cafe-discovery/TODO.md) (drop nginx `:8082` sidecar).
+
+---
+
 ## Open — Retirer entièrement le mode CPM mock (frontend)
 
 **Décision produit :** supprimer **tout** le mock CPM côté **`cafe-frontend`** — pas seulement le switch runtime `VITE_CPM_DATA_SOURCE=mock`, mais aussi **`mockCpmDataSource.ts`**, le placeholder `mock-discovery-scan-placeholder`, et l’UI / composables dédiés au parcours démo sans stack.
