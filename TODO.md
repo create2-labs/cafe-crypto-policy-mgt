@@ -4,19 +4,9 @@ Items deferred; not blocking current IMM work unless noted.
 
 ---
 
-## Livré (CPM-OPS-3 — `GET /version`, backend)
-
-Public **`GET /version`** → `{"version": "<APP_VERSION>"}` on the main API port (Go + `-ldflags`, decision **A** — contract aligned with Discovery, simplified mono-port implementation). See [`README.md`](README.md) § Version endpoint.
-
-**Still open (other repos):** `cafe-deploy` — `/api/cpm/version` ; **`cafe-frontend`** — CPM-UI-7A tile.
-
-**Convergence:** Discovery should adopt the same internal model — track **DISC-OPS-1** in [`cafe-discovery/TODO.md`](../cafe-discovery/TODO.md) (drop nginx `:8082` sidecar).
-
----
-
 ## Open — Retirer entièrement le mode CPM mock (frontend)
 
-**Décision produit :** supprimer **tout** le mock CPM côté **`cafe-frontend`** — pas seulement le switch runtime `VITE_CPM_DATA_SOURCE=mock`, mais aussi **`mockCpmDataSource.ts`**, le placeholder `mock-discovery-scan-placeholder`, et l’UI / composables dédiés au parcours démo sans stack.
+**Décision produit :** supprimer **tout** le mock CPM côté `**cafe-frontend`** — pas seulement le switch runtime `VITE_CPM_DATA_SOURCE=mock`, mais aussi `**mockCpmDataSource.ts**`, le placeholder `mock-discovery-scan-placeholder`, et l’UI / composables dédiés au parcours démo sans stack.
 
 **Hors scope backend :** `cafe-crypto-policy-mgt` n’expose que l’API HTTP réelle ; aucun changement Go requis pour ce chantier. Les « mocks » dans les tests Go (`httptest`, etc.) restent inchangés.
 
@@ -24,23 +14,25 @@ Public **`GET /version`** → `{"version": "<APP_VERSION>"}` on the main API por
 
 ### Périmètre `cafe-frontend`
 
-| Zone | Action |
-|------|--------|
-| `src/cpm/mockCpmDataSource.ts` | **Supprimer** (+ `mockCpmDataSource.spec.ts`) |
-| `src/cpm/cpmDataSourceFactory.ts` | Une seule implémentation : **`createApiCpmDataSource`** ; retirer `CpmDataSourceMode`, `normalizeMode`, branche `mock` |
-| `VITE_CPM_DATA_SOURCE` | Retirer de `vite-env.d.ts`, Dockerfiles, docs ; build toujours API |
-| `CryptoPolicyManagement.vue` | Retirer UI mock-only (wallet type/address éditables, `confirm-mock-signature`, copy « Preparing mock selection », badge mode `mock`, etc.) |
-| `useCpmPolicySelection.ts` | Retirer `CPM_SELECTION_CONTEXT_SCAN_ID` / adresse placeholder ; explore **uniquement** après scan v1 valide |
-| `useCpmScanContext.ts` | Retirer option `cpmMode` liée au mock ; garder rejet placeholder si besoin défensif |
-| `walletChallengeEligibility.ts` | Retirer `mock_pr10` ; EOA = règles API uniquement |
-| ESLint / imports fixtures | Vérifier que les fixtures JSON ne sont importées que par les tests (pattern PR 1) |
+
+| Zone                              | Action                                                                                                                                     |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/cpm/mockCpmDataSource.ts`    | **Supprimer** (+ `mockCpmDataSource.spec.ts`)                                                                                              |
+| `src/cpm/cpmDataSourceFactory.ts` | Une seule implémentation : `**createApiCpmDataSource`** ; retirer `CpmDataSourceMode`, `normalizeMode`, branche `mock`                     |
+| `VITE_CPM_DATA_SOURCE`            | Retirer de `vite-env.d.ts`, Dockerfiles, docs ; build toujours API                                                                         |
+| `CryptoPolicyManagement.vue`      | Retirer UI mock-only (wallet type/address éditables, `confirm-mock-signature`, copy « Preparing mock selection », badge mode `mock`, etc.) |
+| `useCpmPolicySelection.ts`        | Retirer `CPM_SELECTION_CONTEXT_SCAN_ID` / adresse placeholder ; explore **uniquement** après scan v1 valide                                |
+| `useCpmScanContext.ts`            | Retirer option `cpmMode` liée au mock ; garder rejet placeholder si besoin défensif                                                        |
+| `walletChallengeEligibility.ts`   | Retirer `mock_pr10` ; EOA = règles API uniquement                                                                                          |
+| ESLint / imports fixtures         | Vérifier que les fixtures JSON ne sont importées que par les tests (pattern PR 1)                                                          |
+
 
 ### Tests unitaires / intégration (effet de bord principal)
 
-Les specs qui appellent **`createMockCpmDataSource()`** ou **`mode: 'mock'`** doivent migrer vers :
+Les specs qui appellent `**createMockCpmDataSource()`** ou `**mode: 'mock'**` doivent migrer vers :
 
-- **`vi.mock('@/api')`** + réponses axios (modèle **`cpmOptionAFlow.e2e.spec.ts`** / **`apiCpmDataSource.spec.ts`**), ou
-- fakes légers implémentant l’interface **`CpmDataSource`** inline dans le fichier de test.
+- `**vi.mock('@/api')**` + réponses axios (modèle `**cpmOptionAFlow.e2e.spec.ts**` / `**apiCpmDataSource.spec.ts**`), ou
+- fakes légers implémentant l’interface `**CpmDataSource**` inline dans le fichier de test.
 
 **Fichiers à repasser (liste non exhaustive) :** `cpmDataSourceFactory.spec.ts`, `useCpmPolicySelection.spec.ts`, `usePolicyValidation.spec.ts`, `useLocalPolicyDraftStorage.spec.ts`, `useBackendDraftSave.spec.ts`, `usePolicyPersistence.spec.ts`, `useWalletChallengeGate.spec.ts`, `CryptoPolicyManagement.spec.ts`, composants CPM `*.spec.ts` qui injectent le mock.
 
@@ -50,34 +42,38 @@ Les specs qui appellent **`createMockCpmDataSource()`** ou **`mode: 'mock'`** do
 
 ### `cafe-deploy` + docs
 
-| Fichier | Action |
-|---------|--------|
-| `env/dev.env.template` | Retirer `VITE_CPM_DATA_SOURCE` ou documenter valeur fixe `api` puis suppression variable |
-| `scripts/redeployalldev.sh` | Retirer `--build-arg VITE_CPM_DATA_SOURCE` |
-| `README.md` (cafe-deploy) | Section « mock \| api » → CPM toujours API |
+
+| Fichier                     | Action                                                                                   |
+| --------------------------- | ---------------------------------------------------------------------------------------- |
+| `env/dev.env.template`      | Retirer `VITE_CPM_DATA_SOURCE` ou documenter valeur fixe `api` puis suppression variable |
+| `scripts/redeployalldev.sh` | Retirer `--build-arg VITE_CPM_DATA_SOURCE`                                               |
+| `README.md` (cafe-deploy)   | Section « mock | api » → CPM toujours API                                                |
+
 
 ### Docs CPM (ce dépôt)
 
 Mettre à jour les passages « preserve mock mode » / placeholder V1 :
 
-- [`workplans/CPM_post_v_1_option_a_scan_context.md`](./workplans/CPM_post_v_1_option_a_scan_context.md) §13.4
-- [`workplans/CPM_FRONTEND_PR_PLAN_V1.md`](./workplans/CPM_FRONTEND_PR_PLAN_V1.md) (historique V1 : noter mock retiré post-Option A)
-- [`workplans/CPM_OPTION_A_PR_PLAN.md`](./workplans/CPM_OPTION_A_PR_PLAN.md) — mentions `mock-discovery-scan-placeholder` limitées au passé
-- [`docs/CPM_OPTION_A_INTEGRATED.md`](./docs/CPM_OPTION_A_INTEGRATED.md)
+- `[workplans/CPM_post_v_1_option_a_scan_context.md](./workplans/CPM_post_v_1_option_a_scan_context.md)` §13.4
+- `[workplans/CPM_FRONTEND_PR_PLAN_V1.md](./workplans/CPM_FRONTEND_PR_PLAN_V1.md)` (historique V1 : noter mock retiré post-Option A)
+- `[workplans/CPM_OPTION_A_PR_PLAN.md](./workplans/CPM_OPTION_A_PR_PLAN.md)` — mentions `mock-discovery-scan-placeholder` limitées au passé
+- `[docs/CPM_OPTION_A_INTEGRATED.md](./docs/CPM_OPTION_A_INTEGRATED.md)`
 
 ### Acceptance (produit)
 
-- Page **`/crypto-policy-management`** : auth + scan wallet Discovery requis pour explore ; aucun chemin UI sans scan réel.
-- Aucune occurrence runtime de **`mock-discovery-scan-placeholder`** dans les payloads HTTP CPM.
+- Page `**/crypto-policy-management`** : auth + scan wallet Discovery requis pour explore ; aucun chemin UI sans scan réel.
+- Aucune occurrence runtime de `**mock-discovery-scan-placeholder**` dans les payloads HTTP CPM.
 - Stack locale : CPM utilisable uniquement avec Discovery + **cafe-cpm** (comportement attendu).
 
 ### Suggested PR
 
-| Repo | Branche (suggestion) | Titre (suggestion) |
-|------|----------------------|-------------------|
-| `cafe-frontend` | `cpm/remove-mock-datasource` | `refactor(cpm): remove mock CpmDataSource and VITE_CPM_DATA_SOURCE` |
-| `cafe-deploy` | (même PR ou follow-up) | `chore(deploy): drop VITE_CPM_DATA_SOURCE mock default` |
-| `cafe-crypto-policy-mgt` | doc only | `docs(cpm): remove mock-mode references from workplans` |
+
+| Repo                     | Branche (suggestion)         | Titre (suggestion)                                                  |
+| ------------------------ | ---------------------------- | ------------------------------------------------------------------- |
+| `cafe-frontend`          | `cpm/remove-mock-datasource` | `refactor(cpm): remove mock CpmDataSource and VITE_CPM_DATA_SOURCE` |
+| `cafe-deploy`            | (même PR ou follow-up)       | `chore(deploy): drop VITE_CPM_DATA_SOURCE mock default`             |
+| `cafe-crypto-policy-mgt` | doc only                     | `docs(cpm): remove mock-mode references from workplans`             |
+
 
 **Priorité :** après FE-IMM courant / quand la stack `api` est le seul chemin validé en dev.
 
@@ -88,17 +84,19 @@ Mettre à jour les passages « preserve mock mode » / placeholder V1 :
 **Contexte :** aujourd’hui le contenu du catalogue vit dans les JSON (`internal/domain/policy/testdata/` → `/app/policy/` dans l’image), mais **quels fichiers charger** est une liste explicite :
 
 - défauts `defaultPolicyTemplatePaths` / `defaultPolicyInstancePaths` dans `internal/config/config.go` ;
-- surcharge possible via `CPM_POLICY_TEMPLATE_PATHS` / `CPM_POLICY_INSTANCE_PATHS` (env), mais **`cafe-deploy` ne les pose pas** — chaque nouvelle CP oblige à toucher les `const` + rebuild image.
+- surcharge possible via `CPM_POLICY_TEMPLATE_PATHS` / `CPM_POLICY_INSTANCE_PATHS` (env), mais `**cafe-deploy` ne les pose pas** — chaque nouvelle CP oblige à toucher les `const` + rebuild image.
 
 **Problème :** la liste des CP actives est de la **config d’exploitation**, pas de la logique Go. Ajouter une 2ᵉ CP (ex. `crypto_policy_template_pq_ready_progressive.json`) ne devrait pas impliquer de modifier `config.go`.
 
 **Pistes (à trancher) :**
 
-| Option | Idée |
-|--------|------|
-| **A** | Définir `CPM_POLICY_*_PATHS` dans `cafe-deploy` (`compose/25-cpm.yml` / `env/*.env`) ; laisser des défauts minimaux (une CP) ou vides dans `config.go` |
-| **B** | Fichier manifeste `policy-index.json` à la racine de `/app/policy/` (catalog + liste templates + instances) |
-| **C** | Convention par répertoire : charger tous les `crypto_policy_template_*.json` / `crypto_policy_instance_*.json` valides (exclure `invalid_*`) |
+
+| Option | Idée                                                                                                                                                   |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **A**  | Définir `CPM_POLICY_*_PATHS` dans `cafe-deploy` (`compose/25-cpm.yml` / `env/*.env`) ; laisser des défauts minimaux (une CP) ou vides dans `config.go` |
+| **B**  | Fichier manifeste `policy-index.json` à la racine de `/app/policy/` (catalog + liste templates + instances)                                            |
+| **C**  | Convention par répertoire : charger tous les `crypto_policy_template_*.json` / `crypto_policy_instance_*.json` valides (exclure `invalid_*`)           |
+
 
 **Acceptance :** ajouter une CP = nouveaux JSON + rebuild image (ou volume, si un jour adopté) **sans** changement dans `internal/config/config.go` ; tests `LoadReadStore` / explore inchangés en intention ; doc admin (`cafe-documentation/04-cafe-admin-guide.md`) alignée.
 
@@ -107,40 +105,6 @@ Mettre à jour les passages « preserve mock mode » / placeholder V1 :
 **Priorité :** après validation UI catalogue multi-CP (2ᵉ template de test) ; confort ops / éviter dérive défauts ↔ fichiers embarqués.
 
 ---
-
-## Livré (IMM-W1 — ne pas réimplémenter DELETE)
-
-**`DELETE /api/cpm/v1/drafts?id=…`** — série **IMM-W1-1…3** mergée ([#41](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/41)–[#44](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/44)) dans **`cafe-crypto-policy-mgt`** (pas dans Discovery).
-
-| Couche | Rôle |
-|--------|------|
-| **Discovery IMM-9** ([#76](https://github.com/create2-labs/cafe-discovery/pull/76)) | `POST /scan` → **409** if **policy** (**IMM-W1-4** revises draft-only) |
-| **CPM IMM-W1** | `OwnerScopedStore.DeleteDraft` + route **`DELETE /api/cpm/v1/drafts?id=…`** → **204** \| **404** |
-
-**Validation smoke (stack locale :8080 / :8082) :**
-
-- `cafe-deploy/scripts/test-cpm-imm-w1-delete-draft.sh` — OK
-- `cafe-deploy/scripts/test-discovery-imm9-wallet-scan-w1-cpm-block.sh` — step 5 (DELETE draft → rescan **200**) — OK
-
-**Tests unitaires :** `go test ./internal/app/ ./internal/persistence/ -run DeleteDraft`
-
----
-
-## Livré (IMM-9b — normalisation adresse wallet, une règle canonique)
-
-**Règle unique :** `persistence.NormalizeWalletTargetAddress` (`0x` + 42 car. hex minuscules), alignée Discovery.
-
-| PR | Rôle |
-|----|------|
-| [#45](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/45) | `NormalizeWalletSubjectID` — consumer NATS assessment |
-| [#46](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/46) | `WalletSubjectIDFromAddress` — `POST …/policies/assessment/request` |
-
-**Helpers :** `internal/persistence/wallet_target.go` — `NormalizeWalletSubjectID`, `WalletSubjectIDFromAddress`.
-
-**Tests :** `go test ./internal/persistence/ ./internal/integration/nats/ ./internal/app/ -run 'Assessment|WalletSubject|NormalizeWallet'`
-
----
-
 
 ## IMM-9b follow-up — Factor internal policy-reference handlers
 
@@ -178,7 +142,7 @@ Mettre à jour les passages « preserve mock mode » / placeholder V1 :
 - `internal/app/assessment_request.go` — `GET …/discovery/v1/wallets/scans/{scan_id}` (détail)
 - `internal/app/authz_scan_test.go` — mêmes paths dans les mocks HTTP
 
-Le merge `main` ↔ `imm10` a divergé sur **`/discovery/v1/...`** (appel serveur → backend `:8080`) vs **`/api/discovery/v1/...`** (contrat public / edge WORKPLAN). Pour `CAFE_DISCOVERY_HTTP_BASE` pointant sur le backend Discovery, le couple correct est **`/discovery/v1`** (aligné Fiber / compose), pas `/api/discovery/v1` sur `:8080` direct.
+Le merge `main` ↔ `imm10` a divergé sur `**/discovery/v1/...`** (appel serveur → backend `:8080`) vs `**/api/discovery/v1/...**` (contrat public / edge WORKPLAN). Pour `CAFE_DISCOVERY_HTTP_BASE` pointant sur le backend Discovery, le couple correct est `**/discovery/v1**` (aligné Fiber / compose), pas `/api/discovery/v1` sur `:8080` direct.
 
 **Amélioration:** Introduire des constantes ou helpers CPM (p.ex. package `discoverypaths` / extension de `cpmroutes`, ou petit module partagé) :
 
