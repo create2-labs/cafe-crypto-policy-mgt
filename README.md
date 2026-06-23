@@ -2,6 +2,36 @@
 
 `CAFE Crypto Policy Management` (*`CPM`*) is the Crypto Policy Management service for CAFE [cafe-crypto-policy-mgt](github.com/create2-labs/cafe-crypto-policy-mgt).
 
+
+1. [CAFE Crypto Policy Management](#cafe-crypto-policy-management)
+   1. [Role and boundaries](#role-and-boundaries)
+   2. [Repository layout](#repository-layout)
+   3. [Discovery → CPM contract (`cafe.discovery.wallet.observed` v0.1)](#discovery--cpm-contract-cafediscoverywalletobserved-v01)
+      1. [Envelope (`walletobserved.Event`)](#envelope-walletobservedevent)
+      2. [Payload (`walletobserved.Payload`)](#payload-walletobservedpayload)
+      3. [Exported vocabulary](#exported-vocabulary)
+      4. [Canonical fixture](#canonical-fixture)
+   4. [Assessment output model](#assessment-output-model)
+   5. [Compatibility evaluation](#compatibility-evaluation)
+   6. [Ranking and policy decision output](#ranking-and-policy-decision-output)
+   7. [Inbound explicit assessment request](#inbound-explicit-assessment-request)
+   8. [Health and metrics endpoints](#health-and-metrics-endpoints)
+      1. [Version endpoint (CPM-OPS-3)](#version-endpoint-cpm-ops-3)
+         1. [Version flow (end-to-end)](#version-flow-end-to-end)
+   9. [Outbound CPM events](#outbound-cpm-events)
+      1. [Producer-side documentation](#producer-side-documentation)
+   10. [Read APIs](#read-apis)
+   11. [Explore no-deployable-candidate observability (IMM-OPS-1)](#explore-no-deployable-candidate-observability-imm-ops-1)
+   12. [Auth/Authz contract (AUTH-00)](#authauthz-contract-auth-00)
+   13. [AUTH-01 runtime authentication wiring](#auth-01-runtime-authentication-wiring)
+       1. [CP-PERSIST runtime](#cp-persist-runtime)
+       2. [Platform drafts API (CPM-DRAFT-1 contract)](#platform-drafts-api-cpm-draft-1-contract)
+   14. [AUTH-03 owner-scoped persistence foundation](#auth-03-owner-scoped-persistence-foundation)
+   15. [AUTH-04 auth error contract and observability](#auth-04-auth-error-contract-and-observability)
+   16. [Option A integration (Discovery v1 wallet scans)](#option-a-integration-discovery-v1-wallet-scans)
+   17. [Run locally](#run-locally)
+   18. [IMM-OPS-1 smoke script (`scripts/test-imm-ops-1.sh`)](#imm-ops-1-smoke-script-scriptstest-imm-ops-1sh)
+
 ## Role and boundaries
 
 - Discovery observes wallets, persists scan artifacts, and maps observations to the shared wire contract from `cafe-contracts`.
