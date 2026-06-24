@@ -4,6 +4,25 @@ Items deferred; not blocking current IMM work unless noted.
 
 ---
 
+## PERS-D* — Durable CP via cafe-persistence (ADR)
+
+**ADR (validée) :** [cafe-discovery/docs/ADR/ADR_20260622_persistence.md](../cafe-discovery/docs/ADR/ADR_20260622_persistence.md) — extraction plateforme **cafe-persistence** ; CPM reste control plane policy (HTTP `/api/cpm/v1` inchangé).
+
+**Jalons CPM (ordre) :**
+
+| PR | Objectif |
+|----|----------|
+| **PERS-D3b-spec** | Revue schéma / sémantique CP (`internal/cp/v1`) — ownership métier CPM §8.2 |
+| **PERS-D5a** | Client HTTP vers cafe-persistence ; `CPM_STORE=memory` par défaut |
+| **PERS-D5b** | Bascule `CPM_STORE=persistence` staging → prod ; `OwnerScopedStore` conservé (rollback env) |
+| **PERS-D5c** | Retrait chemin prod `OwnerScopedStore` après fenêtre de stabilité |
+
+**Règles chemin critique :** timeouts, retries idempotents (`draft_id`), **503** si persistence indisponible — ADR §5.5–§5.6. Pas d’accès direct Postgres/Redis depuis le binaire CPM.
+
+**Plan d’exécution détaillé :** [ADR_20260622_persistence_PR_PLAN.md](../cafe-discovery/docs/ADR/ADR_20260622_persistence_PR_PLAN.md).
+
+---
+
 ## Open — Retirer entièrement le mode CPM mock (frontend)
 
 **Décision produit :** supprimer **tout** le mock CPM côté `**cafe-frontend`** — pas seulement le switch runtime `VITE_CPM_DATA_SOURCE=mock`, mais aussi `**mockCpmDataSource.ts**`, le placeholder `mock-discovery-scan-placeholder`, et l’UI / composables dédiés au parcours démo sans stack.

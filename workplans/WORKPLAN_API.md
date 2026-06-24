@@ -8,7 +8,9 @@
 
 **Périmètre du document :** définir les **surfaces HTTP** attendues, la **sémantique** des ressources, et les **arbitrages** à valider avant acceptation — **§5** consolide les **décisions finales** ; **§8** est la **checklist de sign-off** avant OpenAPI / code ; le reste du texte peut encore signaler des **points à confirmer** par section lorsqu’ils ne sont pas couverts par **§5**. Il ne modifie pas le code ni les contrats déployés.
 
-**Dépôts concernés (à confirmer par section) :** `cafe-discovery` (observation / scans), `cafe-crypto-policy-mgt` (politiques), `cafe-deploy` / edge (chemins publics).
+**Dépôts concernés (à confirmer par section) :** `cafe-discovery` (observation / scans), `cafe-crypto-policy-mgt` (politiques), `cafe-deploy` / edge (chemins publics), **`cafe-persistence`** (data plane scan + CP durable — voir ci-dessous).
+
+**Plateforme persistance (architecture validée, PERS-D0–D6) :** [`cafe-discovery/docs/ADR/ADR_20260622_persistence.md`](../../cafe-discovery/docs/ADR/ADR_20260622_persistence.md) — extraction du writer scan, module CP Postgres (schéma métier défini par CPM §8.2), contrats internes `internal/scan/v1` et `internal/cp/v1`. **API publiques §0 inchangées.** CPM délègue stockage durable via **`CPM_STORE`** (rollout D5a–D5c) ; plan PR : [`ADR_20260622_persistence_PR_PLAN.md`](../../cafe-discovery/docs/ADR/ADR_20260622_persistence_PR_PLAN.md). Jalons CPM : **PERS-D3b-spec** → **D5a** → **D5b** → **D5c**.
 
 **Option A (définition produit) :** [`CPM_post_v_1_option_a_scan_context.md`](./CPM_post_v_1_option_a_scan_context.md). **Narratif intégré (jalons mergés) :** [`docs/CPM_OPTION_A_INTEGRATED.md`](../docs/CPM_OPTION_A_INTEGRATED.md) — plan de PR [`CPM_OPTION_A_PR_PLAN.md`](./CPM_OPTION_A_PR_PLAN.md) ; index PR mergées [`WORKPLAN_API_PR.md`](./WORKPLAN_API_PR.md).
 
