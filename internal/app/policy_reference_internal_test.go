@@ -37,7 +37,7 @@ func TestPolicyReferenceInternalForbiddenWithoutValidServiceToken(t *testing.T) 
 	owner := persistence.NewOwnerScopedStore()
 	introspect := newDiscoveryValidationServer(t, discoveryValidationTestConfig{status: http.StatusOK})
 	defer introspect.Close()
-	h, err := handlerWithOwnerStore("cafe-cpm", store, owner, authConfig{
+	h, err := testHandler(store, owner, authConfig{
 		Required:                            true,
 		SessionValidationURL:                introspect.URL,
 		SessionValidationTimeoutSec:         3,
@@ -63,7 +63,7 @@ func TestPolicyReferenceInternalUnavailableWhenTokenNotConfigured(t *testing.T) 
 	owner := persistence.NewOwnerScopedStore()
 	introspect := newDiscoveryValidationServer(t, discoveryValidationTestConfig{status: http.StatusOK})
 	defer introspect.Close()
-	h, err := handlerWithOwnerStore("cafe-cpm", store, owner, authConfig{
+	h, err := testHandler(store, owner, authConfig{
 		Required:                            true,
 		SessionValidationURL:                introspect.URL,
 		SessionValidationTimeoutSec:         3,
@@ -102,7 +102,7 @@ func TestPolicyReferenceInternalReferencedAndCount(t *testing.T) {
 	introspect := newDiscoveryValidationServer(t, discoveryValidationTestConfig{status: http.StatusOK})
 	defer introspect.Close()
 	const svcToken = "svc-token-policy-ref"
-	h, err := handlerWithOwnerStore("cafe-cpm", store, owner, authConfig{
+	h, err := testHandler(store, owner, authConfig{
 		Required:                            true,
 		SessionValidationURL:                introspect.URL,
 		SessionValidationTimeoutSec:         3,
@@ -170,7 +170,7 @@ func TestPublicGETPoliciesByScanIDAgreesWithInternalReferenceCheck(t *testing.T)
 	}))
 	t.Cleanup(scanAuth.Close)
 	const svcToken = "svc-ref-agree"
-	h, err := handlerWithOwnerStore("cafe-cpm", read, owner, authConfig{
+	h, err := testHandler(read, owner, authConfig{
 		Required:                            true,
 		SessionValidationURL:                introspect.URL,
 		SessionValidationTimeoutSec:         3,

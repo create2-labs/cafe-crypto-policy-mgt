@@ -30,7 +30,7 @@ func TestHandlerVersionReturnsJSON(t *testing.T) {
 		t.Fatalf("LoadReadStore: %v", err)
 	}
 
-	h, err := handler("cafe-cpm", store, authConfig{Required: false})
+	h, err := testHandler(store, nil, authConfig{Required: false})
 	if err != nil {
 		t.Fatalf("handler: %v", err)
 	}

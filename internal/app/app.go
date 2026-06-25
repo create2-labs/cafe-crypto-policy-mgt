@@ -28,6 +28,11 @@ func Run(cfg config.Config) error {
 		return fmt.Errorf("load read store: %w", err)
 	}
 
+	ownerStore, err := newPolicyStore(cfg)
+	if err != nil {
+		return fmt.Errorf("policy store: %w", err)
+	}
+
 	var assessmentPublish func(context.Context, string, []byte) error
 	if u := strings.TrimSpace(cfg.NATSURL); u != "" {
 		closeNATS, pub, err := cpmmats.ConnectPublisher(u)
@@ -38,7 +43,7 @@ func Run(cfg config.Config) error {
 		assessmentPublish = pub.Publish
 	}
 
-	h, err := handler(cfg.ServiceName, store, authConfig{
+	h, err := handler(cfg, store, ownerStore, authConfig{
 		Required:                            cfg.AuthRequired,
 		SessionValidationURL:                cfg.SessionValidationURL,
 		SessionValidationTimeoutSec:         cfg.SessionValidationTimeoutSec,
@@ -66,11 +71,11 @@ func Run(cfg config.Config) error {
 	return server.ListenAndServe()
 }
 
-func handler(serviceName string, store *api.ReadStore, authCfg authConfig) (http.Handler, error) {
-	return handlerWithOwnerStore(serviceName, store, persistence.NewOwnerScopedStore(), authCfg)
+func handler(cfg config.Config, store *api.ReadStore, ownerStore persistence.PolicyStore, authCfg authConfig) (http.Handler, error) {
+	return handlerWithOwnerStore(cfg.ServiceName, store, ownerStore, authCfg)
 }
 
-func handlerWithOwnerStore(serviceName string, store *api.ReadStore, ownerStore *persistence.OwnerScopedStore, authCfg authConfig) (http.Handler, error) {
+func handlerWithOwnerStore(serviceName string, store *api.ReadStore, ownerStore persistence.PolicyStore, authCfg authConfig) (http.Handler, error) {
 	mux := http.NewServeMux()
 	obs := authCfg.Observability
 	if obs == nil {

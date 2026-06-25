@@ -74,7 +74,7 @@ func newAuthedTestHandlerWithScanAuthz(t *testing.T) http.Handler {
 		_, _ = w.Write([]byte(`{"allowed":true}`))
 	}))
 	t.Cleanup(scanAuthz.Close)
-	h, err := handler("cafe-cpm", store, authConfig{
+	h, err := testHandler(store, nil, authConfig{
 		Required:                    true,
 		SessionValidationURL:        introspect.URL,
 		SessionValidationTimeoutSec: 3,

@@ -21,7 +21,7 @@ type policyScanReferenceRequest struct {
 // registerPolicyReferenceInternalRoute registers POST /internal/policies/references/scan
 // (WORKPLAN_API_PR.md PR5). Caller must gate the mux with service-token auth for this path
 // when CPM_AUTH_REQUIRED is true.
-func registerPolicyReferenceInternalRoute(mux *http.ServeMux, store *persistence.OwnerScopedStore) {
+func registerPolicyReferenceInternalRoute(mux *http.ServeMux, store persistence.PolicyStore) {
 	mux.HandleFunc("POST "+cpmroutes.InternalPolicyReferenceScan, func(w http.ResponseWriter, r *http.Request) {
 		const maxBody = 1 << 16
 		body, err := io.ReadAll(io.LimitReader(r.Body, maxBody+1))
@@ -61,6 +61,10 @@ func registerPolicyReferenceInternalRoute(mux *http.ServeMux, store *persistence
 		if err != nil {
 			if errors.Is(err, persistence.ErrPrincipalRequired) {
 				writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: err.Error()})
+				return
+			}
+			if errors.Is(err, persistence.ErrPersistenceUnavailable) {
+				writeJSON(w, http.StatusServiceUnavailable, apiErrorJSON(errCodePersistenceUnavailable, "persistence is temporarily unavailable"))
 				return
 			}
 			writeJSON(w, http.StatusInternalServerError, map[string]any{jsonKeyError: errMsgInternalServerError})

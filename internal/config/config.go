@@ -17,6 +17,8 @@ const (
 	defaultPolicyCatalogPath           = "/app/policy/policy_graph_catalog_valid.json"
 	defaultPolicyTemplatePaths         = "/app/policy/crypto_policy_template_valid.json,/app/policy/crypto_policy_template_pq_ready_progressive.json"
 	defaultPolicyInstancePaths         = "/app/policy/crypto_policy_instance_valid.json,/app/policy/crypto_policy_instance_pq_ready_progressive.json"
+	defaultCPMStore                    = "memory"
+	defaultPersistenceTimeoutSec       = 15
 )
 
 type Config struct {
@@ -43,6 +45,14 @@ type Config struct {
 	PolicyInstancePaths []string
 	// WalletAuthDomain is embedded in CP-PERSIST canonical messages (§12); falls back to request Host.
 	WalletAuthDomain string
+	// Store selects owner-scoped CP storage: memory (default) or persistence (PERS-D5a+).
+	Store string
+	// PersistenceURL is the cafe-persistence service origin (e.g. http://cafe-persistence:8082).
+	PersistenceURL string
+	// PersistenceTimeoutSec bounds HTTP calls to cafe-persistence (ADR §5.5).
+	PersistenceTimeoutSec int
+	// PersistenceServiceToken is the CAFE_PERSISTENCE_SERVICE_TOKEN bearer for internal/cp/v1.
+	PersistenceServiceToken string
 }
 
 func LoadFromEnv() Config {
@@ -66,6 +76,10 @@ func LoadFromEnv() Config {
 		PolicyTemplatePaths:                 parseCommaList(getEnv("CPM_POLICY_TEMPLATE_PATHS", defaultPolicyTemplatePaths)),
 		PolicyInstancePaths:                 parseCommaList(getEnv("CPM_POLICY_INSTANCE_PATHS", defaultPolicyInstancePaths)),
 		WalletAuthDomain:                    getEnv("CPM_WALLET_AUTH_DOMAIN", ""),
+		Store:                               getEnv("CPM_STORE", defaultCPMStore),
+		PersistenceURL:                      getEnv("CPM_PERSISTENCE_URL", ""),
+		PersistenceTimeoutSec:             getEnvInt("CPM_PERSISTENCE_TIMEOUT_SEC", defaultPersistenceTimeoutSec),
+		PersistenceServiceToken:             getEnv("CAFE_PERSISTENCE_SERVICE_TOKEN", ""),
 	}
 }
 

@@ -31,13 +31,13 @@ type walletChallengeResponse struct {
 	ExpiresAt     string `json:"expires_at"`
 }
 
-func registerWalletChallengeRoutes(mux *http.ServeMux, store *persistence.OwnerScopedStore, cfg authConfig, obs *authObservability) {
+func registerWalletChallengeRoutes(mux *http.ServeMux, store persistence.PolicyStore, cfg authConfig, obs *authObservability) {
 	mux.HandleFunc("POST "+cpmroutes.WalletChallenges, func(w http.ResponseWriter, r *http.Request) {
 		handleWalletChallenge(w, r, store, cfg, obs)
 	})
 }
 
-func handleWalletChallenge(w http.ResponseWriter, r *http.Request, store *persistence.OwnerScopedStore, cfg authConfig, obs *authObservability) {
+func handleWalletChallenge(w http.ResponseWriter, r *http.Request, store persistence.PolicyStore, cfg authConfig, obs *authObservability) {
 	requestID := obs.ensureRequestID(w, r)
 	principal, ok := principalFromContext(r.Context())
 	if !ok {

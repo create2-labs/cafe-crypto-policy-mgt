@@ -319,7 +319,7 @@ func newAuthedTestHandler(t *testing.T) http.Handler {
 	}
 	introspect := newDiscoveryValidationServer(t, discoveryValidationTestConfig{status: http.StatusOK})
 	t.Cleanup(introspect.Close)
-	h, err := handler("cafe-cpm", store, authConfig{
+	h, err := testHandler(store, nil, authConfig{
 		Required:                    true,
 		SessionValidationURL:        introspect.URL,
 		SessionValidationTimeoutSec: 3,

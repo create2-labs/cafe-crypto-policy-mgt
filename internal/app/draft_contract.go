@@ -193,6 +193,8 @@ func mapDraftPersistenceError(w http.ResponseWriter, r *http.Request, obs *authO
 		writeDraftStructuredError(w, r, obs, http.StatusForbidden, authCodeOwnerForbidden, "owner access denied", reasonDetails("owner_forbidden"))
 	case errors.Is(err, persistence.ErrDraftNotFound):
 		writeDraftStructuredError(w, r, obs, http.StatusNotFound, draftCodeNotFound, "draft not found", map[string]any{})
+	case errors.Is(err, persistence.ErrPersistenceUnavailable):
+		writeDraftStructuredError(w, r, obs, http.StatusServiceUnavailable, errCodePersistenceUnavailable, "persistence is temporarily unavailable", map[string]any{})
 	case errors.Is(err, persistence.ErrPrincipalRequired):
 		writeDraftStructuredError(w, r, obs, http.StatusUnauthorized, authCodePrincipalRequired, errMsgAuthenticationRequired, reasonDetails(authReasonPrincipalMissing))
 	default:
