@@ -12,7 +12,7 @@ Items deferred; not blocking current IMM work unless noted.
 
 | PR | Objectif |
 |----|----------|
-| **PERS-D3b-spec** | Revue schéma / sémantique CP (`internal/cp/v1`) — ownership métier CPM §8.2 |
+| **PERS-D3b-spec** | Revue schéma / sémantique CP (`internal/cp/v1`) — **spec publiée** ; voir [`docs/PERS_D3B_SPEC_REVIEW.md`](docs/PERS_D3B_SPEC_REVIEW.md) |
 | **PERS-D5a** | Client HTTP vers cafe-persistence ; `CPM_STORE=memory` par défaut |
 | **PERS-D5b** | Bascule `CPM_STORE=persistence` staging → prod ; `OwnerScopedStore` conservé (rollback env) |
 | **PERS-D5c** | Retrait chemin prod `OwnerScopedStore` après fenêtre de stabilité |
