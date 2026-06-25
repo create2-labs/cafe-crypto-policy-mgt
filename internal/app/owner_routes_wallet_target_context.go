@@ -1,19 +1,20 @@
 package app
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/persistence"
 )
 
-func registerOwnerWalletTargetContextRoute(mux *http.ServeMux, base string, store *persistence.OwnerScopedStore, obs *authObservability) {
+func registerOwnerWalletTargetContextRoute(mux *http.ServeMux, base string, store persistence.PolicyStore, obs *authObservability) {
 	mux.HandleFunc("GET "+base+"/wallet-target-context", func(w http.ResponseWriter, r *http.Request) {
 		handleOwnerGETWalletTargetContext(w, r, store, obs)
 	})
 }
 
-func handleOwnerGETWalletTargetContext(w http.ResponseWriter, r *http.Request, store *persistence.OwnerScopedStore, obs *authObservability) {
+func handleOwnerGETWalletTargetContext(w http.ResponseWriter, r *http.Request, store persistence.PolicyStore, obs *authObservability) {
 	requestID := obs.ensureRequestID(w, r)
 	principal, ok := principalFromContext(r.Context())
 	if !ok {
@@ -39,6 +40,10 @@ func handleOwnerGETWalletTargetContext(w http.ResponseWriter, r *http.Request, s
 	}
 	counts, err := store.CountActiveWalletCPMContext(principal, norm)
 	if err != nil {
+		if errors.Is(err, persistence.ErrPersistenceUnavailable) {
+			writeJSON(w, http.StatusServiceUnavailable, apiErrorJSON(errCodePersistenceUnavailable, "persistence is temporarily unavailable"))
+			return
+		}
 		writeJSON(w, http.StatusInternalServerError, map[string]any{jsonKeyError: errMsgInternalServerError})
 		return
 	}

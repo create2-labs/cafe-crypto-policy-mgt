@@ -25,14 +25,14 @@ type ownerScopedUpsertRequest struct {
 	TenantID    string         `json:"tenant_id,omitempty"`
 }
 
-func registerOwnerScopedRoutes(mux *http.ServeMux, store *persistence.OwnerScopedStore, obs *authObservability) {
+func registerOwnerScopedRoutes(mux *http.ServeMux, store persistence.PolicyStore, obs *authObservability) {
 	if obs == nil {
 		obs = newAuthObservability()
 	}
 	registerOwnerScopedRoutesForPrefix(mux, cpmroutes.V1Base, store, obs)
 }
 
-func registerOwnerScopedRoutesForPrefix(mux *http.ServeMux, base string, store *persistence.OwnerScopedStore, obs *authObservability) {
+func registerOwnerScopedRoutesForPrefix(mux *http.ServeMux, base string, store persistence.PolicyStore, obs *authObservability) {
 	mux.HandleFunc("POST "+base+ownerDraftsPath, func(w http.ResponseWriter, r *http.Request) {
 		handleOwnerPOSTDrafts(w, r, store, obs)
 	})
@@ -54,7 +54,7 @@ func registerOwnerScopedRoutesForPrefix(mux *http.ServeMux, base string, store *
 	})
 }
 
-func handleOwnerPOSTDrafts(w http.ResponseWriter, r *http.Request, store *persistence.OwnerScopedStore, obs *authObservability) {
+func handleOwnerPOSTDrafts(w http.ResponseWriter, r *http.Request, store persistence.PolicyStore, obs *authObservability) {
 	requestID := obs.ensureRequestID(w, r)
 	principal, ok := principalFromContext(r.Context())
 	if !ok {
@@ -80,7 +80,7 @@ func handleOwnerPOSTDrafts(w http.ResponseWriter, r *http.Request, store *persis
 	writeJSON(w, http.StatusOK, draftUpsertResponseFromRecord(record))
 }
 
-func handleOwnerGETDrafts(w http.ResponseWriter, r *http.Request, store *persistence.OwnerScopedStore, obs *authObservability) {
+func handleOwnerGETDrafts(w http.ResponseWriter, r *http.Request, store persistence.PolicyStore, obs *authObservability) {
 	requestID := obs.ensureRequestID(w, r)
 	principal, ok := principalFromContext(r.Context())
 	if !ok {
@@ -101,7 +101,7 @@ func handleOwnerGETDrafts(w http.ResponseWriter, r *http.Request, store *persist
 	writeJSON(w, http.StatusOK, draftRecordResponseFromStore(record))
 }
 
-func handleOwnerDELETEDrafts(w http.ResponseWriter, r *http.Request, store *persistence.OwnerScopedStore, obs *authObservability) {
+func handleOwnerDELETEDrafts(w http.ResponseWriter, r *http.Request, store persistence.PolicyStore, obs *authObservability) {
 	requestID := obs.ensureRequestID(w, r)
 	principal, ok := principalFromContext(r.Context())
 	if !ok {
@@ -128,7 +128,7 @@ func handleOwnerDELETEDrafts(w http.ResponseWriter, r *http.Request, store *pers
 	}
 }
 
-func handleOwnerPOSTPolicies(w http.ResponseWriter, r *http.Request, store *persistence.OwnerScopedStore, obs *authObservability) {
+func handleOwnerPOSTPolicies(w http.ResponseWriter, r *http.Request, store persistence.PolicyStore, obs *authObservability) {
 	requestID := obs.ensureRequestID(w, r)
 	principal, ok := principalFromContext(r.Context())
 	if !ok {
@@ -185,7 +185,7 @@ func validatePolicyPersistBinding(req ownerScopedUpsertRequest) (scanIDToStore s
 	}
 }
 
-func handleOwnerGETPolicies(w http.ResponseWriter, r *http.Request, store *persistence.OwnerScopedStore, obs *authObservability) {
+func handleOwnerGETPolicies(w http.ResponseWriter, r *http.Request, store persistence.PolicyStore, obs *authObservability) {
 	requestID := obs.ensureRequestID(w, r)
 	principal, ok := principalFromContext(r.Context())
 	if !ok {
@@ -239,7 +239,7 @@ func handleOwnerGETPolicies(w http.ResponseWriter, r *http.Request, store *persi
 	})
 }
 
-func handleOwnerDELETEPolicies(w http.ResponseWriter, r *http.Request, store *persistence.OwnerScopedStore, obs *authObservability) {
+func handleOwnerDELETEPolicies(w http.ResponseWriter, r *http.Request, store persistence.PolicyStore, obs *authObservability) {
 	requestID := obs.ensureRequestID(w, r)
 	principal, ok := principalFromContext(r.Context())
 	if !ok {
@@ -298,6 +298,10 @@ func mapPersistenceError(w http.ResponseWriter, r *http.Request, obs *authObserv
 		obs.writeAuthError(w, r, http.StatusForbidden, authCodeOwnerForbidden, "owner access denied", reasonDetails("owner_forbidden"))
 	case errors.Is(err, persistence.ErrDraftNotFound), errors.Is(err, persistence.ErrPolicyNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]any{jsonKeyError: errMsgNotFound})
+	case errors.Is(err, persistence.ErrPersistenceUnavailable):
+		writeJSON(w, http.StatusServiceUnavailable, apiErrorJSON(errCodePersistenceUnavailable, "persistence is temporarily unavailable"))
+	case errors.Is(err, persistence.ErrUnsupportedStoreOperation):
+		writeJSON(w, http.StatusUnprocessableEntity, apiErrorJSON(errCodeInternalError, "operation is not supported when CPM_STORE=persistence"))
 	case errors.Is(err, persistence.ErrPrincipalRequired):
 		obs.recordDecision(r, requestID, authCategoryOwner, authOutcomeDenied, authCodePrincipalRequired, authReasonPrincipalMissing, "", "")
 		obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, errMsgAuthenticationRequired, reasonDetails(authReasonPrincipalMissing))

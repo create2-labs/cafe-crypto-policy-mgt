@@ -41,7 +41,7 @@ func newWalletChallengeTestHandler(t *testing.T) http.Handler {
 	t.Cleanup(discovery.Close)
 
 	store, readStore := testReadStore(t)
-	handler, err := handlerWithOwnerStore("cafe-cpm", readStore, store, authConfig{
+	handler, err := testHandler(readStore, store, authConfig{
 		Required:                    true,
 		SessionValidationURL:        introspect.URL,
 		SessionValidationTimeoutSec: 3,

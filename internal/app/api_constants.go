@@ -20,6 +20,7 @@ const (
 	errCodeDiscoveryUnavailable         = "discovery_unavailable"
 	errCodeInternalError                = "internal_error"
 	errCodeDiscoveryUpstreamUnavailable = "DISCOVERY_UPSTREAM_UNAVAILABLE"
+	errCodePersistenceUnavailable       = "PERSISTENCE_UNAVAILABLE"
 
 	authOutcomeDenied        = "denied"
 	authOutcomeUnavailable   = "unavailable"

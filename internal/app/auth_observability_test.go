@@ -274,7 +274,7 @@ func mustAuthHandler(t *testing.T, cfg authConfig) http.Handler {
 		t.Fatalf("LoadReadStore: %v", err)
 	}
 	cfg.ClockSkewSec = 30
-	h, err := handler("cafe-cpm", store, cfg)
+	h, err := testHandler(store, nil, cfg)
 	if err != nil {
 		t.Fatalf("handler: %v", err)
 	}

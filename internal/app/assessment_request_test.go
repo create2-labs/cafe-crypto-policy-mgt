@@ -212,7 +212,7 @@ func newAssessmentTestHandler(t *testing.T, harness assessmentHarness) http.Hand
 		pub = func(context.Context, string, []byte) error { return nil }
 	}
 
-	h, err := handler("cafe-cpm", store, authConfig{
+	h, err := testHandler(store, nil, authConfig{
 		Required:                    true,
 		SessionValidationURL:        introspect.URL,
 		SessionValidationTimeoutSec: 3,

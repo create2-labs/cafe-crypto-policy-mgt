@@ -32,7 +32,7 @@ type draftPersistResponse struct {
 	PersistedAt         string `json:"persisted_at"`
 }
 
-func registerDraftPersistRoutes(mux *http.ServeMux, store *persistence.OwnerScopedStore, cfg authConfig, obs *authObservability) {
+func registerDraftPersistRoutes(mux *http.ServeMux, store persistence.PolicyStore, cfg authConfig, obs *authObservability) {
 	if !cpmroutes.PathMatches(cpmroutes.DraftPersist, cpmroutes.DraftPersistPath("_")) {
 		panic("cpmroutes: draft persist path pattern mismatch")
 	}
@@ -41,7 +41,7 @@ func registerDraftPersistRoutes(mux *http.ServeMux, store *persistence.OwnerScop
 	})
 }
 
-func handleDraftPersist(w http.ResponseWriter, r *http.Request, store *persistence.OwnerScopedStore, cfg authConfig, obs *authObservability) {
+func handleDraftPersist(w http.ResponseWriter, r *http.Request, store persistence.PolicyStore, cfg authConfig, obs *authObservability) {
 	requestID := obs.ensureRequestID(w, r)
 	principal, ok := principalFromContext(r.Context())
 	if !ok {
@@ -88,6 +88,10 @@ func handleDraftPersist(w http.ResponseWriter, r *http.Request, store *persisten
 		writeWalletAuthorizationError(w, r, obs, http.StatusNotFound, walletAuthCodeDraftNotFound, "draft not found")
 		return
 	case draftErr != nil:
+		if errors.Is(draftErr, persistence.ErrPersistenceUnavailable) {
+			writeWalletAuthorizationError(w, r, obs, http.StatusServiceUnavailable, errCodePersistenceUnavailable, "persistence is temporarily unavailable")
+			return
+		}
 		writeWalletAuthorizationError(w, r, obs, http.StatusInternalServerError, errCodeInternalError, errMsgInternalServerError)
 		return
 	}
@@ -146,6 +150,9 @@ func handleDraftPersist(w http.ResponseWriter, r *http.Request, store *persisten
 		return
 	case errors.Is(persistErr, persistence.ErrDraftNotFound), errors.Is(persistErr, persistence.ErrForbidden):
 		writeWalletAuthorizationError(w, r, obs, http.StatusNotFound, walletAuthCodeDraftNotFound, "draft not found")
+		return
+	case errors.Is(persistErr, persistence.ErrPersistenceUnavailable):
+		writeWalletAuthorizationError(w, r, obs, http.StatusServiceUnavailable, errCodePersistenceUnavailable, "persistence is temporarily unavailable")
 		return
 	case persistErr != nil:
 		writeWalletAuthorizationError(w, r, obs, http.StatusInternalServerError, errCodeInternalError, errMsgInternalServerError)

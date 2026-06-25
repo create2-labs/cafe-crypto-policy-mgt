@@ -71,6 +71,18 @@ func TestLoadFromEnvDefaults(t *testing.T) {
 	if cfg.NATSURL != "" {
 		t.Fatalf("expected empty NATS URL default, got %q", cfg.NATSURL)
 	}
+	if cfg.Store != defaultCPMStore {
+		t.Fatalf("expected default store %q, got %q", defaultCPMStore, cfg.Store)
+	}
+	if cfg.PersistenceURL != "" {
+		t.Fatalf("expected empty persistence URL default, got %q", cfg.PersistenceURL)
+	}
+	if cfg.PersistenceTimeoutSec != defaultPersistenceTimeoutSec {
+		t.Fatalf("expected default persistence timeout %d, got %d", defaultPersistenceTimeoutSec, cfg.PersistenceTimeoutSec)
+	}
+	if cfg.PersistenceServiceToken != "" {
+		t.Fatalf("expected empty persistence service token default, got %q", cfg.PersistenceServiceToken)
+	}
 }
 
 func TestLoadFromEnvOverrides(t *testing.T) {
@@ -92,6 +104,10 @@ func TestLoadFromEnvOverrides(t *testing.T) {
 	t.Setenv("CAFE_DISCOVERY_HTTP_BASE", "http://discovery:8080")
 	t.Setenv("CAFE_DISCOVERY_HTTP_TIMEOUT_SEC", "11")
 	t.Setenv("CPM_NATS_URL", "nats://nats:4222")
+	t.Setenv("CPM_STORE", "persistence")
+	t.Setenv("CPM_PERSISTENCE_URL", "http://persistence:8082")
+	t.Setenv("CPM_PERSISTENCE_TIMEOUT_SEC", "20")
+	t.Setenv("CAFE_PERSISTENCE_SERVICE_TOKEN", "persist-token")
 
 	cfg := LoadFromEnv()
 
@@ -148,5 +164,17 @@ func TestLoadFromEnvOverrides(t *testing.T) {
 	}
 	if cfg.NATSURL != "nats://nats:4222" {
 		t.Fatalf("expected NATS URL override, got %q", cfg.NATSURL)
+	}
+	if cfg.Store != "persistence" {
+		t.Fatalf("expected store override, got %q", cfg.Store)
+	}
+	if cfg.PersistenceURL != "http://persistence:8082" {
+		t.Fatalf("expected persistence URL override, got %q", cfg.PersistenceURL)
+	}
+	if cfg.PersistenceTimeoutSec != 20 {
+		t.Fatalf("expected persistence timeout override, got %d", cfg.PersistenceTimeoutSec)
+	}
+	if cfg.PersistenceServiceToken != "persist-token" {
+		t.Fatalf("expected persistence service token override, got %q", cfg.PersistenceServiceToken)
 	}
 }

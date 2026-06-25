@@ -31,7 +31,7 @@ func TestHandlerHealthz(t *testing.T) {
 
 	introspect := newDiscoveryValidationServer(t, discoveryValidationTestConfig{status: http.StatusOK})
 	defer introspect.Close()
-	h, err := handler("cafe-cpm", store, authConfig{
+	h, err := testHandler(store, nil, authConfig{
 		Required:                    true,
 		SessionValidationURL:        introspect.URL,
 		SessionValidationTimeoutSec: 3,
@@ -69,7 +69,7 @@ func TestHandlerHealthPathNotRegistered(t *testing.T) {
 
 	introspect := newDiscoveryValidationServer(t, discoveryValidationTestConfig{status: http.StatusOK})
 	defer introspect.Close()
-	h, err := handler("cafe-cpm", store, authConfig{
+	h, err := testHandler(store, nil, authConfig{
 		Required:                    true,
 		SessionValidationURL:        introspect.URL,
 		SessionValidationTimeoutSec: 3,
@@ -103,7 +103,7 @@ func TestHandlerRequiresAuthForBusinessRoutes(t *testing.T) {
 	}
 	introspect := newDiscoveryValidationServer(t, discoveryValidationTestConfig{status: http.StatusOK})
 	defer introspect.Close()
-	h, err := handler("cafe-cpm", store, authConfig{
+	h, err := testHandler(store, nil, authConfig{
 		Required:                    true,
 		SessionValidationURL:        introspect.URL,
 		SessionValidationTimeoutSec: 3,
@@ -142,7 +142,7 @@ func TestHandlerRejectsMalformedBearerHeader(t *testing.T) {
 	}
 	introspect := newDiscoveryValidationServer(t, discoveryValidationTestConfig{status: http.StatusOK})
 	defer introspect.Close()
-	h, err := handler("cafe-cpm", store, authConfig{
+	h, err := testHandler(store, nil, authConfig{
 		Required:                    true,
 		SessionValidationURL:        introspect.URL,
 		SessionValidationTimeoutSec: 3,
@@ -175,7 +175,7 @@ func TestHandlerAcceptsValidBearerToken(t *testing.T) {
 	}
 	introspect := newDiscoveryValidationServer(t, discoveryValidationTestConfig{status: http.StatusOK})
 	defer introspect.Close()
-	h, err := handler("cafe-cpm", store, authConfig{
+	h, err := testHandler(store, nil, authConfig{
 		Required:                    true,
 		SessionValidationURL:        introspect.URL,
 		SessionValidationTimeoutSec: 3,
@@ -216,7 +216,7 @@ func TestHandlerRejectsExpiredDiscoveryToken(t *testing.T) {
 	}
 	introspect := newDiscoveryValidationServer(t, discoveryValidationTestConfig{status: http.StatusOK})
 	defer introspect.Close()
-	h, err := handler("cafe-cpm", store, authConfig{
+	h, err := testHandler(store, nil, authConfig{
 		Required:                    true,
 		SessionValidationURL:        introspect.URL,
 		SessionValidationTimeoutSec: 3,
@@ -257,7 +257,7 @@ func TestHandlerRejectsDiscoveryDeniedToken(t *testing.T) {
 	}
 	introspect := newDiscoveryValidationServer(t, discoveryValidationTestConfig{status: http.StatusUnauthorized})
 	defer introspect.Close()
-	h, err := handler("cafe-cpm", store, authConfig{
+	h, err := testHandler(store, nil, authConfig{
 		Required:                    true,
 		SessionValidationURL:        introspect.URL,
 		SessionValidationTimeoutSec: 3,
@@ -309,7 +309,7 @@ func TestHandlerReturns503OnValidationTimeout(t *testing.T) {
 		delay:  2 * time.Second,
 	})
 	defer introspect.Close()
-	h, err := handler("cafe-cpm", store, authConfig{
+	h, err := testHandler(store, nil, authConfig{
 		Required:                    true,
 		SessionValidationURL:        introspect.URL,
 		SessionValidationTimeoutSec: 1,
@@ -350,7 +350,7 @@ func TestHandlerReturns503OnValidation5xx(t *testing.T) {
 	}
 	introspect := newDiscoveryValidationServer(t, discoveryValidationTestConfig{status: http.StatusInternalServerError})
 	defer introspect.Close()
-	h, err := handler("cafe-cpm", store, authConfig{
+	h, err := testHandler(store, nil, authConfig{
 		Required:                    true,
 		SessionValidationURL:        introspect.URL,
 		SessionValidationTimeoutSec: 3,
@@ -394,7 +394,7 @@ func TestHandlerRejectsValidationSuccessButMissingUserID(t *testing.T) {
 		body:   `{"accepted":true,"claims":{"email":"x@example.com","exp":9999999999}}`,
 	})
 	defer introspect.Close()
-	h, err := handler("cafe-cpm", store, authConfig{
+	h, err := testHandler(store, nil, authConfig{
 		Required:                    true,
 		SessionValidationURL:        introspect.URL,
 		SessionValidationTimeoutSec: 3,
@@ -439,7 +439,7 @@ func TestHandlerPropagatesRequestIDToDiscoveryValidation(t *testing.T) {
 		captureRID: &rid,
 	})
 	defer introspect.Close()
-	h, err := handler("cafe-cpm", store, authConfig{
+	h, err := testHandler(store, nil, authConfig{
 		Required:                    true,
 		SessionValidationURL:        introspect.URL,
 		SessionValidationTimeoutSec: 3,
@@ -485,7 +485,7 @@ func TestHandlerFailsClosedWhenScanIDPresentButAuthzNotConfigured(t *testing.T) 
 	}
 	introspect := newDiscoveryValidationServer(t, discoveryValidationTestConfig{status: http.StatusOK})
 	defer introspect.Close()
-	h, err := handler("cafe-cpm", store, authConfig{
+	h, err := testHandler(store, nil, authConfig{
 		Required:                    true,
 		SessionValidationURL:        introspect.URL,
 		SessionValidationTimeoutSec: 3,
@@ -531,7 +531,7 @@ func TestHandlerContinuesWhenAuthzNotConfiguredAndNoScanID(t *testing.T) {
 	}
 	introspect := newDiscoveryValidationServer(t, discoveryValidationTestConfig{status: http.StatusOK})
 	defer introspect.Close()
-	h, err := handler("cafe-cpm", store, authConfig{
+	h, err := testHandler(store, nil, authConfig{
 		Required:                    true,
 		SessionValidationURL:        introspect.URL,
 		SessionValidationTimeoutSec: 3,
@@ -614,7 +614,7 @@ func assertTokenRejected(t *testing.T, algorithms []string, expectedStatus int) 
 	}
 	introspect := newDiscoveryValidationServer(t, discoveryValidationTestConfig{status: http.StatusOK})
 	defer introspect.Close()
-	h, err := handler("cafe-cpm", store, authConfig{
+	h, err := testHandler(store, nil, authConfig{
 		Required:                    true,
 		SessionValidationURL:        introspect.URL,
 		SessionValidationTimeoutSec: 3,

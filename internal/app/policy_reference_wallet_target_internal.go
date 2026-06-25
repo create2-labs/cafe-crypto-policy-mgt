@@ -20,7 +20,7 @@ type policyWalletTargetReferenceRequest struct {
 
 // registerPolicyWalletTargetReferenceInternalRoute registers POST /internal/policies/references/wallet-target
 // (IMM-9b) for Discovery POST /scan W1 guard.
-func registerPolicyWalletTargetReferenceInternalRoute(mux *http.ServeMux, store *persistence.OwnerScopedStore) {
+func registerPolicyWalletTargetReferenceInternalRoute(mux *http.ServeMux, store persistence.PolicyStore) {
 	mux.HandleFunc("POST "+cpmroutes.InternalPolicyReferenceWalletTarget, func(w http.ResponseWriter, r *http.Request) {
 		const maxBody = 1 << 16
 		body, err := io.ReadAll(io.LimitReader(r.Body, maxBody+1))
@@ -60,6 +60,10 @@ func registerPolicyWalletTargetReferenceInternalRoute(mux *http.ServeMux, store 
 		if err != nil {
 			if errors.Is(err, persistence.ErrPrincipalRequired) {
 				writeJSON(w, http.StatusBadRequest, map[string]any{jsonKeyError: err.Error()})
+				return
+			}
+			if errors.Is(err, persistence.ErrPersistenceUnavailable) {
+				writeJSON(w, http.StatusServiceUnavailable, apiErrorJSON(errCodePersistenceUnavailable, "persistence is temporarily unavailable"))
 				return
 			}
 			writeJSON(w, http.StatusInternalServerError, map[string]any{jsonKeyError: errMsgInternalServerError})

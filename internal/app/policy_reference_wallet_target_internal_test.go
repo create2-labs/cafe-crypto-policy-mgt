@@ -24,7 +24,7 @@ func TestPolicyWalletTargetReferenceInternalExists(t *testing.T) {
 	}
 	introspect := newDiscoveryValidationServer(t, discoveryValidationTestConfig{status: http.StatusOK})
 	defer introspect.Close()
-	h, err := handlerWithOwnerStore("cafe-cpm", store, owner, authConfig{
+	h, err := testHandler(store, owner, authConfig{
 		Required:                            true,
 		SessionValidationURL:                introspect.URL,
 		SessionValidationTimeoutSec:         3,
@@ -69,7 +69,7 @@ func TestPolicyWalletTargetReferenceInternalFalseWhenRemoved(t *testing.T) {
 	}
 	introspect := newDiscoveryValidationServer(t, discoveryValidationTestConfig{status: http.StatusOK})
 	defer introspect.Close()
-	h, err := handlerWithOwnerStore("cafe-cpm", store, owner, authConfig{
+	h, err := testHandler(store, owner, authConfig{
 		Required:                            true,
 		SessionValidationURL:                introspect.URL,
 		SessionValidationTimeoutSec:         3,
