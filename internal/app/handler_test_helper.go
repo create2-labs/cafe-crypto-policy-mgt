@@ -10,7 +10,7 @@ import (
 
 func testHandler(readStore *api.ReadStore, owner persistence.PolicyStore, authCfg authConfig) (http.Handler, error) {
 	if owner == nil {
-		owner = persistence.NewOwnerScopedStore()
+		owner = devDefaultPolicyStore()
 	}
 	return handler(config.Config{ServiceName: "cafe-cpm"}, readStore, owner, authCfg)
 }

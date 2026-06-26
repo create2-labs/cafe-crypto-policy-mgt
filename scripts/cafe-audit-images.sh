@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# cafe-crypto-policy-mgt: golangci-lint, govulncheck, Dockerfile-cpm, Docker Scout, rapport.
+# cafe-crypto-policy-mgt: golangci-lint, govulncheck, Dockerfile, Docker Scout, rapport.
 
 set -euo pipefail
 
@@ -51,7 +51,7 @@ main() {
   run_gov || true
 
   local im="${IMAGE_PREFIX}/cafe-cpm:${IMAGE_TAG}" ok=0 sc="KO"
-  if ( cd "$REPO_ROOT" && docker build -f Dockerfile-cpm -t "$im" . ); then ok=1; else warn "docker build échoué"; fi
+  if ( cd "$REPO_ROOT" && docker build -f Dockerfile -t "$im" . ); then ok=1; else warn "docker build échoué"; fi
   if [ "$ok" = 1 ] && [ "$SKIP_SCOUT" != 1 ] && docker scout version >/dev/null 2>&1; then
     sc=$(docker scout quickview "local://$im" 2>&1 | tr -d '\033' | grep -E 'Target[[:space:]]+│' | head -1 | \
       sed -E 's/.*[[:space:]]([0-9]+)C[[:space:]]+([0-9]+)H[[:space:]]+([0-9]+)M[[:space:]]+([0-9]+)L.*/C=\1 H=\2 M=\3 L=\4/') || sc="?"

@@ -5,18 +5,16 @@ import (
 	"testing"
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/config"
-	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/persistence"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/persistence/cphttp"
 )
 
-func TestNewPolicyStoreDefaultsMemory(t *testing.T) {
+func TestNewPolicyStoreDefaultsPersistenceRequiresURL(t *testing.T) {
 	t.Setenv("CPM_STORE", "")
-	store, err := newPolicyStore(config.LoadFromEnv())
-	if err != nil {
-		t.Fatalf("newPolicyStore: %v", err)
-	}
-	if _, ok := store.(*persistence.OwnerScopedStore); !ok {
-		t.Fatalf("expected *OwnerScopedStore, got %T", store)
+	t.Setenv("CPM_PERSISTENCE_URL", "")
+	t.Setenv("CAFE_PERSISTENCE_SERVICE_TOKEN", "token")
+	_, err := newPolicyStore(config.LoadFromEnv())
+	if err == nil || !strings.Contains(err.Error(), "CPM_PERSISTENCE_URL") {
+		t.Fatalf("expected CPM_PERSISTENCE_URL error, got %v", err)
 	}
 }
 
@@ -51,5 +49,13 @@ func TestNewPolicyStorePersistenceClient(t *testing.T) {
 	}
 	if _, ok := store.(*cphttp.Client); !ok {
 		t.Fatalf("expected *cphttp.Client, got %T", store)
+	}
+}
+
+func TestNewPolicyStoreRejectsUnknownMode(t *testing.T) {
+	t.Setenv("CPM_STORE", "redis")
+	_, err := newPolicyStore(config.LoadFromEnv())
+	if err == nil || !strings.Contains(err.Error(), "unsupported CPM_STORE") {
+		t.Fatalf("expected unsupported store error, got %v", err)
 	}
 }

@@ -17,7 +17,7 @@ const (
 	defaultPolicyCatalogPath           = "/app/policy/policy_graph_catalog_valid.json"
 	defaultPolicyTemplatePaths         = "/app/policy/crypto_policy_template_valid.json,/app/policy/crypto_policy_template_pq_ready_progressive.json"
 	defaultPolicyInstancePaths         = "/app/policy/crypto_policy_instance_valid.json,/app/policy/crypto_policy_instance_pq_ready_progressive.json"
-	defaultCPMStore                    = "memory"
+	defaultCPMStore                    = "persistence"
 	defaultPersistenceTimeoutSec       = 15
 )
 
@@ -45,7 +45,8 @@ type Config struct {
 	PolicyInstancePaths []string
 	// WalletAuthDomain is embedded in CP-PERSIST canonical messages (§12); falls back to request Host.
 	WalletAuthDomain string
-	// Store selects owner-scoped CP storage: memory (default) or persistence (PERS-D5a+).
+	// Store selects CP storage backend. Runtime (deployed images): persistence only.
+	// CPM_STORE=memory is compiled only with -tags dev for unit/handler tests — not a runtime mode.
 	Store string
 	// PersistenceURL is the cafe-persistence service origin (e.g. http://cafe-persistence:8082).
 	PersistenceURL string

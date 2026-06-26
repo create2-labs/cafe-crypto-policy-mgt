@@ -1,3 +1,5 @@
+//go:build dev
+
 package persistence
 
 import (
@@ -13,34 +15,6 @@ import (
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/authz"
 )
 
-var (
-	ErrPrincipalRequired      = errors.New("principal is required")
-	ErrDraftNotFound          = errors.New("draft not found")
-	ErrDraftAlreadyPersisted  = errors.New("draft already persisted")
-	ErrPolicyNotFound         = errors.New("policy not found")
-	ErrForbidden              = errors.New("forbidden")
-)
-
-type DraftRecord struct {
-	ID          string
-	OwnerUserID string
-	TenantID    string
-	ScanID      string
-	Payload     map[string]any
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-}
-
-type PolicyRecord struct {
-	ID          string
-	OwnerUserID string
-	TenantID    string
-	ScanID      string
-	Payload     map[string]any
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-}
-
 type draftPersistState struct {
 	PolicyID    string
 	OwnerUserID string
@@ -49,28 +23,11 @@ type draftPersistState struct {
 	PersistedAt time.Time
 }
 
-// PersistDraftInput carries wallet ownership metadata applied to the persisted policy payload.
-type PersistDraftInput struct {
-	WalletAddress string
-	ChainID       int64
-	VerifiedAt    time.Time
-}
-
-// PersistDraftResult is the durable outcome of a successful draft persist transition.
-type PersistDraftResult struct {
-	PolicyID      string
-	DraftID       string
-	ScanID        string
-	WalletAddress string
-	ChainID       int64
-	PersistedAt   time.Time
-}
-
 type OwnerScopedStore struct {
-	mu              sync.RWMutex
-	drafts          map[string]DraftRecord
-	policies        map[string]PolicyRecord
-	draftPersisted  map[string]draftPersistState
+	mu             sync.RWMutex
+	drafts         map[string]DraftRecord
+	policies       map[string]PolicyRecord
+	draftPersisted map[string]draftPersistState
 }
 
 func NewOwnerScopedStore() *OwnerScopedStore {
@@ -220,7 +177,6 @@ func (s *OwnerScopedStore) PersistDraftOnce(principal authz.Principal, draftID s
 	state.PersistedAt = persistedAt
 	s.draftPersisted[draftID] = state
 	delete(s.drafts, draftID)
-
 
 	return PersistDraftResult{
 		PolicyID:      policyID,

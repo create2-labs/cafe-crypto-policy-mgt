@@ -26,11 +26,12 @@
    13. [AUTH-01 runtime authentication wiring](#auth-01-runtime-authentication-wiring)
        1. [CP-PERSIST runtime](#cp-persist-runtime)
        2. [Platform drafts API (CPM-DRAFT-1 contract)](#platform-drafts-api-cpm-draft-1-contract)
-   14. [AUTH-03 owner-scoped persistence foundation](#auth-03-owner-scoped-persistence-foundation)
-   15. [AUTH-04 auth error contract and observability](#auth-04-auth-error-contract-and-observability)
-   16. [Option A integration (Discovery v1 wallet scans)](#option-a-integration-discovery-v1-wallet-scans)
-   17. [Run locally](#run-locally)
-   18. [IMM-OPS-1 smoke script (`scripts/test-imm-ops-1.sh`)](#imm-ops-1-smoke-script-scriptstest-imm-ops-1sh)
+   14. [AUTH-03 owner-scoped persistence](#auth-03-owner-scoped-persistence)
+   15. [Durable CP storage (`CPM_STORE`)](#durable-cp-storage-cpm_store)
+   16. [AUTH-04 auth error contract and observability](#auth-04-auth-error-contract-and-observability)
+   17. [Option A integration (Discovery v1 wallet scans)](#option-a-integration-discovery-v1-wallet-scans)
+   18. [Run locally](#run-locally)
+   19. [IMM-OPS-1 smoke script (`scripts/test-imm-ops-1.sh`)](#imm-ops-1-smoke-script-scriptstest-imm-ops-1sh)
 
 ## Role and boundaries
 
@@ -56,7 +57,7 @@ Wallet control proof for CP persistence (EOA) is specified in [`docs/CP_PERSIST.
 | `internal/domain/vocabulary` | Exported strings for account kind, algorithms, PQ posture, subject type |
 | `internal/domain/policy` | Policy domain contracts (`PolicySelectionRequest`, `PolicyGraphCatalog`, `CryptoPolicyTemplate`, `CryptoPolicyInstance`, `CryptoPolicyValidationResult`, `CryptoPolicyAssessmentResult`, `PolicyCompatibilityResult` + `PolicyCompatibilityEvaluator`, and PR13 `PolicyDecision` models/evaluator) |
 | `internal/api` | PR17 read-only HTTP APIs for policy inspection and decision exploration |
-| `internal/persistence` | Owner-scoped in-memory persistence (`OwnerScopedStore`) for drafts and persisted policy records exposed under `/api/cpm/v1/*` |
+| `internal/persistence` | Durable CP via **cafe-persistence** (`cphttp.Client`); see [Durable CP storage](#durable-cp-storage-cpm_store). `OwnerScopedStore` is compiled **only for tests** (`-tags dev`) — not used at runtime in deployed images. |
 | `internal/walletauth` | CP-PERSIST V1 canonical wallet authorization message builder and EIP-191 / `personal_sign` verifier (PR3); used at persist time by PR4 handlers |
 | `docs/` | Integration narratives — [`docs/CPM_OPTION_A_INTEGRATED.md`](./docs/CPM_OPTION_A_INTEGRATED.md) (Option A v1 flow); [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md) (EOA wallet control proof for CP persistence) |
 | `scripts/` | Operational helpers — [`scripts/test-imm-ops-1.sh`](./scripts/test-imm-ops-1.sh) (IMM-OPS-1 explore observability smoke); Option A v1 smoke lives in [`cafe-deploy`](https://github.com/create2-labs/cafe-deploy/scripts/test-discovery-v1-wallet-scans-to-cpm.sh) |
@@ -189,7 +190,7 @@ The response shape **must** remain `{"version": "..."}`; frontend and `cafe-depl
 
 #### Version flow (end-to-end)
 
-1. **GitHub Action** (`docker-rc.yml` / `docker-release.yml`): sets `APP_VERSION` from the Git tag or RC label (e.g. `v1.2.3`) and passes `--build-arg APP_VERSION=...` to `Dockerfile-cpm`.
+1. **GitHub Action** (`docker-rc.yml` / `docker-release.yml`): sets `APP_VERSION` from the Git tag or RC label (e.g. `v1.2.3`) and passes `--build-arg APP_VERSION=...` to `Dockerfile`.
 2. **Dockerfile**: embeds the resolved version in the binary via `-ldflags` (`internal/version`). Optional runtime override: env `APP_VERSION`.
 3. **CPM container**: serves `GET /version` on the main HTTP listener (`CPM_HTTP_ADDR`, default `:8082` locally, `:8080` in compose).
 4. **Infra** (`cafe-deploy`, follow-up PR): NGINX proxies `location = /api/cpm/version` → `http://cafe-cpm:8080/version`.
@@ -405,20 +406,55 @@ curl -sS -X DELETE "https://localhost/api/cpm/v1/drafts?id=$DRAFT_ID" \
 
 **Not accepted:** `{ "draft": { ... } }` request body; `{ "item": { ... } }` Go-struct leak on POST response (removed in CPM-DRAFT-1B).
 
-## AUTH-03 owner-scoped persistence foundation
+## AUTH-03 owner-scoped persistence
 
-CPM now includes an owner-scoped persistence primitive in `internal/persistence/owner_scoped_store.go` for draft/policy records.
+Draft and policy records are **owner-scoped**: access is always tied to the authenticated principal (`user_id`, optional `tenant_id`), never to client-supplied owner fields.
 
-Rules enforced by this layer:
-- owner is always derived from authenticated principal context (`user_id`, optional `tenant_id`);
+Rules enforced by the `PolicyStore` layer (`internal/persistence`):
+
+- owner is derived from authenticated principal context;
 - cross-user read/update is rejected;
 - write operations require a valid principal;
-- no API should accept owner identity from client payload as authoritative.
+- no API accepts client payload owner identity as authoritative.
+
+**Runtime storage** is durable via **cafe-persistence** (HTTP `internal/cp/v1`). See [Durable CP storage](#durable-cp-storage-cpm_store).
+
+**Tests only:** `OwnerScopedStore` (`owner_scoped_store_dev.go`, `//go:build dev`) is an in-process fake used by unit/handler tests so they do not require a running cafe-persistence instance. It is **not** linked into production binaries and **must not** be used for staging, production, or normal local stack runs.
+
+## Durable CP storage (`CPM_STORE`)
+
+Normative detail: [`docs/PERS_D5C_REMOVE_MEMORY.md`](./docs/PERS_D5C_REMOVE_MEMORY.md) (follows [PERS-D5b](./docs/PERS_D5B_ROLLOUT.md) staging/prod rollout).
+
+| Context | `CPM_STORE` | Backend |
+| --- | --- | --- |
+| **Deployed CPM** (dev stack, staging, prod) | `persistence` (default) | `cphttp.Client` → cafe-persistence |
+| **Unit / handler tests** | `memory` (only with `-tags dev`) | `OwnerScopedStore` — in-process, **tests only** |
+| **Production binary** | `memory` | **Rejected** at startup |
+
+Environment variables (runtime — **persistence required**):
+
+- `CPM_STORE` (default: `persistence`) — only `persistence` is valid in deployed images.
+- `CPM_PERSISTENCE_URL` — cafe-persistence origin (e.g. `http://cafe-discovery-persistence:8082`).
+- `CAFE_PERSISTENCE_SERVICE_TOKEN` — bearer for `internal/cp/v1`.
+- `CPM_PERSISTENCE_TIMEOUT_SEC` (default: `15`).
+
+**Why `memory` still exists:** handler tests (`draft_persist`, wallet challenge, policy references, etc.) exercise owner-scoped routes against an in-memory `PolicyStore` without Postgres, Redis, or HTTP to cafe-persistence. That keeps CI fast and removes a hard dependency on the data plane for CPM-only test runs.
+
+**What `memory` is not:** not a rollback path, not a dev-stack shortcut, not a supported runtime mode in Docker images. If cafe-persistence is down, CPM returns **503** on durable CP operations (ADR §5.5) — restore persistence; do not set `CPM_STORE=memory`.
+
+Run tests (includes in-memory store code):
+
+```bash
+go test -tags dev ./...
+```
+
+Deploy / local stack wiring: [`cafe-deploy` env templates](https://github.com/create2-labs/cafe-deploy) and [`RUNBOOK_CP_PERSISTENCE.md`](https://github.com/create2-labs/cafe-deploy/blob/main/docs/RUNBOOK_CP_PERSISTENCE.md).
 
 Legacy anonymous records strategy (AUTH-03):
-- current rollout treats legacy anonymous draft/policy data as inaccessible to authenticated owner-scoped reads;
-- no backfill migration is performed in this PR;
-- local/dev anonymous datasets can be dropped or regenerated during rollout.
+
+- authenticated owner-scoped reads do not expose legacy anonymous draft/policy data;
+- no backfill migration in the AUTH-03 rollout;
+- test fixtures can be dropped or regenerated freely.
 
 ## AUTH-04 auth error contract and observability
 

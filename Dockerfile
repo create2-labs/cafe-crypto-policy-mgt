@@ -5,7 +5,7 @@ COPY go.mod ./
 RUN go mod download
 
 COPY . .
-RUN go test ./...
+RUN go test ./internal/app -run TestNewPolicyStoreRejectsMemoryInProductionBuild && go test -tags dev ./...
 
 FROM golang:1.26.4 AS build
 WORKDIR /app
