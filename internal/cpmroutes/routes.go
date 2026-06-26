@@ -28,11 +28,6 @@ const (
 	Metrics  = "/metrics"
 	// Version is the public ops endpoint for deployed service version (CPM-OPS-3).
 	Version = "/version"
-
-	// InternalPolicyReferenceScan is the service-token-gated lookup used by Discovery DELETE (PR5).
-	InternalPolicyReferenceScan = "/internal/policies/references/scan"
-	// InternalPolicyReferenceWalletTarget is the service-token-gated W1 lookup by normalized target_address (IMM-9b).
-	InternalPolicyReferenceWalletTarget = "/internal/policies/references/wallet-target"
 )
 
 // Policies is the owner-scoped collection path (GET/POST/DELETE ?id= / ?scan_id=).

@@ -34,12 +34,6 @@ func TestClassifyRoute(t *testing.T) {
 	if got := classifyRoute(http.MethodGet, "/does-not-exist"); got != authz.RouteClassDeprecatedDisabled {
 		t.Fatalf("expected unknown route class %q, got %q", authz.RouteClassDeprecatedDisabled, got)
 	}
-	if got := classifyRoute(http.MethodPost, cpmroutes.InternalPolicyReferenceScan); got != authz.RouteClassInternalService {
-		t.Fatalf("expected internal service class %q, got %q", authz.RouteClassInternalService, got)
-	}
-	if got := classifyRoute(http.MethodPost, cpmroutes.InternalPolicyReferenceWalletTarget); got != authz.RouteClassInternalService {
-		t.Fatalf("expected wallet-target internal class %q, got %q", authz.RouteClassInternalService, got)
-	}
 }
 
 func TestWithAuthenticationFailsWithoutValidationURLWhenRequired(t *testing.T) {

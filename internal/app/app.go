@@ -53,7 +53,6 @@ func Run(cfg config.Config) error {
 		ScanAuthorizationURL:                cfg.ScanAuthorizationURL,
 		ScanAuthorizationTimeoutSec:         cfg.ScanAuthorizationTimeoutSec,
 		ScanAuthorizationServiceToken:       cfg.ScanAuthorizationServiceToken,
-		PolicyReferenceInternalServiceToken: cfg.PolicyReferenceInternalServiceToken,
 		ClockSkewSec:                        cfg.AuthClockSkewSec,
 		DiscoveryHTTPBaseURL:                cfg.DiscoveryHTTPBaseURL,
 		DiscoveryHTTPTimeoutSec:             cfg.DiscoveryHTTPTimeoutSec,
@@ -101,8 +100,6 @@ func handlerWithOwnerStore(serviceName string, store *api.ReadStore, ownerStore 
 	registerOwnerScopedRoutes(mux, ownerStore, obs)
 	registerWalletChallengeRoutes(mux, ownerStore, authCfg, obs)
 	registerDraftPersistRoutes(mux, ownerStore, authCfg, obs)
-	registerPolicyReferenceInternalRoute(mux, ownerStore)
-	registerPolicyWalletTargetReferenceInternalRoute(mux, ownerStore)
 	protected, err := withAuthentication(mux, authCfg)
 	if err != nil {
 		return nil, fmt.Errorf("wire auth middleware: %w", err)
