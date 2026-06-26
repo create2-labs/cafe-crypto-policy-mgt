@@ -33,16 +33,7 @@ func Run(cfg config.Config) error {
 	if err != nil {
 		return fmt.Errorf("policy store: %w", err)
 	}
-	storeMode := strings.ToLower(strings.TrimSpace(cfg.Store))
-	if storeMode == "" {
-		storeMode = "memory"
-	}
-	switch storeMode {
-	case "persistence":
-		log.Printf("cpm: policy store=persistence url=%s", cfg.PersistenceURL)
-	default:
-		log.Printf("cpm: policy store=memory (OwnerScopedStore retained for rollback until PERS-D5c)")
-	}
+	log.Printf("cpm: policy store=persistence url=%s", cfg.PersistenceURL)
 
 	var assessmentPublish func(context.Context, string, []byte) error
 	if u := strings.TrimSpace(cfg.NATSURL); u != "" {

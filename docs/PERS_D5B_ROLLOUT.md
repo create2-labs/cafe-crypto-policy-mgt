@@ -1,13 +1,15 @@
 # PERS-D5b — `CPM_STORE=persistence` rollout
 
-**Status:** D5b enables durable CP in staging/production via env (`cafe-deploy`).  
+**Status:** Completed — staging/prod on durable CP via env (`cafe-deploy`).  
+**Follow-up:** [PERS-D5c](./PERS_D5C_REMOVE_MEMORY.md) removes the production memory path.
+
 **Prerequisite:** [PERS-D5a](https://github.com/create2-labs/cafe-crypto-policy-mgt) — HTTP client to `internal/cp/v1`.
 
-## Behaviour
+## Behaviour (historical D5b window)
 
 | `CPM_STORE` | Backend | Survives CPM restart |
 |-------------|---------|----------------------|
-| `memory` (default) | `OwnerScopedStore` | No |
+| `memory` | `OwnerScopedStore` | No |
 | `persistence` | `cphttp.Client` → cafe-persistence | Yes |
 
 When `persistence` is selected, CPM **does not** fall back to memory on read/write errors (503 per ADR §5.5).
@@ -20,9 +22,9 @@ When `persistence` is selected, CPM **does not** fall back to memory on read/wri
 | `CAFE_PERSISTENCE_SERVICE_TOKEN` | Bearer for `internal/cp/v1` |
 | `CPM_PERSISTENCE_TIMEOUT_SEC` | Client timeout (default 15s) |
 
-## Rollback
+## Rollback (D5b only — superseded by D5c)
 
-Set `CPM_STORE=memory` and redeploy **cafe-cpm** only. `OwnerScopedStore` code stays in the binary until **PERS-D5c**.
+During the D5b stability window, rollback was: set `CPM_STORE=memory` and redeploy **cafe-cpm** only. **No longer available** after [PERS-D5c](./PERS_D5C_REMOVE_MEMORY.md).
 
 Deploy runbook: [`cafe-deploy/docs/RUNBOOK_CP_PERSISTENCE.md`](../../cafe-deploy/docs/RUNBOOK_CP_PERSISTENCE.md).
 
@@ -32,7 +34,3 @@ Deploy runbook: [`cafe-deploy/docs/RUNBOOK_CP_PERSISTENCE.md`](../../cafe-deploy
 # From cafe-deploy (stack running, CPM_STORE=persistence)
 ./scripts/test-cpm-cp-persist-d5-restart-survival.sh
 ```
-
-## Post-D5b
-
-After **7–14 days** stable smokes, **PERS-D5c** removes the production memory path.

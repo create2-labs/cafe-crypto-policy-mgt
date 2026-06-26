@@ -3,7 +3,8 @@ package persistence
 import "github.com/create2-labs/cafe-crypto-policy-mgt/internal/authz"
 
 // PolicyStore is the owner-scoped durable CP storage surface used by CPM HTTP handlers.
-// Memory (OwnerScopedStore) is the default; HTTP (cphttp.Client) backs CPM_STORE=persistence (PERS-D5a+).
+// Deployed CPM uses cphttp.Client (CPM_STORE=persistence). OwnerScopedStore exists only
+// under //go:build dev for unit/handler tests — not linked into production binaries (PERS-D5c).
 type PolicyStore interface {
 	SaveDraft(principal authz.Principal, id string, scanID string, payload map[string]any) (DraftRecord, error)
 	GetDraft(principal authz.Principal, id string) (DraftRecord, error)
