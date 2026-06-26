@@ -14,7 +14,7 @@ Items deferred; not blocking current IMM work unless noted.
 |----|----------|
 | **PERS-D3b-spec** | Revue schéma / sémantique CP (`internal/cp/v1`) — **spec publiée** ; voir [`docs/PERS_D3B_SPEC_REVIEW.md`](docs/PERS_D3B_SPEC_REVIEW.md) |
 | **PERS-D5a** | Client HTTP vers cafe-persistence ; `CPM_STORE=memory` par défaut |
-| **PERS-D5b** | Bascule `CPM_STORE=persistence` staging → prod ; `OwnerScopedStore` conservé (rollback env) |
+| **PERS-D5b** | Bascule `CPM_STORE=persistence` staging → prod ; `OwnerScopedStore` conservé (rollback env) — voir [`docs/PERS_D5B_ROLLOUT.md`](docs/PERS_D5B_ROLLOUT.md) |
 | **PERS-D5c** | Retrait chemin prod `OwnerScopedStore` après fenêtre de stabilité |
 
 **Règles chemin critique :** timeouts, retries idempotents (`draft_id`), **503** si persistence indisponible — ADR §5.5–§5.6. Pas d’accès direct Postgres/Redis depuis le binaire CPM.

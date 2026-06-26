@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -31,6 +32,16 @@ func Run(cfg config.Config) error {
 	ownerStore, err := newPolicyStore(cfg)
 	if err != nil {
 		return fmt.Errorf("policy store: %w", err)
+	}
+	storeMode := strings.ToLower(strings.TrimSpace(cfg.Store))
+	if storeMode == "" {
+		storeMode = "memory"
+	}
+	switch storeMode {
+	case "persistence":
+		log.Printf("cpm: policy store=persistence url=%s", cfg.PersistenceURL)
+	default:
+		log.Printf("cpm: policy store=memory (OwnerScopedStore retained for rollback until PERS-D5c)")
 	}
 
 	var assessmentPublish func(context.Context, string, []byte) error
