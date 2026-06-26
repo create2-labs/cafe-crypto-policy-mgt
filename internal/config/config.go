@@ -32,8 +32,6 @@ type Config struct {
 	ScanAuthorizationURL          string
 	ScanAuthorizationTimeoutSec   int
 	ScanAuthorizationServiceToken string
-	// PolicyReferenceInternalServiceToken gates POST /internal/policies/references/scan (Discovery PR6).
-	PolicyReferenceInternalServiceToken string
 	AuthClockSkewSec                    int
 	// DiscoveryHTTPBaseURL is the Discovery service origin for server-side GET /discovery/v1/... (PR13g).
 	DiscoveryHTTPBaseURL string
@@ -68,7 +66,6 @@ func LoadFromEnv() Config {
 		ScanAuthorizationURL:                getEnv("CAFE_SCAN_AUTHORIZATION_URL", ""),
 		ScanAuthorizationTimeoutSec:         getEnvInt("CAFE_SCAN_AUTHORIZATION_TIMEOUT_SEC", defaultScanAuthorizationTimeoutSec),
 		ScanAuthorizationServiceToken:       getEnv("CAFE_SCAN_AUTHORIZATION_SERVICE_TOKEN", ""),
-		PolicyReferenceInternalServiceToken: getEnv("CAFE_POLICY_REFERENCE_INTERNAL_SERVICE_TOKEN", ""),
 		AuthClockSkewSec:                    getEnvInt("CPM_AUTH_CLOCK_SKEW_SEC", defaultAuthClockSkewSec),
 		DiscoveryHTTPBaseURL:                getEnv("CAFE_DISCOVERY_HTTP_BASE", ""),
 		DiscoveryHTTPTimeoutSec:             getEnvInt("CAFE_DISCOVERY_HTTP_TIMEOUT_SEC", defaultDiscoveryHTTPTimeoutSec),

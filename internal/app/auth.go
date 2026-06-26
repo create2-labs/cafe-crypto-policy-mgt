@@ -3,7 +3,6 @@ package app
 import (
 	"bytes"
 	"context"
-	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -27,7 +26,6 @@ type authConfig struct {
 	ScanAuthorizationURL                string
 	ScanAuthorizationTimeoutSec         int
 	ScanAuthorizationServiceToken       string
-	PolicyReferenceInternalServiceToken string
 	ClockSkewSec                        int
 	Observability                       *authObservability
 	// DiscoveryHTTPBaseURL is the Discovery service origin (e.g. http://discovery:8080) for
@@ -53,8 +51,6 @@ func buildRouteInventory() []routeSpec {
 		{Method: http.MethodGet, Path: cpmroutes.Healthz, Class: authz.RouteClassPublicHealth},
 		{Method: http.MethodGet, Path: cpmroutes.Metrics, Class: authz.RouteClassPublicHealth},
 		{Method: http.MethodGet, Path: cpmroutes.Version, Class: authz.RouteClassPublicHealth},
-		{Method: http.MethodPost, Path: cpmroutes.InternalPolicyReferenceScan, Class: authz.RouteClassInternalService},
-		{Method: http.MethodPost, Path: cpmroutes.InternalPolicyReferenceWalletTarget, Class: authz.RouteClassInternalService},
 	}
 	for _, ar := range cpmroutes.AuthenticatedRoutes() {
 		routes = append(routes, routeSpec{Method: ar.Method, Path: ar.Path, Class: authz.RouteClassAuthenticated})
@@ -89,21 +85,6 @@ func withAuthentication(next http.Handler, cfg authConfig) (http.Handler, error)
 		requestID := obs.ensureRequestID(w, r)
 		class := classifyRoute(r.Method, r.URL.Path)
 		if class == authz.RouteClassPublicHealth {
-			next.ServeHTTP(w, r)
-			return
-		}
-		if class == authz.RouteClassInternalService {
-			expected := strings.TrimSpace(cfg.PolicyReferenceInternalServiceToken)
-			if expected == "" {
-				obs.recordDecision(r, requestID, authCategoryAuthn, authOutcomeUnavailable, authCodeInternalMisconfigured, "internal_token_not_configured", "", "")
-				obs.writeAuthError(w, r, http.StatusServiceUnavailable, authCodeInternalMisconfigured, "policy reference internal check is not configured", map[string]any{jsonKeyReason: "internal_service_token_missing"})
-				return
-			}
-			if !internalBearerTokenMatches(r.Header.Get("Authorization"), expected) {
-				obs.recordDecision(r, requestID, authCategoryAuthn, authOutcomeDenied, authCodeInternalForbidden, "internal_service_token_mismatch", "", "")
-				obs.writeAuthError(w, r, http.StatusForbidden, authCodeInternalForbidden, "forbidden", map[string]any{jsonKeyReason: "invalid_internal_service_token"})
-				return
-			}
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -954,18 +935,4 @@ func authorizeScanReadForAssessment(
 			Details: map[string]any{jsonKeyReason: authReasonScanAuthUnexpectedStatus},
 		}, http.StatusServiceUnavailable
 	}
-}
-
-// internalBearerTokenMatches reports whether Authorization is "Bearer <token>" with
-// token equal to expectedSecret using constant-time comparison (lengths must match).
-func internalBearerTokenMatches(authorizationHeader, expectedSecret string) bool {
-	header := strings.TrimSpace(authorizationHeader)
-	if !strings.HasPrefix(strings.ToLower(header), "bearer ") {
-		return false
-	}
-	raw := strings.TrimSpace(header[len("Bearer "):])
-	if len(raw) != len(expectedSecret) {
-		return false
-	}
-	return subtle.ConstantTimeCompare([]byte(raw), []byte(expectedSecret)) == 1
 }
