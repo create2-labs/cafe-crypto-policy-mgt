@@ -69,7 +69,7 @@ Extraction adresse wallet pour W1 : même règles que `wallet_target.go` (IMM-9b
 ## Non-objectifs D3b-spec
 
 - Pas de client HTTP CPM (→ D5a)
-- Pas de `CPM_STORE=persistence` (→ D5b)
+- Pas de `CPM_STORE=persistence` en prod dans D5a (→ **D5b** ; voir [`docs/PERS_D5B_ROLLOUT.md`](./PERS_D5B_ROLLOUT.md))
 - Pas de changement `/api/cpm/v1` ni routes internes CPM existantes (proxy jusqu’à D6b)
 
 ## Sign-off
