@@ -40,7 +40,7 @@ That implementation lives behind `//go:build dev`. Production `go build` (Docker
 
 | Variable | Purpose |
 |----------|---------|
-| `CPM_PERSISTENCE_URL` | Origin, e.g. `http://cafe-discovery-persistence:8082` |
+| `CPM_PERSISTENCE_URL` | Origin, e.g. `http://cafe-persistence:8082` |
 | `CAFE_PERSISTENCE_SERVICE_TOKEN` | Bearer for `internal/cp/v1` |
 | `CPM_PERSISTENCE_TIMEOUT_SEC` | Client timeout (default 15s) |
 
