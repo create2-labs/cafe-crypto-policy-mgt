@@ -207,9 +207,10 @@ func (c *Client) CountActiveWalletCPMContext(principal authz.Principal, normaliz
 		return persistence.WalletTargetContextCounts{}, err
 	}
 	return persistence.WalletTargetContextCounts{
-		Exists:      wire.Exists,
-		PolicyCount: int(wire.PolicyCount),
-		DraftCount:  int(wire.DraftCount),
+		Exists:          wire.Exists,
+		PolicyCount:     int(wire.PolicyCount),
+		DraftCount:      int(wire.DraftCount),
+		PlatformDraftID: strings.TrimSpace(wire.PlatformDraftID),
 	}, nil
 }
 
@@ -425,9 +426,10 @@ type listPoliciesWire struct {
 }
 
 type walletReferenceWire struct {
-	Exists       bool  `json:"exists"`
-	PolicyCount  int64 `json:"policy_count"`
-	DraftCount   int64 `json:"draft_count"`
+	Exists          bool   `json:"exists"`
+	PolicyCount     int64  `json:"policy_count"`
+	DraftCount      int64  `json:"draft_count"`
+	PlatformDraftID string `json:"platform_draft_id,omitempty"`
 }
 
 func parseTime(value string) (time.Time, error) {

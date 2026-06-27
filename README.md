@@ -434,9 +434,11 @@ Normative detail: [`docs/PERS_D5C_REMOVE_MEMORY.md`](./docs/PERS_D5C_REMOVE_MEMO
 Environment variables (runtime — **persistence required**):
 
 - `CPM_STORE` (default: `persistence`) — only `persistence` is valid in deployed images.
-- `CPM_PERSISTENCE_URL` — cafe-persistence origin (e.g. `http://cafe-discovery-persistence:8082`).
+- `CPM_PERSISTENCE_URL` — cafe-persistence origin (e.g. `http://cafe-persistence:8082`).
 - `CAFE_PERSISTENCE_SERVICE_TOKEN` — bearer for `internal/cp/v1`.
 - `CPM_PERSISTENCE_TIMEOUT_SEC` (default: `15`).
+
+**Postgres only — no Redis CP cache (P0):** cafe-persistence stores durable CP in Postgres (`crypto_policy_*` tables) via `internal/cp/v1`. Unlike wallet/TLS scans (Postgres + Redis cache in cafe-persistence), **there is no Redis layer for CP** in P0. CPM never talks to Postgres or Redis directly. Optional Redis CP accelerators are P1+ only (ADR §8.2). See [`cafe-deploy/docs/RUNBOOK_CP_PERSISTENCE.md`](https://github.com/create2-labs/cafe-deploy/blob/main/docs/RUNBOOK_CP_PERSISTENCE.md#storage-postgres-only-no-redis-cp-cache).
 
 **Why `memory` still exists:** handler tests (`draft_persist`, wallet challenge, policy references, etc.) exercise owner-scoped routes against an in-memory `PolicyStore` without Postgres, Redis, or HTTP to cafe-persistence. That keeps CI fast and removes a hard dependency on the data plane for CPM-only test runs.
 
