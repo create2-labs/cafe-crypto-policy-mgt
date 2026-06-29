@@ -11,6 +11,7 @@ FROM golang:1.26.4 AS build
 WORKDIR /app
 
 ARG APP_VERSION
+ARG TARGETARCH
 COPY go.mod ./
 RUN go mod download
 
@@ -25,7 +26,7 @@ RUN RESOLVED_VERSION="${APP_VERSION}" && \
         RESOLVED_VERSION="dev"; \
       fi; \
     fi && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    CGO_ENABLED=0 GOOS=linux GOARCH="${TARGETARCH}" go build \
       -ldflags "-X github.com/create2-labs/cafe-crypto-policy-mgt/internal/version.version=${RESOLVED_VERSION}" \
       -o /out/cafe-cpm ./cmd/cafe-cpm
 

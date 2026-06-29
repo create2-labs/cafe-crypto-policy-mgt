@@ -1,3 +1,8 @@
+# RC workflow: build once per trigger (label on PR or workflow_dispatch).
+# Pushes sha-<short_sha> (source of truth) and optionally vX.Y.Z-rc<run_id>.
+# Release workflow promotes from sha-<short_sha> without rebuilding.
+# Fork PRs are refused (guard below).
+
 name: Docker RC
 
 on:
@@ -40,6 +45,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Extract version and SHA
         id: version
         run: |
@@ -72,8 +83,40 @@ jobs:
           echo "rc_tag=${RC_TAG:-<none>}"
           echo "app_version=$APP_VERSION"
 
-      - name: Document RC parity plan
+      - name: Build for scan (cafe-cpm, amd64)
         run: |
-          echo "PR0 baseline: image repository/tag wiring and vulnerability scan policy will be finalized in follow-up PR."
-          echo "This workflow intentionally captures trigger/guard/versioning logic parity with cafe-discovery."
-          echo "APP_VERSION for docker build: ${{ steps.version.outputs.app_version }}"
+          docker buildx build \
+            --load \
+            --platform linux/amd64 \
+            --build-arg APP_VERSION="${{ steps.version.outputs.app_version }}" \
+            -f Dockerfile \
+            -t oleglod/cafe-cpm:scan-local \
+            .
+
+      - name: Install Docker Scout CLI
+        run: |
+          mkdir -p ~/.docker/cli-plugins
+          curl -fsSL https://raw.githubusercontent.com/docker/scout-cli/main/install.sh | sh
+          echo "$HOME/.docker/cli-plugins" >> $GITHUB_PATH
+          docker scout version
+
+      - name: Scan cafe-cpm with Docker Scout
+        continue-on-error: true
+        run: |
+          docker scout cves oleglod/cafe-cpm:scan-local \
+            --only-severity critical,high
+
+      - name: Build & push cafe-cpm (multi-arch)
+        run: |
+          TAGS="-t oleglod/cafe-cpm:sha-${{ steps.version.outputs.short_sha }}"
+          if [[ -n "${{ steps.version.outputs.rc_tag }}" ]]; then
+            TAGS="$TAGS -t oleglod/cafe-cpm:${{ steps.version.outputs.rc_tag }}"
+          fi
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --build-arg APP_VERSION="${{ steps.version.outputs.app_version }}" \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
+            -f Dockerfile \
+            $TAGS \
+            --push .
