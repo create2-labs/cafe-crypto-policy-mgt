@@ -2,24 +2,6 @@
 
 Items deferred; not blocking current IMM work unless noted.
 
----
-
-## PERS-D* — Durable CP via cafe-persistence (ADR)
-
-**ADR (validée) :** [cafe-discovery/docs/ADR/ADR_20260622_persistence.md](../cafe-discovery/docs/ADR/ADR_20260622_persistence.md) — extraction plateforme **cafe-persistence** ; CPM reste control plane policy (HTTP `/api/cpm/v1` inchangé).
-
-**Jalons CPM (ordre) :**
-
-| PR | Objectif |
-|----|----------|
-| **PERS-D3b-spec** | Revue schéma / sémantique CP (`internal/cp/v1`) — **spec publiée** ; voir [`docs/PERS_D3B_SPEC_REVIEW.md`](docs/PERS_D3B_SPEC_REVIEW.md) |
-| **PERS-D5a** | Client HTTP vers cafe-persistence ; `CPM_STORE=memory` par défaut |
-| **PERS-D5b** | Bascule `CPM_STORE=persistence` staging → prod ; `OwnerScopedStore` conservé (rollback env) — voir [`docs/PERS_D5B_ROLLOUT.md`](docs/PERS_D5B_ROLLOUT.md) |
-| **PERS-D5c** | ✅ done | Retrait chemin prod `OwnerScopedStore` — voir [`docs/PERS_D5C_REMOVE_MEMORY.md`](docs/PERS_D5C_REMOVE_MEMORY.md) |
-
-**Règles chemin critique :** timeouts, retries idempotents (`draft_id`), **503** si persistence indisponible — ADR §5.5–§5.6. Pas d’accès direct Postgres/Redis depuis le binaire CPM.
-
-**Plan d’exécution détaillé :** [ADR_20260622_persistence_PR_PLAN.md](../cafe-discovery/docs/ADR/ADR_20260622_persistence_PR_PLAN.md).
 
 ---
 
