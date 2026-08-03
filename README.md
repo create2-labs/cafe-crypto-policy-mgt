@@ -227,6 +227,7 @@ Environment variables:
 - `CPM_POLICY_CATALOG_PATH` (default: `/app/policy/policy_graph_catalog_valid.json`)
 - `CPM_POLICY_TEMPLATE_PATHS` (comma-separated, default: `/app/policy/crypto_policy_template_valid.json,/app/policy/crypto_policy_template_pq_ready_progressive.json`)
 - `CPM_POLICY_INSTANCE_PATHS` (comma-separated, default: `/app/policy/crypto_policy_instance_valid.json,/app/policy/crypto_policy_instance_pq_ready_progressive.json`)
+- `CPM_PROVIDER_MANIFEST_PATHS` (comma-separated, default empty): optional Capability Provider manifests (`ProviderManifest` v0.1). Parsed at config load; **not** consumed by explore/persist yet (see ADR Capability Providers). Fixture: `internal/domain/provider/testdata/provider_manifest_nicetry_v0_1.json`.
 
 Endpoints:
 

@@ -2,6 +2,11 @@
 
 Items deferred; not blocking current IMM work unless noted.
 
+---
+
+## Capability Providers (ADR 2026-08-03)
+
+See [ADR](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction.md) / [PR plan](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction_PR_PLAN.md). **CPM-P1:** `internal/domain/provider` (`ProviderManifest` v0.1 + Nicetry fixture, refs `unpinned_pending_fixture`). Explore/persist unchanged; `CPM_PROVIDER_MANIFEST_PATHS` optional unused. Next: CPM-P2 RAZ catalogue + `solution_profile_ref`.
 
 ---
 
