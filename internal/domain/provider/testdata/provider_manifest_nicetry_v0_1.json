@@ -1,0 +1,48 @@
+{
+  "schema_version": "cafe.provider_manifest.v0.1",
+  "provider_id": "nicetry",
+  "provider_name": "NiceTry",
+  "provider_version": "2026-08",
+  "provider_maturity": "research",
+  "website": "https://nicetry.xyz",
+  "solution_profiles": [
+    {
+      "solution_profile_id": "nicetry.fors_c.erc4337.v0_1",
+      "display_name": "NiceTry FORS+C ERC-4337 Smart Account",
+      "maturity": "research",
+      "claim_status": "declared",
+      "input_requirements": { "wallet_types": ["EOA"], "requires_wallet_control_proof": true },
+      "signature": {
+        "scheme": "FORS+C",
+        "family": "hash_based",
+        "account_validation_posture": "pq_hash_based",
+        "key_rotation_model": "per_userop"
+      },
+      "account_model": {
+        "standard": "ERC-4337",
+        "execution_model": "erc4337_bundler",
+        "requires_bundler": true,
+        "requires_entrypoint": true,
+        "entrypoint_versions": ["0.7"]
+      },
+      "constraints": {
+        "requires_new_account": true,
+        "address_continuity_supported": false,
+        "requires_local_signer_state": true
+      },
+      "chain_support": [
+        { "chain_id": 11155111, "network": "sepolia", "status": "testnet_supported", "capabilities": ["deploy", "sign_userop", "rotate_signer"] },
+        { "chain_id": 1, "network": "ethereum-mainnet", "status": "planned", "capabilities": [] }
+      ],
+      "references": [
+        { "kind": "source_repo", "url": "https://github.com/RivaLabs-Core/NiceTry", "commit": "unpinned_pending_fixture" },
+        { "kind": "protocol_spec", "url": "https://github.com/RivaLabs-Core/Ephemeral-Keys-Protocol", "version": "unpinned_pending_fixture" }
+      ],
+      "risk_notes": [
+        "FORS+C parameters are still presented as tunable by upstream documentation.",
+        "Signer state management and bounded reuse semantics are part of the security model.",
+        "EIP-1271 direct view validation is not supported by the current protocol notes for FORS+C/WOTS+C rotation."
+      ]
+    }
+  ]
+}

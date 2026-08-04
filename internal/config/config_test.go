@@ -59,6 +59,9 @@ func TestLoadFromEnvDefaults(t *testing.T) {
 		cfg.PolicyInstancePaths[1] != "/app/policy/crypto_policy_instance_pq_ready_progressive.json" {
 		t.Fatalf("unexpected default policy instance paths: %#v", cfg.PolicyInstancePaths)
 	}
+	if len(cfg.ProviderManifestPaths) != 0 {
+		t.Fatalf("expected empty default provider manifest paths, got %#v", cfg.ProviderManifestPaths)
+	}
 	if cfg.DiscoveryHTTPBaseURL != "" {
 		t.Fatalf("expected empty discovery HTTP base default, got %q", cfg.DiscoveryHTTPBaseURL)
 	}
@@ -97,6 +100,7 @@ func TestLoadFromEnvOverrides(t *testing.T) {
 	t.Setenv("CPM_POLICY_CATALOG_PATH", "catalog.json")
 	t.Setenv("CPM_POLICY_TEMPLATE_PATHS", "tpl-a.json, tpl-b.json")
 	t.Setenv("CPM_POLICY_INSTANCE_PATHS", "inst-a.json,inst-b.json")
+	t.Setenv("CPM_PROVIDER_MANIFEST_PATHS", "provider-a.json, provider-b.json")
 	t.Setenv("CAFE_DISCOVERY_HTTP_BASE", "http://discovery:8080")
 	t.Setenv("CAFE_DISCOVERY_HTTP_TIMEOUT_SEC", "11")
 	t.Setenv("CPM_NATS_URL", "nats://nats:4222")
@@ -148,6 +152,9 @@ func TestLoadFromEnvOverrides(t *testing.T) {
 	}
 	if len(cfg.PolicyInstancePaths) != 2 || cfg.PolicyInstancePaths[0] != "inst-a.json" || cfg.PolicyInstancePaths[1] != "inst-b.json" {
 		t.Fatalf("expected policy instance paths override, got %#v", cfg.PolicyInstancePaths)
+	}
+	if len(cfg.ProviderManifestPaths) != 2 || cfg.ProviderManifestPaths[0] != "provider-a.json" || cfg.ProviderManifestPaths[1] != "provider-b.json" {
+		t.Fatalf("expected provider manifest paths override, got %#v", cfg.ProviderManifestPaths)
 	}
 	if cfg.DiscoveryHTTPBaseURL != "http://discovery:8080" {
 		t.Fatalf("expected discovery HTTP base override, got %q", cfg.DiscoveryHTTPBaseURL)

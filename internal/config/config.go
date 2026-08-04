@@ -17,6 +17,7 @@ const (
 	defaultPolicyCatalogPath           = "/app/policy/policy_graph_catalog_valid.json"
 	defaultPolicyTemplatePaths         = "/app/policy/crypto_policy_template_valid.json,/app/policy/crypto_policy_template_pq_ready_progressive.json"
 	defaultPolicyInstancePaths         = "/app/policy/crypto_policy_instance_valid.json,/app/policy/crypto_policy_instance_pq_ready_progressive.json"
+	defaultProviderManifestPaths       = "" // optional; not loaded by explore/persist in CPM-P1
 	defaultCPMStore                    = "persistence"
 	defaultPersistenceTimeoutSec       = 15
 )
@@ -41,6 +42,9 @@ type Config struct {
 	PolicyCatalogPath   string
 	PolicyTemplatePaths []string
 	PolicyInstancePaths []string
+	// ProviderManifestPaths lists optional ProviderManifest JSON files (CPM_PROVIDER_MANIFEST_PATHS).
+	// Not consumed by explore/persist in CPM-P1.
+	ProviderManifestPaths []string
 	// WalletAuthDomain is embedded in CP-PERSIST canonical messages (§12); falls back to request Host.
 	WalletAuthDomain string
 	// Store selects CP storage backend. Runtime (deployed images): persistence only.
@@ -73,6 +77,7 @@ func LoadFromEnv() Config {
 		PolicyCatalogPath:                   getEnv("CPM_POLICY_CATALOG_PATH", defaultPolicyCatalogPath),
 		PolicyTemplatePaths:                 parseCommaList(getEnv("CPM_POLICY_TEMPLATE_PATHS", defaultPolicyTemplatePaths)),
 		PolicyInstancePaths:                 parseCommaList(getEnv("CPM_POLICY_INSTANCE_PATHS", defaultPolicyInstancePaths)),
+		ProviderManifestPaths:               parseCommaList(getEnv("CPM_PROVIDER_MANIFEST_PATHS", defaultProviderManifestPaths)),
 		WalletAuthDomain:                    getEnv("CPM_WALLET_AUTH_DOMAIN", ""),
 		Store:                               getEnv("CPM_STORE", defaultCPMStore),
 		PersistenceURL:                      getEnv("CPM_PERSISTENCE_URL", ""),
