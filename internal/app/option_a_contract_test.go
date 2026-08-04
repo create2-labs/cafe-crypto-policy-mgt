@@ -58,10 +58,10 @@ func newAuthedTestHandlerWithScanAuthz(t *testing.T) http.Handler {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
 		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 	})
 	if err != nil {

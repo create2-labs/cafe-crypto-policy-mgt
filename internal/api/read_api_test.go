@@ -16,10 +16,10 @@ func TestLoadReadStoreAndRoutes(t *testing.T) {
 	store, err := LoadReadStore(ReadStoreOptions{
 		CatalogPath: fixturePath("policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
-			fixturePath("crypto_policy_template_valid.json"),
+			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
-			fixturePath("crypto_policy_instance_valid.json"),
+			fixturePath("crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 	})
 	if err != nil {
@@ -48,26 +48,34 @@ func TestLoadReadStoreAndRoutes(t *testing.T) {
 	}
 }
 
-func TestLoadReadStoreWithTwoTemplates(t *testing.T) {
+func TestLoadReadStore_RAZCatalogue(t *testing.T) {
 	store, err := LoadReadStore(ReadStoreOptions{
 		CatalogPath: fixturePath("policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
-			fixturePath("crypto_policy_template_valid.json"),
-			fixturePath("crypto_policy_template_pq_ready_progressive.json"),
+			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
-			fixturePath("crypto_policy_instance_valid.json"),
-			fixturePath("crypto_policy_instance_pq_ready_progressive.json"),
+			fixturePath("crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 	})
 	if err != nil {
 		t.Fatalf("LoadReadStore: %v", err)
 	}
-	if len(store.templates) != 2 {
-		t.Fatalf("templates: got %d want 2", len(store.templates))
+	if len(store.templates) != 1 {
+		t.Fatalf("templates: got %d want 1", len(store.templates))
 	}
-	if len(store.instances) != 2 {
-		t.Fatalf("instances: got %d want 2", len(store.instances))
+	if store.templates[0].ID != "tpl_pq_account_validation_v1" {
+		t.Fatalf("template id: got %q", store.templates[0].ID)
+	}
+	if len(store.instances) != 1 {
+		t.Fatalf("instances: got %d want 1", len(store.instances))
+	}
+	inst := store.instances[0]
+	if inst.ID != "cpx_pq_account_validation_v1" {
+		t.Fatalf("instance id: got %q", inst.ID)
+	}
+	if inst.SolutionProfileRef.SolutionProfileID != "nicetry.fors_c.erc4337.v0_1" {
+		t.Fatalf("solution_profile_ref: %#v", inst.SolutionProfileRef)
 	}
 }
 
@@ -75,10 +83,10 @@ func TestDecisionExplorePreservesDeployabilityDistinction(t *testing.T) {
 	store, err := LoadReadStore(ReadStoreOptions{
 		CatalogPath: fixturePath("policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
-			fixturePath("crypto_policy_template_valid.json"),
+			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
-			fixturePath("crypto_policy_instance_valid.json"),
+			fixturePath("crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 	})
 	if err != nil {
@@ -153,10 +161,10 @@ func TestDecisionExplore_optionA_policy_context(t *testing.T) {
 	store, err := LoadReadStore(ReadStoreOptions{
 		CatalogPath: fixturePath("policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
-			fixturePath("crypto_policy_template_valid.json"),
+			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
-			fixturePath("crypto_policy_instance_valid.json"),
+			fixturePath("crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 	})
 	if err != nil {
@@ -222,10 +230,10 @@ func TestDecisionExplore_discoveryV1WalletScanDetailEnvelope(t *testing.T) {
 	store, err := LoadReadStore(ReadStoreOptions{
 		CatalogPath: fixturePath("policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
-			fixturePath("crypto_policy_template_valid.json"),
+			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
-			fixturePath("crypto_policy_instance_valid.json"),
+			fixturePath("crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 	})
 	if err != nil {
@@ -280,10 +288,10 @@ func TestDecisionExplore_targetAddressFlatPolicyContext(t *testing.T) {
 	store, err := LoadReadStore(ReadStoreOptions{
 		CatalogPath: fixturePath("policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
-			fixturePath("crypto_policy_template_valid.json"),
+			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
-			fixturePath("crypto_policy_instance_valid.json"),
+			fixturePath("crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 	})
 	if err != nil {
@@ -333,10 +341,10 @@ func TestDecisionExplore_doesNotMutateReadStoreInstances(t *testing.T) {
 	store, err := LoadReadStore(ReadStoreOptions{
 		CatalogPath: fixturePath("policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
-			fixturePath("crypto_policy_template_valid.json"),
+			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
-			fixturePath("crypto_policy_instance_valid.json"),
+			fixturePath("crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 	})
 	if err != nil {

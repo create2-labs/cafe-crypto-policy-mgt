@@ -100,8 +100,8 @@ fixture_env() {
   export CPM_AUTH_REQUIRED=false
   export CPM_HTTP_ADDR="$CPM_HTTP_ADDR"
   export CPM_POLICY_CATALOG_PATH="$REPO_ROOT/internal/domain/policy/testdata/policy_graph_catalog_valid.json"
-  export CPM_POLICY_TEMPLATE_PATHS="$REPO_ROOT/internal/domain/policy/testdata/crypto_policy_template_valid.json"
-  export CPM_POLICY_INSTANCE_PATHS="$REPO_ROOT/internal/domain/policy/testdata/crypto_policy_instance_valid.json"
+  export CPM_POLICY_TEMPLATE_PATHS="$REPO_ROOT/internal/domain/policy/testdata/crypto_policy_template_pq_account_validation_v1.json"
+  export CPM_POLICY_INSTANCE_PATHS="$REPO_ROOT/internal/domain/policy/testdata/crypto_policy_instance_pq_account_validation_v1.json"
 }
 
 run_unit() {

@@ -6,7 +6,7 @@ Items deferred; not blocking current IMM work unless noted.
 
 ## Capability Providers (ADR 2026-08-03)
 
-See [ADR](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction.md) / [PR plan](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction_PR_PLAN.md). **CPM-P1:** `internal/domain/provider` (`ProviderManifest` v0.1 + Nicetry fixture, refs `unpinned_pending_fixture`). Explore/persist unchanged; `CPM_PROVIDER_MANIFEST_PATHS` optional unused. Next: CPM-P2 RAZ catalogue + `solution_profile_ref`.
+See [ADR](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction.md) / [PR plan](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction_PR_PLAN.md). **CPM-P2:** RAZ catalogue → `tpl_pq_account_validation_v1` + instance `cpx_pq_account_validation_v1` with `solution_profile_ref` → `nicetry.fors_c.erc4337.v0_1`. Explore/compat engine unchanged (no Nicetry hard/soft yet). Next: CPM-P2b deadcode sweep of old fixtures.
 
 ---
 
@@ -92,7 +92,7 @@ Mettre à jour les passages « preserve mock mode » / placeholder V1 :
 - défauts `defaultPolicyTemplatePaths` / `defaultPolicyInstancePaths` dans `internal/config/config.go` ;
 - surcharge possible via `CPM_POLICY_TEMPLATE_PATHS` / `CPM_POLICY_INSTANCE_PATHS` (env), mais `**cafe-deploy` ne les pose pas** — chaque nouvelle CP oblige à toucher les `const` + rebuild image.
 
-**Problème :** la liste des CP actives est de la **config d’exploitation**, pas de la logique Go. Ajouter une 2ᵉ CP (ex. `crypto_policy_template_pq_ready_progressive.json`) ne devrait pas impliquer de modifier `config.go`.
+**Problème :** la liste des CP actives est de la **config d’exploitation**, pas de la logique Go. Ajouter une 2ᵉ CP (ex. `crypto_policy_template_pq_account_validation_v1.json`) ne devrait pas impliquer de modifier `config.go`.
 
 **Pistes (à trancher) :**
 
