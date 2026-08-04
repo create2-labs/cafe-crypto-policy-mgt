@@ -15,12 +15,12 @@ func TestLoadCryptoPolicyInstanceFromFile_Valid(t *testing.T) {
 		t.Fatalf("LoadPolicyGraphCatalogFromFile: %v", err)
 	}
 
-	instance, err := LoadCryptoPolicyInstanceFromFile(filepath.Join("testdata", "crypto_policy_instance_valid.json"), catalog)
+	instance, err := LoadCryptoPolicyInstanceFromFile(filepath.Join("testdata", "crypto_policy_instance_pq_account_validation_v1.json"), catalog)
 	if err != nil {
 		t.Fatalf("LoadCryptoPolicyInstanceFromFile: %v", err)
 	}
 
-	if instance.ID != "cpx_hybrid_prod" {
+	if instance.ID != "cpx_pq_account_validation_v1" {
 		t.Fatalf("id: got %q", instance.ID)
 	}
 	if !reflect.DeepEqual(instance.Scope.ChainIDs, []int64{1, 8453}) {
@@ -32,7 +32,13 @@ func TestLoadCryptoPolicyInstanceFromFile_Valid(t *testing.T) {
 	if instance.GlobalParams.ApprovalMode != ApprovalModeManual {
 		t.Fatalf("global_parameters.approval_mode: got %q want %q", instance.GlobalParams.ApprovalMode, ApprovalModeManual)
 	}
-	if !reflect.DeepEqual(instance.Governance.Tags, []string{"baseline", "prod"}) {
+	if instance.SolutionProfileRef.ProviderID != "nicetry" {
+		t.Fatalf("solution_profile_ref.provider_id: got %q", instance.SolutionProfileRef.ProviderID)
+	}
+	if instance.SolutionProfileRef.SolutionProfileID != "nicetry.fors_c.erc4337.v0_1" {
+		t.Fatalf("solution_profile_ref.solution_profile_id: got %q", instance.SolutionProfileRef.SolutionProfileID)
+	}
+	if !reflect.DeepEqual(instance.Governance.Tags, []string{"pq_account_validation", "nicetry"}) {
 		t.Fatalf("governance.tags: %#v", instance.Governance.Tags)
 	}
 }
@@ -93,7 +99,7 @@ func TestCryptoPolicyInstance_Validate_ReferenceRules(t *testing.T) {
 
 	t.Run("ambiguous reference", func(t *testing.T) {
 		in := makeBase()
-		in.TemplateID = "tpl_hybrid_baseline"
+		in.TemplateID = "tpl_pq_account_validation_v1"
 		in.NodePath = []string{"NODE_EOA_ENTRY", "NODE_SIG_EIP7932"}
 		in.NodeParameters = nil
 		err := in.Validate(catalog)
@@ -124,6 +130,11 @@ func TestCryptoPolicyInstance_Validate_NodeSchemaAndTransitions(t *testing.T) {
 			Name:           "Schema checks",
 			CatalogVersion: "v0.1",
 			NodePath:       []string{"NODE_EOA_ENTRY", "NODE_SIG_EIP7932", "NODE_TARGET_HYBRID"},
+			SolutionProfileRef: SolutionProfileRef{
+				ProviderID:        "nicetry",
+				SolutionProfileID: "nicetry.fors_c.erc4337.v0_1",
+				ManifestVersion:   "2026-08",
+			},
 			Scope: PolicyScope{
 				Name:     "prod",
 				ChainIDs: []int64{8453, 1},
@@ -195,6 +206,59 @@ func TestCryptoPolicyInstance_Validate_NodeSchemaAndTransitions(t *testing.T) {
 		err := in.Validate(catalog)
 		if !errors.Is(err, ErrNodeParameterTypeMismatch) {
 			t.Fatalf("error = %v, want %v", err, ErrNodeParameterTypeMismatch)
+		}
+	})
+}
+
+func TestCryptoPolicyInstance_Validate_SolutionProfileRef(t *testing.T) {
+	catalog, err := LoadPolicyGraphCatalogFromFile(filepath.Join("testdata", "policy_graph_catalog_valid.json"))
+	if err != nil {
+		t.Fatalf("LoadPolicyGraphCatalogFromFile: %v", err)
+	}
+
+	base := CryptoPolicyInstance{
+		ID:             "cpx_ref",
+		Name:           "Ref checks",
+		CatalogVersion: "v0.1",
+		TemplateID:     "tpl_pq_account_validation_v1",
+		Scope:          PolicyScope{Name: "catalogue"},
+		GlobalParams: GlobalPolicyParameters{
+			TargetPosture:   vocabulary.PQPostureHybrid,
+			MinimumMaturity: 1,
+			ApprovalMode:    ApprovalModeManual,
+		},
+	}
+
+	t.Run("missing", func(t *testing.T) {
+		in := base
+		err := in.Validate(catalog)
+		if !errors.Is(err, ErrSolutionProfileRefRequired) {
+			t.Fatalf("error = %v, want %v", err, ErrSolutionProfileRefRequired)
+		}
+	})
+
+	t.Run("missing provider_id", func(t *testing.T) {
+		in := base
+		in.SolutionProfileRef = SolutionProfileRef{
+			SolutionProfileID: "nicetry.fors_c.erc4337.v0_1",
+			ManifestVersion:   "2026-08",
+		}
+		err := in.Validate(catalog)
+		if !errors.Is(err, ErrSolutionProfileRefProviderIDRequired) {
+			t.Fatalf("error = %v, want %v", err, ErrSolutionProfileRefProviderIDRequired)
+		}
+	})
+
+	t.Run("valid", func(t *testing.T) {
+		in := base
+		in.SolutionProfileRef = SolutionProfileRef{
+			ProviderID:        "nicetry",
+			SolutionProfileID: "nicetry.fors_c.erc4337.v0_1",
+			ManifestVersion:   "2026-08",
+			VerificationDate:  "2026-08-03",
+		}
+		if err := in.NormalizeAndValidate(catalog); err != nil {
+			t.Fatalf("NormalizeAndValidate: %v", err)
 		}
 	})
 }

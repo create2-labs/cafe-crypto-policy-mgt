@@ -1,0 +1,32 @@
+{
+  "id": "tpl_pq_account_validation_v1",
+  "name": "PQ account validation",
+  "version": "v0.1",
+  "catalog_version": "v0.1",
+  "description": "CAFE intention: reach post-quantum account validation for an EVM wallet. Concrete technique is selected via solution_profile_ref on catalogue instances.",
+  "target_posture": "hybrid",
+  "node_path": [
+    "NODE_EOA_ENTRY",
+    "NODE_SIG_EIP7932",
+    "NODE_TARGET_HYBRID"
+  ],
+  "default_selection": {
+    "target_chain_ids": [8453, 1, 8453],
+    "require_multichain": true,
+    "minimum_maturity": 0,
+    "allowed_provider_modes": ["third_party", "user_managed"],
+    "preferred_families": ["smart_account"],
+    "preferred_providers": ["nicetry"],
+    "approval_mode": "manual"
+  },
+  "constraints": {
+    "minimum_maturity": 0,
+    "require_multichain": true,
+    "target_chain_ids": [8453, 1, 8453]
+  },
+  "metadata": {
+    "owner_team": "cpm",
+    "target_posture": "hybrid",
+    "tags": ["pq_account_validation", "capability_provider"]
+  }
+}

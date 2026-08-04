@@ -19,10 +19,10 @@ func TestHandlerHealthz(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
 		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 	})
 	if err != nil {
@@ -57,10 +57,10 @@ func TestHandlerHealthPathNotRegistered(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
 		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 	})
 	if err != nil {
@@ -92,10 +92,10 @@ func TestHandlerRequiresAuthForBusinessRoutes(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
 		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 	})
 	if err != nil {
@@ -131,10 +131,10 @@ func TestHandlerRejectsMalformedBearerHeader(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
 		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 	})
 	if err != nil {
@@ -164,10 +164,10 @@ func TestHandlerAcceptsValidBearerToken(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
 		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 	})
 	if err != nil {
@@ -205,10 +205,10 @@ func TestHandlerRejectsExpiredDiscoveryToken(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
 		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 	})
 	if err != nil {
@@ -246,10 +246,10 @@ func TestHandlerRejectsDiscoveryDeniedToken(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
 		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 	})
 	if err != nil {
@@ -295,10 +295,10 @@ func TestHandlerReturns503OnValidationTimeout(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
 		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 	})
 	if err != nil {
@@ -339,10 +339,10 @@ func TestHandlerReturns503OnValidation5xx(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
 		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 	})
 	if err != nil {
@@ -380,10 +380,10 @@ func TestHandlerRejectsValidationSuccessButMissingUserID(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
 		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 	})
 	if err != nil {
@@ -424,10 +424,10 @@ func TestHandlerPropagatesRequestIDToDiscoveryValidation(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
 		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 	})
 	if err != nil {
@@ -474,10 +474,10 @@ func TestHandlerFailsClosedWhenScanIDPresentButAuthzNotConfigured(t *testing.T) 
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
 		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 	})
 	if err != nil {
@@ -520,10 +520,10 @@ func TestHandlerContinuesWhenAuthzNotConfiguredAndNoScanID(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
 		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 	})
 	if err != nil {
@@ -603,10 +603,10 @@ func assertTokenRejected(t *testing.T, algorithms []string, expectedStatus int) 
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
 		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_valid.json"),
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 	})
 	if err != nil {

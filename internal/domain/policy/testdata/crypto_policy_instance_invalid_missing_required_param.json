@@ -3,6 +3,11 @@
   "name": "Invalid missing required node param",
   "catalog_version": "v0.1",
   "node_path": ["NODE_EOA_ENTRY", "NODE_SIG_EIP7932", "NODE_TARGET_HYBRID"],
+  "solution_profile_ref": {
+    "provider_id": "nicetry",
+    "solution_profile_id": "nicetry.fors_c.erc4337.v0_1",
+    "manifest_version": "2026-08"
+  },
   "scope": {
     "name": "production",
     "chain_ids": [1],

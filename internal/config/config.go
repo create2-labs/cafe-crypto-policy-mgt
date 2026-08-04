@@ -15,8 +15,8 @@ const (
 	defaultSessionValidationTimeoutSec = 3
 	defaultScanAuthorizationTimeoutSec = 3
 	defaultPolicyCatalogPath           = "/app/policy/policy_graph_catalog_valid.json"
-	defaultPolicyTemplatePaths         = "/app/policy/crypto_policy_template_valid.json,/app/policy/crypto_policy_template_pq_ready_progressive.json"
-	defaultPolicyInstancePaths         = "/app/policy/crypto_policy_instance_valid.json,/app/policy/crypto_policy_instance_pq_ready_progressive.json"
+	defaultPolicyTemplatePaths         = "/app/policy/crypto_policy_template_pq_account_validation_v1.json"
+	defaultPolicyInstancePaths         = "/app/policy/crypto_policy_instance_pq_account_validation_v1.json"
 	defaultProviderManifestPaths       = "" // optional; not loaded by explore/persist in CPM-P1
 	defaultCPMStore                    = "persistence"
 	defaultPersistenceTimeoutSec       = 15

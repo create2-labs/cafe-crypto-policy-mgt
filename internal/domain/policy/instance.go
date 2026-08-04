@@ -54,21 +54,40 @@ var (
 	ErrNodeParameterTypeMismatch = errors.New("node parameter value does not match catalog schema type")
 	// ErrNodeParameterEnumValueInvalid indicates enum value outside schema.
 	ErrNodeParameterEnumValueInvalid = errors.New("node parameter enum value is not allowed by catalog schema")
+	// ErrSolutionProfileRefRequired indicates a missing solution profile reference.
+	ErrSolutionProfileRefRequired = errors.New("instance solution_profile_ref is required")
+	// ErrSolutionProfileRefProviderIDRequired indicates a missing provider_id.
+	ErrSolutionProfileRefProviderIDRequired = errors.New("solution_profile_ref provider_id is required")
+	// ErrSolutionProfileRefSolutionIDRequired indicates a missing solution_profile_id.
+	ErrSolutionProfileRefSolutionIDRequired = errors.New("solution_profile_ref solution_profile_id is required")
+	// ErrSolutionProfileRefManifestVersionRequired indicates a missing manifest_version.
+	ErrSolutionProfileRefManifestVersionRequired = errors.New("solution_profile_ref manifest_version is required")
 )
 
 // CryptoPolicyInstance is the concrete, scope-bound policy document used by CPM.
 // It intentionally has no edge-level configurable parameters; transition semantics
 // are enforced by catalog/template compatibility rules.
 type CryptoPolicyInstance struct {
-	ID             string                      `json:"id"`
-	Name           string                      `json:"name"`
-	CatalogVersion string                      `json:"catalog_version"`
-	TemplateID     string                      `json:"template_id,omitempty"`
-	NodePath       []string                    `json:"node_path,omitempty"`
-	Scope          PolicyScope                 `json:"scope"`
-	GlobalParams   GlobalPolicyParameters      `json:"global_parameters"`
-	NodeParameters map[string]NodeParameterMap `json:"node_parameters,omitempty"`
-	Governance     GovernanceMetadata          `json:"governance,omitempty"`
+	ID                 string                      `json:"id"`
+	Name               string                      `json:"name"`
+	CatalogVersion     string                      `json:"catalog_version"`
+	TemplateID         string                      `json:"template_id,omitempty"`
+	NodePath           []string                    `json:"node_path,omitempty"`
+	SolutionProfileRef SolutionProfileRef          `json:"solution_profile_ref"`
+	Scope              PolicyScope                 `json:"scope"`
+	GlobalParams       GlobalPolicyParameters      `json:"global_parameters"`
+	NodeParameters     map[string]NodeParameterMap `json:"node_parameters,omitempty"`
+	Governance         GovernanceMetadata          `json:"governance,omitempty"`
+}
+
+// SolutionProfileRef binds a catalogue instance to a Capability Provider solution
+// profile (ADR Capability Providers). Explore matching of provider constraints is
+// introduced in later PRs; this field is declarative identity for the catalogue.
+type SolutionProfileRef struct {
+	ProviderID        string `json:"provider_id"`
+	SolutionProfileID string `json:"solution_profile_id"`
+	ManifestVersion   string `json:"manifest_version"`
+	VerificationDate  string `json:"verification_date,omitempty"`
 }
 
 // PolicyScope identifies where the instance applies.
@@ -175,6 +194,9 @@ func (i *CryptoPolicyInstance) Validate(catalog *PolicyGraphCatalog) error {
 	}
 	if i.TemplateID != "" && len(i.NodePath) > 0 {
 		return ErrInstanceReferenceAmbiguous
+	}
+	if err := i.SolutionProfileRef.Validate(); err != nil {
+		return err
 	}
 
 	if err := i.Scope.Validate(); err != nil {
@@ -288,6 +310,23 @@ func (v NodeParameterValue) ValidateAgainstSchema(schema PolicyNodeParameterSche
 		}
 	default:
 		return fmt.Errorf("%w: unsupported schema type %q", ErrNodeParameterTypeMismatch, schema.Type)
+	}
+	return nil
+}
+
+// Validate checks solution_profile_ref identity fields.
+func (r SolutionProfileRef) Validate() error {
+	if r.ProviderID == "" && r.SolutionProfileID == "" && r.ManifestVersion == "" && r.VerificationDate == "" {
+		return ErrSolutionProfileRefRequired
+	}
+	if r.ProviderID == "" {
+		return ErrSolutionProfileRefProviderIDRequired
+	}
+	if r.SolutionProfileID == "" {
+		return ErrSolutionProfileRefSolutionIDRequired
+	}
+	if r.ManifestVersion == "" {
+		return ErrSolutionProfileRefManifestVersionRequired
 	}
 	return nil
 }

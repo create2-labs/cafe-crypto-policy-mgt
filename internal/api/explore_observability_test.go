@@ -108,8 +108,8 @@ func TestExploreObservability_emitsMetricAndLogForNoCandidate(t *testing.T) {
 			TargetChainIDs: []int64{1, 2, 5},
 		},
 		RejectedCandidates: []policy.RejectedPolicy{{
-			CryptoPolicyInstanceID: "cpx_hybrid_prod",
-			TemplateID:             "tpl_hybrid_baseline",
+			CryptoPolicyInstanceID: "cpx_pq_account_validation_v1",
+			TemplateID:             "tpl_pq_account_validation_v1",
 			RejectionReasons: []policy.AssessmentFinding{{
 				Code:     rejectionCodeChainScope,
 				Severity: policy.AssessmentFindingSeverityBlocking,
@@ -125,7 +125,7 @@ func TestExploreObservability_emitsMetricAndLogForNoCandidate(t *testing.T) {
 			ChainIDs:      []int64{1, 2, 5},
 		},
 	}
-	scopes := map[string][]int64{"cpx_hybrid_prod": {1, 3, 5}}
+	scopes := map[string][]int64{"cpx_pq_account_validation_v1": {1, 3, 5}}
 	httpReq := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, nil)
 	httpReq.Header.Set("X-Request-Id", "req-ops-1")
 
@@ -214,10 +214,10 @@ func TestDecisionExplore_noDeployableCandidateObservabilityIntegration(t *testin
 	store, err := LoadReadStore(ReadStoreOptions{
 		CatalogPath: fixturePath("policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
-			fixturePath("crypto_policy_template_valid.json"),
+			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
-			fixturePath("crypto_policy_instance_valid.json"),
+			fixturePath("crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 	})
 	if err != nil {

@@ -20,11 +20,11 @@ func mustLoadFixtures(t *testing.T) (*PolicyGraphCatalog, *CryptoPolicyTemplate,
 	if err != nil {
 		t.Fatalf("catalog: %v", err)
 	}
-	tpl, err := LoadCryptoPolicyTemplateFromFile(testdataPath(t, "crypto_policy_template_valid.json"), cat)
+	tpl, err := LoadCryptoPolicyTemplateFromFile(testdataPath(t, "crypto_policy_template_pq_account_validation_v1.json"), cat)
 	if err != nil {
 		t.Fatalf("template: %v", err)
 	}
-	inst, err := LoadCryptoPolicyInstanceFromFile(testdataPath(t, "crypto_policy_instance_valid.json"), cat)
+	inst, err := LoadCryptoPolicyInstanceFromFile(testdataPath(t, "crypto_policy_instance_pq_account_validation_v1.json"), cat)
 	if err != nil {
 		t.Fatalf("instance: %v", err)
 	}

@@ -225,9 +225,9 @@ CPM now exposes read-only APIs backed by local policy files loaded at startup. T
 Environment variables:
 
 - `CPM_POLICY_CATALOG_PATH` (default: `/app/policy/policy_graph_catalog_valid.json`)
-- `CPM_POLICY_TEMPLATE_PATHS` (comma-separated, default: `/app/policy/crypto_policy_template_valid.json,/app/policy/crypto_policy_template_pq_ready_progressive.json`)
-- `CPM_POLICY_INSTANCE_PATHS` (comma-separated, default: `/app/policy/crypto_policy_instance_valid.json,/app/policy/crypto_policy_instance_pq_ready_progressive.json`)
-- `CPM_PROVIDER_MANIFEST_PATHS` (comma-separated, default empty): optional Capability Provider manifests (`ProviderManifest` v0.1). Parsed at config load; **not** consumed by explore/persist yet (see ADR Capability Providers). Fixture: `internal/domain/provider/testdata/provider_manifest_nicetry_v0_1.json`.
+- `CPM_POLICY_TEMPLATE_PATHS` (comma-separated, default: `/app/policy/crypto_policy_template_pq_account_validation_v1.json`)
+- `CPM_POLICY_INSTANCE_PATHS` (comma-separated, default: `/app/policy/crypto_policy_instance_pq_account_validation_v1.json`)
+- `CPM_PROVIDER_MANIFEST_PATHS` (comma-separated, default empty): optional Capability Provider manifests (`ProviderManifest` v0.1). Parsed at config load; **not** consumed by explore/persist yet (see ADR Capability Providers → CPM-P6b for full narrative). Fixture: `internal/domain/provider/testdata/provider_manifest_nicetry_v0_1.json`. Catalogue instance `cpx_pq_account_validation_v1` carries `solution_profile_ref` → `nicetry.fors_c.erc4337.v0_1`.
 
 Endpoints:
 
@@ -363,7 +363,7 @@ Canonical spec: [`workplans/CPM_DRAFT_1_PR.md`](workplans/CPM_DRAFT_1_PR.md), Op
 {
   "id": "550e8400-e29b-41d4-a716-446655440001",
   "scan_id": "550e8400-e29b-41d4-a716-446655440000",
-  "payload": { "selected_candidate_id": "cpx_hybrid_prod" }
+  "payload": { "selected_candidate_id": "cpx_pq_account_validation_v1" }
 }
 ```
 
@@ -396,7 +396,7 @@ Canonical spec: [`workplans/CPM_DRAFT_1_PR.md`](workplans/CPM_DRAFT_1_PR.md), Op
 curl -sS -X POST "https://localhost/api/cpm/v1/drafts" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d "{\"id\":\"$DRAFT_ID\",\"scan_id\":\"$SCAN_ID\",\"payload\":{\"selected_candidate_id\":\"cpx_hybrid_prod\"}}"
+  -d "{\"id\":\"$DRAFT_ID\",\"scan_id\":\"$SCAN_ID\",\"payload\":{\"selected_candidate_id\":\"cpx_pq_account_validation_v1\"}}"
 
 curl -sS "https://localhost/api/cpm/v1/drafts?id=$DRAFT_ID" \
   -H "Authorization: Bearer $TOKEN"
@@ -523,8 +523,8 @@ With repo test fixtures and auth disabled:
 ```bash
 export CPM_AUTH_REQUIRED=false
 export CPM_POLICY_CATALOG_PATH=internal/domain/policy/testdata/policy_graph_catalog_valid.json
-export CPM_POLICY_TEMPLATE_PATHS=internal/domain/policy/testdata/crypto_policy_template_valid.json
-export CPM_POLICY_INSTANCE_PATHS=internal/domain/policy/testdata/crypto_policy_instance_valid.json
+export CPM_POLICY_TEMPLATE_PATHS=internal/domain/policy/testdata/crypto_policy_template_pq_account_validation_v1.json
+export CPM_POLICY_INSTANCE_PATHS=internal/domain/policy/testdata/crypto_policy_instance_pq_account_validation_v1.json
 go run ./cmd/cafe-cpm
 ```
 
@@ -544,7 +544,7 @@ Validates explore no-deployable-candidate observability (unit tests, HTTP smoke,
 **What the smoke test does**
 
 1. `GET /healthz`, `GET /metrics`, and `GET /version`
-2. **No-candidate case** — `POST …/decisions/explore` with `target_chain_ids: [1, 2, 5]` while fixture instance `cpx_hybrid_prod` has `scope.chain_ids: [1, 8453]` → HTTP 200, empty `ranked_candidates`, `incompatible.chain_scope` in `rejected_candidates`
+2. **No-candidate case** — `POST …/decisions/explore` with `target_chain_ids: [1, 2, 5]` while fixture instance `cpx_pq_account_validation_v1` has `scope.chain_ids: [1, 8453]` → HTTP 200, empty `ranked_candidates`, `incompatible.chain_scope` in `rejected_candidates`
 3. Prints **CP scope vs request** (via `GET /policies/instances`): requested targets, instance `scope.chain_ids`, chains missing from scope — explains why observed and requested wallet chains can match while explore still rejects
 4. Asserts log `cpm.explore.no_deployable_candidate` and increment of `cpm_explore_no_deployable_candidate_total`
 5. **Negative case** — explore with `target_chain_ids: [1, 8453]` → deployable candidate; metric must **not** increment again

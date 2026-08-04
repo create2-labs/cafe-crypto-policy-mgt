@@ -15,12 +15,12 @@ func TestLoadCryptoPolicyTemplateFromFile_Valid(t *testing.T) {
 		t.Fatalf("LoadPolicyGraphCatalogFromFile: %v", err)
 	}
 
-	tpl, err := LoadCryptoPolicyTemplateFromFile(filepath.Join("testdata", "crypto_policy_template_valid.json"), catalog)
+	tpl, err := LoadCryptoPolicyTemplateFromFile(filepath.Join("testdata", "crypto_policy_template_pq_account_validation_v1.json"), catalog)
 	if err != nil {
 		t.Fatalf("LoadCryptoPolicyTemplateFromFile: %v", err)
 	}
 
-	if tpl.ID != "tpl_hybrid_baseline" {
+	if tpl.ID != "tpl_pq_account_validation_v1" {
 		t.Fatalf("id: got %q", tpl.ID)
 	}
 	if tpl.TargetPosture != vocabulary.PQPostureHybrid {
@@ -38,29 +38,8 @@ func TestLoadCryptoPolicyTemplateFromFile_Valid(t *testing.T) {
 	if tpl.Defaults.MinimumMaturity != 1 {
 		t.Fatalf("default_selection.minimum_maturity: got %d want 1", tpl.Defaults.MinimumMaturity)
 	}
-	if !reflect.DeepEqual(tpl.Metadata.Tags, []string{"baseline", "hybrid"}) {
+	if !reflect.DeepEqual(tpl.Metadata.Tags, []string{"pq_account_validation", "capability_provider"}) {
 		t.Fatalf("metadata.tags: %#v", tpl.Metadata.Tags)
-	}
-}
-
-func TestLoadCryptoPolicyTemplateFromFile_PqReadyProgressive(t *testing.T) {
-	catalog, err := LoadPolicyGraphCatalogFromFile(filepath.Join("testdata", "policy_graph_catalog_valid.json"))
-	if err != nil {
-		t.Fatalf("LoadPolicyGraphCatalogFromFile: %v", err)
-	}
-
-	tpl, err := LoadCryptoPolicyTemplateFromFile(
-		filepath.Join("testdata", "crypto_policy_template_pq_ready_progressive.json"),
-		catalog,
-	)
-	if err != nil {
-		t.Fatalf("LoadCryptoPolicyTemplateFromFile pq_ready_progressive: %v", err)
-	}
-	if tpl.ID != "tpl_pq_ready_progressive" {
-		t.Fatalf("id: got %q", tpl.ID)
-	}
-	if tpl.Name != "PQ-ready progressive path" {
-		t.Fatalf("name: got %q", tpl.Name)
 	}
 }
 
