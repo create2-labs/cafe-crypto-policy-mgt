@@ -3,7 +3,7 @@ module github.com/create2-labs/cafe-crypto-policy-mgt
 go 1.26.4
 
 require (
-	github.com/create2-labs/cafe-contracts v0.0.2-0.20260427141324-4a96a8df5546
+	github.com/create2-labs/cafe-contracts v0.0.2-0.20260805161432-01fea0174749
 	github.com/ethereum/go-ethereum v1.17.2
 	github.com/nats-io/nats.go v1.51.0
 	github.com/prometheus/client_golang v1.23.2
@@ -28,8 +28,8 @@ require (
 	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/supranational/blst v0.3.16 // indirect
-	golang.org/x/crypto v0.49.0 // indirect
+	golang.org/x/crypto v0.50.0 // indirect
 	golang.org/x/sync v0.18.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/sys v0.43.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )

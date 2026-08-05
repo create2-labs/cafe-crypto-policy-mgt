@@ -158,7 +158,7 @@ func validAssessmentRequest(eventID string) cafenatsv01.PolicyAssessmentRequeste
 				RequireMultichain:         true,
 				AllowNewWallet:            false,
 				AddressContinuityRequired: false,
-				KeyRotationRequired:       true,
+				KeyRotationModel:          cafenatsv01.KeyRotationModelPerUserOp,
 				RecoveryRequired:          true,
 				MinimumMaturity:           1,
 				ApprovalMode:              "manual",

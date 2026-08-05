@@ -392,7 +392,7 @@ func fetchDiscoveryWalletScanDetail(ctx context.Context, authCfg authConfig, aut
 func targetAddressFromWalletScanDetailJSON(detail []byte) (string, error) {
 	var wrap struct {
 		ScanFamily string `json:"scan_family"`
-		Result struct {
+		Result     struct {
 			TargetAddress string `json:"target_address"`
 		} `json:"result"`
 	}
@@ -420,7 +420,7 @@ func policySelectionRequestToWire(r policy.PolicySelectionRequest) cafenatsv01.P
 		RequireMultichain:         r.RequireMultichain,
 		AllowNewWallet:            r.AllowNewWallet,
 		AddressContinuityRequired: r.AddressContinuityRequired,
-		KeyRotationRequired:       r.KeyRotationRequired,
+		KeyRotationModel:          string(r.KeyRotationModel),
 		RecoveryRequired:          r.RecoveryRequired,
 		MinimumMaturity:           r.MinimumMaturity,
 		AllowResearch:             r.AllowResearch,

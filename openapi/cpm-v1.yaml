@@ -762,8 +762,7 @@ components:
             request body remain rejected by the API (strict JSON on the outer envelope).
           additionalProperties: true
         selection_request:
-          type: object
-          additionalProperties: true
+          $ref: "#/components/schemas/PolicySelectionRequest"
 
     DecisionExploreResponse:
       type: object
@@ -772,6 +771,69 @@ components:
         decision:
           type: object
           additionalProperties: true
+
+    PolicySelectionRequest:
+      type: object
+      description: |
+        Stable selection contract driving explore and assessment (ADR §7.1).
+        Breaking vs pre-provider wire: `key_rotation_model` replaces `key_rotation_required` bool.
+      required:
+        - target_posture
+        - key_rotation_model
+        - approval_mode
+      properties:
+        target_posture:
+          type: string
+          enum: [classical_only, hybrid, full_pq, unknown]
+        target_chain_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+            minimum: 1
+        require_multichain:
+          type: boolean
+        allow_new_wallet:
+          type: boolean
+        address_continuity_required:
+          type: boolean
+        key_rotation_model:
+          type: string
+          description: |
+            Requested key-rotation posture. Compatibility matches instance/solution
+            `key_rotation_model` exactly (`none` refuses rotation; `per_userop` accepts Nicetry).
+          enum: [none, per_userop]
+        recovery_required:
+          type: boolean
+        minimum_maturity:
+          type: integer
+          minimum: 1
+          maximum: 5
+          default: 1
+        allow_research:
+          type: boolean
+        allowed_provider_modes:
+          type: array
+          items:
+            type: string
+            enum: [third_party, user_managed]
+        preferred_families:
+          type: array
+          items:
+            type: string
+        preferred_providers:
+          type: array
+          items:
+            type: string
+        require_bundler_available:
+          type: boolean
+        require_paymaster_available:
+          type: boolean
+        approval_mode:
+          type: string
+          enum: [auto, manual]
+          default: manual
+      additionalProperties: false
 
     PolicyAssessmentRequest:
       type: object
@@ -786,9 +848,7 @@ components:
           format: uuid
           description: Discovery wallet scan id (owner-scoped).
         selection_request:
-          type: object
-          description: Same shape as `selection_request` on `POST …/decisions/explore`.
-          additionalProperties: true
+          $ref: "#/components/schemas/PolicySelectionRequest"
         client_request_id:
           type: string
           description: Optional client correlation id (not the NATS idempotence key).

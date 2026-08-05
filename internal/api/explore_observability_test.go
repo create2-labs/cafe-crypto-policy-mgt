@@ -251,7 +251,7 @@ func TestDecisionExplore_noDeployableCandidateObservabilityIntegration(t *testin
 			"require_multichain":          true,
 			"allow_new_wallet":            false,
 			"address_continuity_required": true,
-			"key_rotation_required":       true,
+			"key_rotation_model": "per_userop",
 			"recovery_required":           true,
 			"minimum_maturity":            1,
 			"approval_mode":               "manual",

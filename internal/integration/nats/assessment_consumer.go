@@ -103,7 +103,7 @@ func mapSelectionRequest(in cafenatsv01.PolicySelectionRequestWire) policy.Polic
 		RequireMultichain:         in.RequireMultichain,
 		AllowNewWallet:            in.AllowNewWallet,
 		AddressContinuityRequired: in.AddressContinuityRequired,
-		KeyRotationRequired:       in.KeyRotationRequired,
+		KeyRotationModel:          policy.KeyRotationModel(in.KeyRotationModel),
 		RecoveryRequired:          in.RecoveryRequired,
 		MinimumMaturity:           in.MinimumMaturity,
 		AllowResearch:             in.AllowResearch,

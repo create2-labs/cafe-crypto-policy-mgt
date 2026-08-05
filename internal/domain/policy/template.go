@@ -110,6 +110,12 @@ func (t *CryptoPolicyTemplate) Normalize() {
 	if t.Defaults.TargetPosture == "" {
 		t.Defaults.TargetPosture = t.TargetPosture
 	}
+	if t.Defaults.ApprovalMode == "" {
+		t.Defaults.ApprovalMode = ApprovalModeManual
+	}
+	if t.Defaults.KeyRotationModel == "" {
+		t.Defaults.KeyRotationModel = KeyRotationNone
+	}
 }
 
 // Validate ensures template integrity against catalog constraints.

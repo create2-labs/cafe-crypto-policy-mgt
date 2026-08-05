@@ -23,7 +23,7 @@
     "allow_research": true,
     "allow_new_wallet": false,
     "address_continuity_required": true,
-    "key_rotation_required": true,
+    "key_rotation_model": "per_userop",
     "recovery_required": true,
     "allowed_provider_modes": ["third_party", "user_managed"],
     "require_bundler_available": true,
