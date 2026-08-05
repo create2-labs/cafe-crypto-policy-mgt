@@ -155,8 +155,8 @@ func evaluateWithPath(
 		}
 	}
 
-	if req.KeyRotationRequired && !inst.GlobalParams.KeyRotationRequired {
-		add("incompatible.constraint", "key_rotation_required not met by instance", AssessmentFindingSeverityBlocking)
+	if req.KeyRotationModel != inst.GlobalParams.KeyRotationModel {
+		add("incompatible.constraint", "key_rotation_model not met by instance", AssessmentFindingSeverityBlocking)
 		return PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}
 	}
 	if req.AddressContinuityRequired && !inst.GlobalParams.AddressContinuityRequired {

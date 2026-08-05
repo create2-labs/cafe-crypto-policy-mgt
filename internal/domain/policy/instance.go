@@ -42,6 +42,8 @@ var (
 	ErrGlobalApprovalModeInvalid = errors.New("global parameters approval_mode is invalid")
 	// ErrGlobalProviderModeInvalid indicates invalid provider mode.
 	ErrGlobalProviderModeInvalid = errors.New("global parameters allowed_provider_modes contains an invalid value")
+	// ErrGlobalKeyRotationModelInvalid indicates invalid key rotation model.
+	ErrGlobalKeyRotationModelInvalid = errors.New("global parameters key_rotation_model is invalid")
 	// ErrNodeParameterNodeUnknown indicates parameter map references unknown node.
 	ErrNodeParameterNodeUnknown = errors.New("node_parameters references unknown node")
 	// ErrNodeParameterNodeNotInPath indicates parameter map references node not selected in path.
@@ -107,7 +109,7 @@ type GlobalPolicyParameters struct {
 	AllowResearch             bool                        `json:"allow_research"`
 	AllowNewWallet            bool                        `json:"allow_new_wallet"`
 	AddressContinuityRequired bool                        `json:"address_continuity_required"`
-	KeyRotationRequired       bool                        `json:"key_rotation_required"`
+	KeyRotationModel          KeyRotationModel            `json:"key_rotation_model"`
 	RecoveryRequired          bool                        `json:"recovery_required"`
 	AllowedProviderModes      []ProviderMode              `json:"allowed_provider_modes,omitempty"`
 	RequireBundlerAvailable   bool                        `json:"require_bundler_available"`
@@ -166,6 +168,9 @@ func (i *CryptoPolicyInstance) Normalize() {
 	}
 	if i.GlobalParams.ApprovalMode == "" {
 		i.GlobalParams.ApprovalMode = ApprovalModeManual
+	}
+	if i.GlobalParams.KeyRotationModel == "" {
+		i.GlobalParams.KeyRotationModel = KeyRotationNone
 	}
 }
 
@@ -363,6 +368,9 @@ func (p *GlobalPolicyParameters) Validate() error {
 	}
 	if !isValidApprovalMode(p.ApprovalMode) {
 		return fmt.Errorf("%w: %q", ErrGlobalApprovalModeInvalid, p.ApprovalMode)
+	}
+	if !isValidKeyRotationModel(p.KeyRotationModel) {
+		return fmt.Errorf("%w: %q", ErrGlobalKeyRotationModelInvalid, p.KeyRotationModel)
 	}
 	for _, mode := range p.AllowedProviderModes {
 		if !isValidProviderMode(mode) {

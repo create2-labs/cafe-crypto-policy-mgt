@@ -36,6 +36,15 @@ var (
 	ErrMinimumMaturityRange         = errors.New("minimum_maturity must be between 1 and 5")
 	ErrApprovalModeInvalid          = errors.New("approval_mode is invalid")
 	ErrProviderModeInvalid          = errors.New("allowed_provider_modes contains an invalid value")
+	ErrKeyRotationModelInvalid      = errors.New("key_rotation_model is invalid")
+)
+
+// KeyRotationModel is the rotation posture requested by the caller (ADR §7.1).
+type KeyRotationModel string
+
+const (
+	KeyRotationNone      KeyRotationModel = "none"
+	KeyRotationPerUserOp KeyRotationModel = "per_userop"
 )
 
 // PolicySelectionRequest is the stable, serializable contract that drives CPM policy selection.
@@ -50,7 +59,7 @@ type PolicySelectionRequest struct {
 	RequireMultichain         bool                        `json:"require_multichain"`
 	AllowNewWallet            bool                        `json:"allow_new_wallet"`
 	AddressContinuityRequired bool                        `json:"address_continuity_required"`
-	KeyRotationRequired       bool                        `json:"key_rotation_required"`
+	KeyRotationModel          KeyRotationModel            `json:"key_rotation_model"`
 	RecoveryRequired          bool                        `json:"recovery_required"`
 	MinimumMaturity           int                         `json:"minimum_maturity"`
 	AllowResearch             bool                        `json:"allow_research"`
@@ -72,6 +81,9 @@ func (r *PolicySelectionRequest) Normalize() {
 	}
 	if r.ApprovalMode == "" {
 		r.ApprovalMode = ApprovalModeManual
+	}
+	if r.KeyRotationModel == "" {
+		r.KeyRotationModel = KeyRotationNone
 	}
 
 	r.TargetChainIDs = normalizeChainIDs(r.TargetChainIDs)
@@ -105,6 +117,9 @@ func (r *PolicySelectionRequest) Validate() error {
 	}
 	if !isValidApprovalMode(r.ApprovalMode) {
 		return fmt.Errorf("%w: %q", ErrApprovalModeInvalid, r.ApprovalMode)
+	}
+	if !isValidKeyRotationModel(r.KeyRotationModel) {
+		return fmt.Errorf("%w: %q", ErrKeyRotationModelInvalid, r.KeyRotationModel)
 	}
 	for _, mode := range r.AllowedProviderModes {
 		if !isValidProviderMode(mode) {
@@ -184,6 +199,15 @@ func isValidApprovalMode(mode ApprovalMode) bool {
 func isValidProviderMode(mode ProviderMode) bool {
 	switch mode {
 	case ProviderModeThirdParty, ProviderModeUserManaged:
+		return true
+	default:
+		return false
+	}
+}
+
+func isValidKeyRotationModel(model KeyRotationModel) bool {
+	switch model {
+	case KeyRotationNone, KeyRotationPerUserOp:
 		return true
 	default:
 		return false

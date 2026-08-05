@@ -14,6 +14,7 @@
     "target_chain_ids": [8453, 1, 8453],
     "require_multichain": true,
     "minimum_maturity": 0,
+    "key_rotation_model": "per_userop",
     "allowed_provider_modes": ["third_party", "user_managed"],
     "preferred_families": ["smart_account"],
     "preferred_providers": ["nicetry"],

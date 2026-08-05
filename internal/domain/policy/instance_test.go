@@ -77,6 +77,7 @@ func TestCryptoPolicyInstance_Validate_ReferenceRules(t *testing.T) {
 				TargetPosture:        vocabulary.PQPostureHybrid,
 				MinimumMaturity:      1,
 				ApprovalMode:         ApprovalModeManual,
+				KeyRotationModel:     KeyRotationNone,
 				AllowedProviderModes: []ProviderMode{ProviderModeThirdParty},
 			},
 			NodeParameters: map[string]NodeParameterMap{
@@ -143,6 +144,7 @@ func TestCryptoPolicyInstance_Validate_NodeSchemaAndTransitions(t *testing.T) {
 				TargetPosture:        vocabulary.PQPostureHybrid,
 				MinimumMaturity:      1,
 				ApprovalMode:         ApprovalModeManual,
+				KeyRotationModel:     KeyRotationNone,
 				AllowedProviderModes: []ProviderMode{ProviderModeThirdParty},
 			},
 			NodeParameters: map[string]NodeParameterMap{
@@ -223,9 +225,10 @@ func TestCryptoPolicyInstance_Validate_SolutionProfileRef(t *testing.T) {
 		TemplateID:     "tpl_pq_account_validation_v1",
 		Scope:          PolicyScope{Name: "catalogue"},
 		GlobalParams: GlobalPolicyParameters{
-			TargetPosture:   vocabulary.PQPostureHybrid,
-			MinimumMaturity: 1,
-			ApprovalMode:    ApprovalModeManual,
+			TargetPosture:    vocabulary.PQPostureHybrid,
+			MinimumMaturity:  1,
+			ApprovalMode:     ApprovalModeManual,
+			KeyRotationModel: KeyRotationNone,
 		},
 	}
 

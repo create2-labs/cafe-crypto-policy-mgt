@@ -50,7 +50,7 @@ func baseSelection() PolicySelectionRequest {
 		RequireMultichain:         true,
 		AllowNewWallet:            true,
 		AddressContinuityRequired: true,
-		KeyRotationRequired:       true,
+		KeyRotationModel:          KeyRotationPerUserOp,
 		RecoveryRequired:          true,
 		MinimumMaturity:           1,
 		AllowedProviderModes:      []ProviderMode{ProviderModeThirdParty, ProviderModeUserManaged},
@@ -189,6 +189,32 @@ func TestEffectiveNodePath_explicitPath(t *testing.T) {
 	}
 	if res.Status != AssessmentStatusCompatibleAndDeployable {
 		t.Fatalf("status: got %q", res.Status)
+	}
+}
+
+func TestPolicyCompatibilityEvaluator_incompatibleKeyRotationModel(t *testing.T) {
+	cat, tpl, inst := mustLoadFixtures(t)
+	obs := baseObservation()
+	req := baseSelection()
+	req.KeyRotationModel = KeyRotationNone
+	var ev PolicyCompatibilityEvaluator
+	res, err := ev.Evaluate(obs, &req, inst, cat, tpl)
+	if err != nil {
+		t.Fatalf("Evaluate: %v", err)
+	}
+	if res.Status != AssessmentStatusIncompatible {
+		t.Fatalf("want incompatible, got %q %+v", res.Status, res.Findings)
+	}
+	found := false
+	for _, finding := range res.Findings {
+		if finding.Code == "incompatible.constraint" &&
+			finding.Message == "key_rotation_model not met by instance" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected key_rotation_model finding, got %+v", res.Findings)
 	}
 }
 
