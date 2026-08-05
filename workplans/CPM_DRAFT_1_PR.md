@@ -241,7 +241,7 @@ Replace `$TOKEN`, `$SCAN_ID`, `$DRAFT_ID` (client-generated UUID).
 curl -sS -X POST "https://localhost/api/cpm/v1/drafts" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d "{\"id\":\"$DRAFT_ID\",\"scan_id\":\"$SCAN_ID\",\"payload\":{\"selected_candidate_id\":\"cpx_hybrid_prod\"}}"
+  -d "{\"id\":\"$DRAFT_ID\",\"scan_id\":\"$SCAN_ID\",\"payload\":{\"selected_candidate_id\":\"cpx_pq_account_validation_v1\"}}"
 
 # Read draft by id
 curl -sS "https://localhost/api/cpm/v1/drafts?id=$DRAFT_ID" \

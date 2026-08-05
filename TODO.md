@@ -6,7 +6,7 @@ Items deferred; not blocking current IMM work unless noted.
 
 ## Capability Providers (ADR 2026-08-03)
 
-See [ADR](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction.md) / [PR plan](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction_PR_PLAN.md). **CPM-P2:** RAZ catalogue → `tpl_pq_account_validation_v1` + instance `cpx_pq_account_validation_v1` with `solution_profile_ref` → `nicetry.fors_c.erc4337.v0_1`. Explore/compat engine unchanged (no Nicetry hard/soft yet). Next: CPM-P2b deadcode sweep of old fixtures.
+See [ADR](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction.md) / [PR plan](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction_PR_PLAN.md). **CPM-P2** RAZ catalogue + **CPM-P2b** deadcode sweep (old hybrid / `pq_ready_progressive` fixtures removed). Live catalogue: `tpl_pq_account_validation_v1` / `cpx_pq_account_validation_v1` with `solution_profile_ref` → `nicetry.fors_c.erc4337.v0_1`. Next: CPM-P3 `key_rotation_model`.
 
 ---
 
