@@ -57,8 +57,8 @@ func TestLoadFromEnvDefaults(t *testing.T) {
 	if cfg.PolicyInstancePaths[0] != "/app/policy/crypto_policy_instance_pq_account_validation_v1.json" {
 		t.Fatalf("unexpected default policy instance paths: %#v", cfg.PolicyInstancePaths)
 	}
-	if len(cfg.ProviderManifestPaths) != 0 {
-		t.Fatalf("expected empty default provider manifest paths, got %#v", cfg.ProviderManifestPaths)
+	if len(cfg.ProviderManifestPaths) != 1 || cfg.ProviderManifestPaths[0] != "/app/policy/provider_manifest_nicetry_v0_1.json" {
+		t.Fatalf("unexpected default provider manifest paths: %#v", cfg.ProviderManifestPaths)
 	}
 	if cfg.DiscoveryHTTPBaseURL != "" {
 		t.Fatalf("expected empty discovery HTTP base default, got %q", cfg.DiscoveryHTTPBaseURL)

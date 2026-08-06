@@ -9,6 +9,7 @@ import (
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/policy"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/provider"
 )
 
 var (
@@ -16,9 +17,10 @@ var (
 )
 
 type ReadStoreOptions struct {
-	CatalogPath   string
-	TemplatePaths []string
-	InstancePaths []string
+	CatalogPath           string
+	TemplatePaths         []string
+	InstancePaths         []string
+	ProviderManifestPaths []string
 }
 
 type ReadStore struct {
@@ -26,6 +28,7 @@ type ReadStore struct {
 	templates    []*policy.CryptoPolicyTemplate
 	instances    []*policy.CryptoPolicyInstance
 	templateByID map[string]*policy.CryptoPolicyTemplate
+	providers    *provider.Registry
 }
 
 func LoadReadStore(opts ReadStoreOptions) (*ReadStore, error) {
@@ -72,11 +75,20 @@ func LoadReadStore(opts ReadStoreOptions) (*ReadStore, error) {
 		instances = append(instances, inst)
 	}
 
+	var providers *provider.Registry
+	if len(opts.ProviderManifestPaths) > 0 {
+		providers, err = provider.LoadRegistryFromFiles(opts.ProviderManifestPaths)
+		if err != nil {
+			return nil, fmt.Errorf("load provider manifests: %w", err)
+		}
+	}
+
 	return &ReadStore{
 		catalog:      catalog,
 		templates:    templates,
 		instances:    instances,
 		templateByID: templateByID,
+		providers:    providers,
 	}, nil
 }
 
@@ -123,7 +135,9 @@ func registerReadRoutesForPrefix(mux *http.ServeMux, store *ReadStore, prefix st
 			})
 		}
 
-		decision, err := (policy.PolicyDecisionEvaluator{}).Evaluate(
+		decision, err := (policy.PolicyDecisionEvaluator{
+			CompatibilityEvaluator: policy.PolicyCompatibilityEvaluator{Providers: store.providers},
+		}).Evaluate(
 			observation,
 			&req.SelectionRequest,
 			candidates,

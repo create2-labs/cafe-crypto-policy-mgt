@@ -83,8 +83,8 @@ type CryptoPolicyInstance struct {
 }
 
 // SolutionProfileRef binds a catalogue instance to a Capability Provider solution
-// profile (ADR Capability Providers). Explore matching of provider constraints is
-// introduced in later PRs; this field is declarative identity for the catalogue.
+// profile (ADR Capability Providers). Explore resolves the ref via the provider
+// registry and applies ADR §7 hard checks (CPM-P4).
 type SolutionProfileRef struct {
 	ProviderID        string `json:"provider_id"`
 	SolutionProfileID string `json:"solution_profile_id"`

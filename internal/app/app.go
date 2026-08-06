@@ -21,9 +21,10 @@ import (
 // Run starts a minimal HTTP server used as bootstrap for CPM.
 func Run(cfg config.Config) error {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		CatalogPath:   cfg.PolicyCatalogPath,
-		TemplatePaths: cfg.PolicyTemplatePaths,
-		InstancePaths: cfg.PolicyInstancePaths,
+		CatalogPath:           cfg.PolicyCatalogPath,
+		TemplatePaths:         cfg.PolicyTemplatePaths,
+		InstancePaths:         cfg.PolicyInstancePaths,
+		ProviderManifestPaths: cfg.ProviderManifestPaths,
 	})
 	if err != nil {
 		return fmt.Errorf("load read store: %w", err)

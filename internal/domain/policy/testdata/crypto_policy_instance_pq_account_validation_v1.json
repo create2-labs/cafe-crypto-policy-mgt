@@ -13,7 +13,7 @@
     "name": "catalogue",
     "subject_type": "wallet",
     "subject_ids": ["wallet_abc"],
-    "chain_ids": [8453, 1, 8453],
+    "chain_ids": [11155111, 8453, 1],
     "require_multichain": true
   },
   "global_parameters": {

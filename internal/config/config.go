@@ -17,7 +17,7 @@ const (
 	defaultPolicyCatalogPath           = "/app/policy/policy_graph_catalog_valid.json"
 	defaultPolicyTemplatePaths         = "/app/policy/crypto_policy_template_pq_account_validation_v1.json"
 	defaultPolicyInstancePaths         = "/app/policy/crypto_policy_instance_pq_account_validation_v1.json"
-	defaultProviderManifestPaths       = "" // optional; not loaded by explore/persist in CPM-P1
+	defaultProviderManifestPaths       = "/app/policy/provider_manifest_nicetry_v0_1.json"
 	defaultCPMStore                    = "persistence"
 	defaultPersistenceTimeoutSec       = 15
 )
@@ -42,8 +42,8 @@ type Config struct {
 	PolicyCatalogPath   string
 	PolicyTemplatePaths []string
 	PolicyInstancePaths []string
-	// ProviderManifestPaths lists optional ProviderManifest JSON files (CPM_PROVIDER_MANIFEST_PATHS).
-	// Not consumed by explore/persist in CPM-P1.
+	// ProviderManifestPaths lists ProviderManifest JSON files (CPM_PROVIDER_MANIFEST_PATHS).
+	// Loaded into the explore registry for ADR §7 hard compatibility (CPM-P4).
 	ProviderManifestPaths []string
 	// WalletAuthDomain is embedded in CP-PERSIST canonical messages (§12); falls back to request Host.
 	WalletAuthDomain string

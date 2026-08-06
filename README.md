@@ -128,6 +128,8 @@ Golden JSON: [`internal/domain/walletobserved/testdata/discovery_wallet_observed
 
 `internal/domain/policy/compatibility_result.go` defines `PolicyCompatibilityEvaluator`, which classifies a single validated `CryptoPolicyInstance` against a `walletobserved.Payload` and `PolicySelectionRequest`. It returns `PolicyCompatibilityResult` with one of: `compatible_and_deployable`, `compatible_but_not_deployable` (e.g. empty instance scope `chain_ids`), or `incompatible`, with structured `AssessmentFinding` entries. Template-backed instances that omit `node_path` must pass the matching `CryptoPolicyTemplate` so the node path can be resolved.
 
+When `CPM_PROVIDER_MANIFEST_PATHS` is set (default: Nicetry fixture), explore resolves each instance `solution_profile_ref` and applies ADR §7 **hard** provider checks before graph rules. Hard fail → `rejected_candidate` with stable codes such as `incompatible.provider.chain`, `incompatible.provider.rotation`, `incompatible.provider.continuity`, `incompatible.provider.new_wallet`, `incompatible.provider.wallet_type`. Soft findings (bundler / local signer) are **not** emitted yet (CPM-P5).
+
 ## Ranking and policy decision output 
 
 `internal/domain/policy/policy_decision.go` defines `PolicyDecisionEvaluator`, `PolicyDecision`, `RankedPolicy`, and `RejectedPolicy`. It applies deterministic first-version ranking over compatible candidates:
@@ -227,7 +229,7 @@ Environment variables:
 - `CPM_POLICY_CATALOG_PATH` (default: `/app/policy/policy_graph_catalog_valid.json`)
 - `CPM_POLICY_TEMPLATE_PATHS` (comma-separated, default: `/app/policy/crypto_policy_template_pq_account_validation_v1.json`)
 - `CPM_POLICY_INSTANCE_PATHS` (comma-separated, default: `/app/policy/crypto_policy_instance_pq_account_validation_v1.json`)
-- `CPM_PROVIDER_MANIFEST_PATHS` (comma-separated, default empty): optional Capability Provider manifests (`ProviderManifest` v0.1). Parsed at config load; **not** consumed by explore/persist yet (see ADR Capability Providers → CPM-P6b for full narrative). Fixture: `internal/domain/provider/testdata/provider_manifest_nicetry_v0_1.json`. Catalogue instance `cpx_pq_account_validation_v1` carries `solution_profile_ref` → `nicetry.fors_c.erc4337.v0_1`.
+- `CPM_PROVIDER_MANIFEST_PATHS` (comma-separated, default: `/app/policy/provider_manifest_nicetry_v0_1.json`): Capability Provider manifests (`ProviderManifest` v0.1). Loaded into the explore registry for ADR §7 hard compatibility (CPM-P4). Fixture source: `internal/domain/provider/testdata/provider_manifest_nicetry_v0_1.json`. Catalogue instance `cpx_pq_account_validation_v1` carries `solution_profile_ref` → `nicetry.fors_c.erc4337.v0_1`. Soft findings / persist snapshot: later PRs (P5/P6).
 
 Endpoints:
 
@@ -525,6 +527,7 @@ export CPM_AUTH_REQUIRED=false
 export CPM_POLICY_CATALOG_PATH=internal/domain/policy/testdata/policy_graph_catalog_valid.json
 export CPM_POLICY_TEMPLATE_PATHS=internal/domain/policy/testdata/crypto_policy_template_pq_account_validation_v1.json
 export CPM_POLICY_INSTANCE_PATHS=internal/domain/policy/testdata/crypto_policy_instance_pq_account_validation_v1.json
+export CPM_PROVIDER_MANIFEST_PATHS=internal/domain/provider/testdata/provider_manifest_nicetry_v0_1.json
 go run ./cmd/cafe-cpm
 ```
 
