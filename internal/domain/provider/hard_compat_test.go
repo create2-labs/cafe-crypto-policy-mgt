@@ -46,6 +46,7 @@ func TestEvaluateHardCompatibility_table(t *testing.T) {
 
 	baseObs := HardObservation{AccountKind: "eoa", ChainIDs: []int64{11155111}}
 	baseReq := HardSelectionRequest{
+		RequiredPosture:           "hybrid",
 		TargetChainIDs:            []int64{11155111},
 		AllowNewWallet:            true,
 		AddressContinuityRequired: false,
@@ -63,6 +64,7 @@ func TestEvaluateHardCompatibility_table(t *testing.T) {
 			name: "mainnet_planned_reject",
 			obs:  HardObservation{AccountKind: "eoa", ChainIDs: []int64{1}},
 			req: HardSelectionRequest{
+				RequiredPosture:  "hybrid",
 				TargetChainIDs:   []int64{1},
 				AllowNewWallet:   true,
 				KeyRotationModel: string(KeyRotationPerUserOp),
@@ -73,6 +75,7 @@ func TestEvaluateHardCompatibility_table(t *testing.T) {
 			name: "continuity_reject",
 			obs:  baseObs,
 			req: HardSelectionRequest{
+				RequiredPosture:           "hybrid",
 				TargetChainIDs:            []int64{11155111},
 				AllowNewWallet:            true,
 				AddressContinuityRequired: true,
@@ -84,6 +87,7 @@ func TestEvaluateHardCompatibility_table(t *testing.T) {
 			name: "rotation_none_reject",
 			obs:  baseObs,
 			req: HardSelectionRequest{
+				RequiredPosture:  "hybrid",
 				TargetChainIDs:   []int64{11155111},
 				AllowNewWallet:   true,
 				KeyRotationModel: string(KeyRotationNone),
@@ -94,6 +98,7 @@ func TestEvaluateHardCompatibility_table(t *testing.T) {
 			name: "new_wallet_disallowed_reject",
 			obs:  baseObs,
 			req: HardSelectionRequest{
+				RequiredPosture:  "hybrid",
 				TargetChainIDs:   []int64{11155111},
 				AllowNewWallet:   false,
 				KeyRotationModel: string(KeyRotationPerUserOp),
@@ -110,11 +115,23 @@ func TestEvaluateHardCompatibility_table(t *testing.T) {
 			name: "unknown_chain_reject",
 			obs:  HardObservation{AccountKind: "eoa", ChainIDs: []int64{8453}},
 			req: HardSelectionRequest{
+				RequiredPosture:  "hybrid",
 				TargetChainIDs:   []int64{8453},
 				AllowNewWallet:   true,
 				KeyRotationModel: string(KeyRotationPerUserOp),
 			},
 			wantCode: FindingCodeChain,
+		},
+		{
+			name: "posture_mismatch_reject",
+			obs:  baseObs,
+			req: HardSelectionRequest{
+				RequiredPosture:  "full_pq",
+				TargetChainIDs:   []int64{11155111},
+				AllowNewWallet:   true,
+				KeyRotationModel: string(KeyRotationPerUserOp),
+			},
+			wantCode: FindingCodePosture,
 		},
 	}
 

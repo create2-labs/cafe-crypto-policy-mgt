@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/provider"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/vocabulary"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/walletobserved"
 )
@@ -25,26 +26,38 @@ type PolicyDecisionCandidate struct {
 
 // RankedPolicy stores one compatible candidate after deterministic ranking.
 type RankedPolicy struct {
-	PolicyID                 string              `json:"policy_id"`
-	CryptoPolicyInstanceID   string              `json:"crypto_policy_instance_id"`
-	TemplateID               string              `json:"template_id,omitempty"`
-	CompatibilityStatus      AssessmentStatus    `json:"compatibility_status"`
-	CompatibilityFindings    []AssessmentFinding `json:"compatibility_findings,omitempty"`
-	TargetPostureAlignment   int                 `json:"target_posture_alignment"`
-	MaturityScore            int                 `json:"maturity_score"`
-	ChainCoverageScore       int                 `json:"chain_coverage_score"`
-	AddressContinuityMatched bool                `json:"address_continuity_matched"`
-	AvoidsNewWalletCreation  bool                `json:"avoids_new_wallet_creation"`
-	RankingReasons           []string            `json:"ranking_reasons,omitempty"`
+	CandidateID              string                      `json:"candidate_id"`
+	PolicyID                 string                      `json:"policy_id"`
+	CryptoPolicyInstanceID   string                      `json:"crypto_policy_instance_id"`
+	TemplateID               string                      `json:"template_id,omitempty"`
+	RequiredPosture          vocabulary.CurrentPQPosture `json:"required_posture,omitempty"`
+	ResultingPosture         vocabulary.CurrentPQPosture `json:"resulting_posture,omitempty"`
+	SolutionProfileRef       SolutionProfileRef          `json:"solution_profile_ref,omitempty"`
+	Maturity                 string                      `json:"maturity,omitempty"`
+	ClaimStatus              string                      `json:"claim_status,omitempty"`
+	CompatibilityStatus      AssessmentStatus            `json:"compatibility_status"`
+	CompatibilityFindings    []AssessmentFinding         `json:"compatibility_findings,omitempty"`
+	TargetPostureAlignment   int                         `json:"target_posture_alignment"`
+	MaturityScore            int                         `json:"maturity_score"`
+	ChainCoverageScore       int                         `json:"chain_coverage_score"`
+	AddressContinuityMatched bool                        `json:"address_continuity_matched"`
+	AvoidsNewWalletCreation  bool                        `json:"avoids_new_wallet_creation"`
+	RankingReasons           []string                    `json:"ranking_reasons,omitempty"`
 }
 
 // RejectedPolicy stores one incompatible candidate and explainable reasons.
 type RejectedPolicy struct {
-	PolicyID               string              `json:"policy_id"`
-	CryptoPolicyInstanceID string              `json:"crypto_policy_instance_id"`
-	TemplateID             string              `json:"template_id,omitempty"`
-	CompatibilityStatus    AssessmentStatus    `json:"compatibility_status"`
-	RejectionReasons       []AssessmentFinding `json:"rejection_reasons,omitempty"`
+	CandidateID            string                      `json:"candidate_id"`
+	PolicyID               string                      `json:"policy_id"`
+	CryptoPolicyInstanceID string                      `json:"crypto_policy_instance_id"`
+	TemplateID             string                      `json:"template_id,omitempty"`
+	RequiredPosture        vocabulary.CurrentPQPosture `json:"required_posture,omitempty"`
+	ResultingPosture       vocabulary.CurrentPQPosture `json:"resulting_posture,omitempty"`
+	SolutionProfileRef     SolutionProfileRef          `json:"solution_profile_ref,omitempty"`
+	Maturity               string                      `json:"maturity,omitempty"`
+	ClaimStatus            string                      `json:"claim_status,omitempty"`
+	CompatibilityStatus    AssessmentStatus            `json:"compatibility_status"`
+	RejectionReasons       []AssessmentFinding         `json:"rejection_reasons,omitempty"`
 }
 
 // ObservedWalletSummary is a compact decision-facing projection of wallet input.
@@ -125,18 +138,25 @@ func (e PolicyDecisionEvaluator) Evaluate(
 		}
 
 		policyID := deriveStablePolicyID(candidate.Instance)
+		profileView := resolveProfileView(e.CompatibilityEvaluator.Providers, candidate)
 		if compatibility.Status == AssessmentStatusIncompatible {
 			decision.RejectedCandidates = append(decision.RejectedCandidates, RejectedPolicy{
+				CandidateID:            candidate.Instance.ID,
 				PolicyID:               policyID,
 				CryptoPolicyInstanceID: candidate.Instance.ID,
 				TemplateID:             candidate.Instance.TemplateID,
+				RequiredPosture:        profileView.RequiredPosture,
+				ResultingPosture:       profileView.ResultingPosture,
+				SolutionProfileRef:     candidate.Instance.SolutionProfileRef,
+				Maturity:               profileView.Maturity,
+				ClaimStatus:            profileView.ClaimStatus,
 				CompatibilityStatus:    compatibility.Status,
 				RejectionReasons:       compatibility.Findings,
 			})
 			continue
 		}
 
-		ranked := buildRankedCandidate(policyID, observation, req, candidate, compatibility, catalog)
+		ranked := buildRankedCandidate(policyID, observation, req, candidate, compatibility, catalog, profileView)
 		decision.RankedCandidates = append(decision.RankedCandidates, ranked)
 	}
 
@@ -163,6 +183,7 @@ func buildRankedCandidate(
 	candidate PolicyDecisionCandidate,
 	compatibility PolicyCompatibilityResult,
 	catalog *PolicyGraphCatalog,
+	profileView candidateProfileView,
 ) RankedPolicy {
 	path, err := effectiveNodePath(candidate.Instance, candidate.Template, catalog)
 	if err != nil {
@@ -171,9 +192,15 @@ func buildRankedCandidate(
 	}
 
 	r := RankedPolicy{
+		CandidateID:              candidate.Instance.ID,
 		PolicyID:                 policyID,
 		CryptoPolicyInstanceID:   candidate.Instance.ID,
 		TemplateID:               candidate.Instance.TemplateID,
+		RequiredPosture:          profileView.RequiredPosture,
+		ResultingPosture:         profileView.ResultingPosture,
+		SolutionProfileRef:       candidate.Instance.SolutionProfileRef,
+		Maturity:                 profileView.Maturity,
+		ClaimStatus:              profileView.ClaimStatus,
 		CompatibilityStatus:      compatibility.Status,
 		CompatibilityFindings:    compatibility.Findings,
 		TargetPostureAlignment:   computeTargetPostureAlignment(req, candidate.Instance),
@@ -194,6 +221,38 @@ func buildRankedCandidate(
 	}
 
 	return r
+}
+
+type candidateProfileView struct {
+	RequiredPosture  vocabulary.CurrentPQPosture
+	ResultingPosture vocabulary.CurrentPQPosture
+	Maturity         string
+	ClaimStatus      string
+}
+
+func resolveProfileView(reg *provider.Registry, candidate PolicyDecisionCandidate) candidateProfileView {
+	view := candidateProfileView{
+		RequiredPosture: candidate.Instance.GlobalParams.RequiredPosture,
+	}
+	if candidate.Template != nil && candidate.Template.RequiredPosture != "" {
+		view.RequiredPosture = candidate.Template.RequiredPosture
+	}
+	if reg == nil || candidate.Instance == nil {
+		return view
+	}
+	ref := candidate.Instance.SolutionProfileRef
+	resolved, ok := reg.Lookup(provider.ProfileRef{
+		ProviderID:        ref.ProviderID,
+		SolutionProfileID: ref.SolutionProfileID,
+		ManifestVersion:   ref.ManifestVersion,
+	})
+	if !ok {
+		return view
+	}
+	view.ResultingPosture = vocabulary.CurrentPQPosture(resolved.Profile.ResultingPosture)
+	view.Maturity = string(resolved.Profile.Maturity)
+	view.ClaimStatus = string(resolved.Profile.ClaimStatus)
+	return view
 }
 
 func compareRanked(a, b RankedPolicy) int {
@@ -234,7 +293,7 @@ func compareRanked(a, b RankedPolicy) int {
 }
 
 func computeTargetPostureAlignment(req *PolicySelectionRequest, inst *CryptoPolicyInstance) int {
-	return postureRank(inst.GlobalParams.TargetPosture) - postureRank(req.TargetPosture)
+	return postureRank(inst.GlobalParams.RequiredPosture) - postureRank(req.TargetPosture)
 }
 
 func computeMaturityScore(path []string, inst *CryptoPolicyInstance, catalog *PolicyGraphCatalog) int {

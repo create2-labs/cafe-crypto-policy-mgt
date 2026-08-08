@@ -74,7 +74,7 @@ func (e PolicyCompatibilityEvaluator) Evaluate(
 	if err != nil {
 		return PolicyCompatibilityResult{}, err
 	}
-	return e.evaluateWithPath(observation, req, inst, catalog, path), nil
+	return e.evaluateWithPath(observation, req, inst, catalog, tpl, path), nil
 }
 
 func effectiveNodePath(
@@ -100,15 +100,16 @@ func effectiveNodePath(
 	if tpl.CatalogVersion != inst.CatalogVersion {
 		return nil, fmt.Errorf("%w: instance catalog %q template catalog %q", ErrCompatibilityTemplateMismatch, inst.CatalogVersion, tpl.CatalogVersion)
 	}
-	if catalog != nil && len(tpl.NodePath) > 0 {
+	// CPM-P4b: empty node_path is valid; graph path is non-normative.
+	if len(tpl.NodePath) == 0 {
+		return nil, nil
+	}
+	if catalog != nil {
 		for _, id := range tpl.NodePath {
 			if _, ok := catalog.Nodes[id]; !ok {
 				return nil, fmt.Errorf("template node_path: %w: %q", ErrInstanceNodeUnknown, id)
 			}
 		}
-	}
-	if len(tpl.NodePath) == 0 {
-		return nil, ErrCompatibilityNodePathRequired
 	}
 	return tpl.NodePath, nil
 }
@@ -135,6 +136,7 @@ func (e PolicyCompatibilityEvaluator) evaluateWithPath(
 	req *PolicySelectionRequest,
 	inst *CryptoPolicyInstance,
 	catalog *PolicyGraphCatalog,
+	tpl *CryptoPolicyTemplate,
 	nodePath []string,
 ) PolicyCompatibilityResult {
 	var findings []AssessmentFinding
@@ -145,7 +147,12 @@ func (e PolicyCompatibilityEvaluator) evaluateWithPath(
 		findings = append(findings, AssessmentFinding{Code: code, Message: msg, Severity: sev, Field: field})
 	}
 
-	// ADR §7 provider hard checks (before graph scoring). Soft findings are CPM-P5.
+	requiredPosture := req.TargetPosture
+	if tpl != nil && tpl.RequiredPosture != "" {
+		requiredPosture = tpl.RequiredPosture
+	}
+
+	// ADR §7 provider hard checks (before legacy graph scoring). Soft findings are CPM-P5.
 	if e.Providers != nil && inst.SolutionProfileRef.ProviderID != "" {
 		resolved, ok := e.Providers.Lookup(provider.ProfileRef{
 			ProviderID:        inst.SolutionProfileRef.ProviderID,
@@ -163,6 +170,7 @@ func (e PolicyCompatibilityEvaluator) evaluateWithPath(
 		hard := provider.EvaluateHardCompatibility(
 			provider.HardObservation{AccountKind: observation.AccountKind, ChainIDs: observation.ChainIDs},
 			provider.HardSelectionRequest{
+				RequiredPosture:           string(requiredPosture),
 				TargetChainIDs:            req.TargetChainIDs,
 				AllowNewWallet:            req.AllowNewWallet,
 				AddressContinuityRequired: req.AddressContinuityRequired,
@@ -178,13 +186,13 @@ func (e PolicyCompatibilityEvaluator) evaluateWithPath(
 		}
 	}
 
-	// Policy must reach at least the posture requested for this assessment.
-	if rp, ip := postureRank(req.TargetPosture), postureRank(inst.GlobalParams.TargetPosture); ip < rp {
-		add("incompatible.target_posture", "instance target_posture does not satisfy selection target_posture", AssessmentFindingSeverityBlocking)
+	// Instance required_posture must satisfy selection.
+	if rp, ip := postureRank(req.TargetPosture), postureRank(inst.GlobalParams.RequiredPosture); ip < rp {
+		add("incompatible.required_posture", "instance required_posture does not satisfy selection target_posture", AssessmentFindingSeverityBlocking)
 		return PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}
 	}
-	if inst.GlobalParams.TargetPosture == vocabulary.PQPostureUnknown {
-		add("incompatible.target_posture", "instance target_posture is unknown", AssessmentFindingSeverityBlocking)
+	if inst.GlobalParams.RequiredPosture == vocabulary.PQPostureUnknown {
+		add("incompatible.required_posture", "instance required_posture is unknown", AssessmentFindingSeverityBlocking)
 		return PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}
 	}
 
@@ -235,12 +243,12 @@ func (e PolicyCompatibilityEvaluator) evaluateWithPath(
 		}
 	}
 
-	// Target (last) node must advertise the instance global target posture when constrained.
+	// Legacy path_posture only when a non-empty node_path remains.
 	if len(nodePath) > 0 {
 		lastID := nodePath[len(nodePath)-1]
 		last := catalog.Nodes[lastID]
-		if len(last.SupportedPostures) > 0 && !slices.Contains(last.SupportedPostures, inst.GlobalParams.TargetPosture) {
-			add("incompatible.path_posture", "last path node does not support instance target_posture", AssessmentFindingSeverityBlocking)
+		if len(last.SupportedPostures) > 0 && !slices.Contains(last.SupportedPostures, inst.GlobalParams.RequiredPosture) {
+			add("incompatible.path_posture", "last path node does not support instance required_posture", AssessmentFindingSeverityBlocking)
 			return PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}
 		}
 	}

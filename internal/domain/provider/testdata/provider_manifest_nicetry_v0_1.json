@@ -11,11 +11,11 @@
       "display_name": "NiceTry FORS+C ERC-4337 Smart Account",
       "maturity": "research",
       "claim_status": "declared",
+      "resulting_posture": "hybrid",
       "input_requirements": { "wallet_types": ["EOA"], "requires_wallet_control_proof": true },
       "signature": {
         "scheme": "FORS+C",
         "family": "hash_based",
-        "account_validation_posture": "pq_hash_based",
         "key_rotation_model": "per_userop"
       },
       "account_model": {

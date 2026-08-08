@@ -38,6 +38,9 @@ func TestLoadCryptoPolicyInstanceFromFile_Valid(t *testing.T) {
 	if instance.SolutionProfileRef.SolutionProfileID != "nicetry.fors_c.erc4337.v0_1" {
 		t.Fatalf("solution_profile_ref.solution_profile_id: got %q", instance.SolutionProfileRef.SolutionProfileID)
 	}
+	if instance.GlobalParams.RequiredPosture != vocabulary.PQPostureHybrid {
+		t.Fatalf("global_parameters.required_posture: got %q", instance.GlobalParams.RequiredPosture)
+	}
 	if !reflect.DeepEqual(instance.Governance.Tags, []string{"pq_account_validation", "nicetry"}) {
 		t.Fatalf("governance.tags: %#v", instance.Governance.Tags)
 	}
@@ -74,7 +77,7 @@ func TestCryptoPolicyInstance_Validate_ReferenceRules(t *testing.T) {
 				Name: "prod",
 			},
 			GlobalParams: GlobalPolicyParameters{
-				TargetPosture:        vocabulary.PQPostureHybrid,
+				RequiredPosture:        vocabulary.PQPostureHybrid,
 				MinimumMaturity:      1,
 				ApprovalMode:         ApprovalModeManual,
 				KeyRotationModel:     KeyRotationNone,
@@ -141,7 +144,7 @@ func TestCryptoPolicyInstance_Validate_NodeSchemaAndTransitions(t *testing.T) {
 				ChainIDs: []int64{8453, 1},
 			},
 			GlobalParams: GlobalPolicyParameters{
-				TargetPosture:        vocabulary.PQPostureHybrid,
+				RequiredPosture:        vocabulary.PQPostureHybrid,
 				MinimumMaturity:      1,
 				ApprovalMode:         ApprovalModeManual,
 				KeyRotationModel:     KeyRotationNone,
@@ -225,7 +228,7 @@ func TestCryptoPolicyInstance_Validate_SolutionProfileRef(t *testing.T) {
 		TemplateID:     "tpl_pq_account_validation_v1",
 		Scope:          PolicyScope{Name: "catalogue"},
 		GlobalParams: GlobalPolicyParameters{
-			TargetPosture:    vocabulary.PQPostureHybrid,
+			RequiredPosture:    vocabulary.PQPostureHybrid,
 			MinimumMaturity:  1,
 			ApprovalMode:     ApprovalModeManual,
 			KeyRotationModel: KeyRotationNone,

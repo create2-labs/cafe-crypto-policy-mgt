@@ -24,6 +24,12 @@ func TestLoadProviderManifestFromFile_NicetryFixture(t *testing.T) {
 	if p.ClaimStatus != ClaimDeclared || p.Signature.KeyRotationModel != KeyRotationPerUserOp {
 		t.Fatalf("claim=%q rotation=%q", p.ClaimStatus, p.Signature.KeyRotationModel)
 	}
+	if p.ResultingPosture != "hybrid" {
+		t.Fatalf("resulting_posture: got %q", p.ResultingPosture)
+	}
+	if p.Signature.Scheme != "FORS+C" || p.Signature.Family != "hash_based" {
+		t.Fatalf("signature: scheme=%q family=%q", p.Signature.Scheme, p.Signature.Family)
+	}
 	if len(p.References) != 2 {
 		t.Fatalf("references len: %d", len(p.References))
 	}
@@ -47,10 +53,10 @@ func validBase() ProviderManifest {
 			DisplayName:       "NiceTry FORS+C ERC-4337 Smart Account",
 			Maturity:          MaturityResearch,
 			ClaimStatus:       ClaimDeclared,
+			ResultingPosture:  "hybrid",
 			InputRequirements: InputRequirements{WalletTypes: []string{"EOA"}},
 			Signature: SignatureProfile{
-				Scheme: "FORS+C", Family: "hash_based",
-				AccountValidationPosture: "pq_hash_based", KeyRotationModel: KeyRotationPerUserOp,
+				Scheme: "FORS+C", Family: "hash_based", KeyRotationModel: KeyRotationPerUserOp,
 			},
 			AccountModel: AccountModel{Standard: "ERC-4337", ExecutionModel: "erc4337_bundler"},
 			ChainSupport: []ChainSupport{{ChainID: 11155111, Network: "sepolia", Status: ChainStatusTestnetSupported}},
@@ -69,6 +75,8 @@ func TestProviderManifest_RejectIncompleteAndUnknownClaim(t *testing.T) {
 		{"no profiles", func(m *ProviderManifest) { m.SolutionProfiles = nil }, ErrInvalidManifest},
 		{"bad schema", func(m *ProviderManifest) { m.SchemaVersion = "v9" }, ErrInvalidManifest},
 		{"bad rotation", func(m *ProviderManifest) { m.SolutionProfiles[0].Signature.KeyRotationModel = "weekly" }, ErrInvalidManifest},
+		{"missing resulting_posture", func(m *ProviderManifest) { m.SolutionProfiles[0].ResultingPosture = "" }, ErrInvalidManifest},
+		{"bad resulting_posture", func(m *ProviderManifest) { m.SolutionProfiles[0].ResultingPosture = "pq_hash_based" }, ErrInvalidManifest},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

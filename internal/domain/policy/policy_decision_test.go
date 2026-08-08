@@ -29,7 +29,7 @@ func TestPolicyDecisionEvaluator_SelectsBestCompatibleAndKeepsRejected(t *testin
 
 	rejected := shallowCopyInstance(base)
 	rejected.ID = "cp003"
-	rejected.GlobalParams.TargetPosture = vocabulary.PQPostureClassicalOnly
+	rejected.GlobalParams.RequiredPosture = vocabulary.PQPostureClassicalOnly
 	if err := rejected.NormalizeAndValidate(catalog); err != nil {
 		t.Fatalf("rejected instance: %v", err)
 	}
@@ -110,14 +110,14 @@ func TestPolicyDecisionEvaluator_PrefersBetterTargetPostureAlignment(t *testing.
 
 	exact := shallowCopyInstance(base)
 	exact.ID = "cp100"
-	exact.GlobalParams.TargetPosture = vocabulary.PQPostureHybrid
+	exact.GlobalParams.RequiredPosture = vocabulary.PQPostureHybrid
 	if err := exact.NormalizeAndValidate(catalog); err != nil {
 		t.Fatalf("exact instance: %v", err)
 	}
 
 	over := shallowCopyInstance(base)
 	over.ID = "cp101"
-	over.GlobalParams.TargetPosture = vocabulary.PQPostureFullPQ
+	over.GlobalParams.RequiredPosture = vocabulary.PQPostureFullPQ
 	if err := over.NormalizeAndValidate(catalog); err != nil {
 		t.Fatalf("over instance: %v", err)
 	}

@@ -20,7 +20,7 @@ func TestDominantExploreRejectionCode_prefersChainScope(t *testing.T) {
 	rejected := []policy.RejectedPolicy{
 		{
 			RejectionReasons: []policy.AssessmentFinding{
-				{Code: "incompatible.target_posture", Severity: policy.AssessmentFindingSeverityBlocking},
+				{Code: "incompatible.required_posture", Severity: policy.AssessmentFindingSeverityBlocking},
 			},
 		},
 		{
@@ -82,11 +82,11 @@ func TestBucketMissingChainCount_nonChainScopeDominantIsUnknown(t *testing.T) {
 		[]int64{1, 2, 5},
 		[]policy.RejectedPolicy{{
 			RejectionReasons: []policy.AssessmentFinding{
-				{Code: "incompatible.target_posture", Severity: policy.AssessmentFindingSeverityBlocking},
+				{Code: "incompatible.required_posture", Severity: policy.AssessmentFindingSeverityBlocking},
 			},
 		}},
 		map[string][]int64{"inst": {1, 2, 5}},
-		"incompatible.target_posture",
+		"incompatible.required_posture",
 	)
 	if got != exploreLabelUnknown {
 		t.Fatalf("missing_chain_count bucket: got %q want unknown", got)

@@ -769,13 +769,141 @@ components:
       required: [decision]
       properties:
         decision:
+          $ref: "#/components/schemas/PolicyDecision"
+
+    PolicyDecision:
+      type: object
+      description: |
+        Explore ranking output without normative policy graph topology
+        (no nodeInstances / graphEdges / edgeIds). Candidates are structured
+        around required_posture + solution_profile_ref + resulting_posture.
+      properties:
+        observed_wallet_summary:
           type: object
           additionalProperties: true
+        request_summary:
+          type: object
+          additionalProperties: true
+        selected_policy_id:
+          type: string
+        selected_policy_instance_id:
+          type: string
+        ranked_candidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/RankedPolicyCandidate"
+        rejected_candidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/RejectedPolicyCandidate"
+        warnings:
+          type: array
+          items:
+            type: string
+
+    RankedPolicyCandidate:
+      type: object
+      required: [candidate_id, crypto_policy_instance_id, compatibility_status]
+      properties:
+        candidate_id:
+          type: string
+        policy_id:
+          type: string
+        crypto_policy_instance_id:
+          type: string
+        template_id:
+          type: string
+        required_posture:
+          type: string
+          enum: [classical_only, hybrid, full_pq]
+        resulting_posture:
+          type: string
+          enum: [classical_only, hybrid, full_pq]
+        solution_profile_ref:
+          $ref: "#/components/schemas/SolutionProfileRef"
+        maturity:
+          type: string
+          enum: [research, testnet, production]
+          description: Provider solution-profile maturity (declaration, not audited proof).
+        claim_status:
+          type: string
+          enum: [declared, cafe_reviewed, externally_audited, executed_observed]
+          description: Provider claim level; `declared` is never audited/executed proof.
+        compatibility_status:
+          type: string
+        compatibility_findings:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        target_posture_alignment:
+          type: integer
+        maturity_score:
+          type: integer
+        chain_coverage_score:
+          type: integer
+        address_continuity_matched:
+          type: boolean
+        avoids_new_wallet_creation:
+          type: boolean
+        ranking_reasons:
+          type: array
+          items:
+            type: string
+
+    RejectedPolicyCandidate:
+      type: object
+      required: [candidate_id, crypto_policy_instance_id, compatibility_status]
+      properties:
+        candidate_id:
+          type: string
+        policy_id:
+          type: string
+        crypto_policy_instance_id:
+          type: string
+        template_id:
+          type: string
+        required_posture:
+          type: string
+          enum: [classical_only, hybrid, full_pq]
+        resulting_posture:
+          type: string
+          enum: [classical_only, hybrid, full_pq]
+        solution_profile_ref:
+          $ref: "#/components/schemas/SolutionProfileRef"
+        maturity:
+          type: string
+          enum: [research, testnet, production]
+        claim_status:
+          type: string
+          enum: [declared, cafe_reviewed, externally_audited, executed_observed]
+        compatibility_status:
+          type: string
+        rejection_reasons:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    SolutionProfileRef:
+      type: object
+      required: [provider_id, solution_profile_id, manifest_version]
+      properties:
+        provider_id:
+          type: string
+        solution_profile_id:
+          type: string
+        manifest_version:
+          type: string
+        verification_date:
+          type: string
 
     PolicySelectionRequest:
       type: object
       description: |
         Stable selection contract driving explore and assessment (ADR §7.1).
+        `target_posture` is the wire name for the CAFE required posture
+        (aligned with template `required_posture` / solution `resulting_posture`).
         Breaking vs pre-provider wire: `key_rotation_model` replaces `key_rotation_required` bool.
       required:
         - target_posture
@@ -784,6 +912,7 @@ components:
       properties:
         target_posture:
           type: string
+          description: Required CAFE posture for this selection (classical_only|hybrid|full_pq|unknown).
           enum: [classical_only, hybrid, full_pq, unknown]
         target_chain_ids:
           type: array

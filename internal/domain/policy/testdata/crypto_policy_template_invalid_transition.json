@@ -3,7 +3,7 @@
   "name": "Invalid transition template",
   "version": "v0.1",
   "catalog_version": "v0.1",
-  "target_posture": "hybrid",
+  "required_posture": "hybrid",
   "node_path": [
     "NODE_SIG_EIP7932",
     "NODE_EOA_ENTRY"

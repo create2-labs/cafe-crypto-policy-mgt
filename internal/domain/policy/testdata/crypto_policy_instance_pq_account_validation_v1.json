@@ -17,7 +17,7 @@
     "require_multichain": true
   },
   "global_parameters": {
-    "target_posture": "hybrid",
+    "required_posture": "hybrid",
     "minimum_maturity": 0,
     "approval_mode": "",
     "allow_research": true,
