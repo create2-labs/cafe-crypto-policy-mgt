@@ -23,7 +23,7 @@ func TestLoadCryptoPolicyInstanceFromFile_Valid(t *testing.T) {
 	if instance.ID != "cpx_pq_account_validation_v1" {
 		t.Fatalf("id: got %q", instance.ID)
 	}
-	if !reflect.DeepEqual(instance.Scope.ChainIDs, []int64{1, 8453}) {
+	if !reflect.DeepEqual(instance.Scope.ChainIDs, []int64{1, 8453, 11155111}) {
 		t.Fatalf("scope.chain_ids: %#v", instance.Scope.ChainIDs)
 	}
 	if instance.GlobalParams.MinimumMaturity != 1 {

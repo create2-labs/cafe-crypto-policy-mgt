@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/provider"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/vocabulary"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/walletobserved"
 )
@@ -33,12 +34,16 @@ type PolicyCompatibilityResult struct {
 
 // PolicyCompatibilityEvaluator evaluates a single policy instance against a
 // normalized wallet observation and a selection request.
-type PolicyCompatibilityEvaluator struct{}
+type PolicyCompatibilityEvaluator struct {
+	// Providers, when non-nil, resolves instance solution_profile_ref for ADR §7 hard checks.
+	// When nil, provider hard checks are skipped (graph/instance rules only).
+	Providers *provider.Registry
+}
 
 // Evaluate runs deterministic compatibility rules from the CPM v0.7 workstream.
 // tpl must be provided when the instance only references template_id and does
 // not materialize node_path, so the effective path can be resolved.
-func (PolicyCompatibilityEvaluator) Evaluate(
+func (e PolicyCompatibilityEvaluator) Evaluate(
 	observation walletobserved.Payload,
 	req *PolicySelectionRequest,
 	inst *CryptoPolicyInstance,
@@ -69,7 +74,7 @@ func (PolicyCompatibilityEvaluator) Evaluate(
 	if err != nil {
 		return PolicyCompatibilityResult{}, err
 	}
-	return evaluateWithPath(observation, req, inst, catalog, path), nil
+	return e.evaluateWithPath(observation, req, inst, catalog, path), nil
 }
 
 func effectiveNodePath(
@@ -125,7 +130,7 @@ func postureRank(p vocabulary.CurrentPQPosture) int {
 	}
 }
 
-func evaluateWithPath(
+func (e PolicyCompatibilityEvaluator) evaluateWithPath(
 	observation walletobserved.Payload,
 	req *PolicySelectionRequest,
 	inst *CryptoPolicyInstance,
@@ -135,6 +140,42 @@ func evaluateWithPath(
 	var findings []AssessmentFinding
 	add := func(code, msg string, sev AssessmentFindingSeverity) {
 		findings = append(findings, AssessmentFinding{Code: code, Message: msg, Severity: sev})
+	}
+	addField := func(code, msg, field string, sev AssessmentFindingSeverity) {
+		findings = append(findings, AssessmentFinding{Code: code, Message: msg, Severity: sev, Field: field})
+	}
+
+	// ADR §7 provider hard checks (before graph scoring). Soft findings are CPM-P5.
+	if e.Providers != nil && inst.SolutionProfileRef.ProviderID != "" {
+		resolved, ok := e.Providers.Lookup(provider.ProfileRef{
+			ProviderID:        inst.SolutionProfileRef.ProviderID,
+			SolutionProfileID: inst.SolutionProfileRef.SolutionProfileID,
+			ManifestVersion:   inst.SolutionProfileRef.ManifestVersion,
+		})
+		if !ok {
+			addField(provider.FindingCodeUnresolved,
+				fmt.Sprintf("solution_profile_ref %s/%s (manifest_version %q) not found in provider registry",
+					inst.SolutionProfileRef.ProviderID, inst.SolutionProfileRef.SolutionProfileID, inst.SolutionProfileRef.ManifestVersion),
+				"solution_profile_ref",
+				AssessmentFindingSeverityBlocking)
+			return PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}
+		}
+		hard := provider.EvaluateHardCompatibility(
+			provider.HardObservation{AccountKind: observation.AccountKind, ChainIDs: observation.ChainIDs},
+			provider.HardSelectionRequest{
+				TargetChainIDs:            req.TargetChainIDs,
+				AllowNewWallet:            req.AllowNewWallet,
+				AddressContinuityRequired: req.AddressContinuityRequired,
+				KeyRotationModel:          string(req.KeyRotationModel),
+			},
+			&resolved.Profile,
+		)
+		if len(hard) > 0 {
+			for _, h := range hard {
+				addField(h.Code, h.Message, h.Field, AssessmentFindingSeverityBlocking)
+			}
+			return PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}
+		}
 	}
 
 	// Policy must reach at least the posture requested for this assessment.
