@@ -17,7 +17,6 @@ import (
 
 func TestHandlerHealthz(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
@@ -55,7 +54,6 @@ func TestHandlerHealthz(t *testing.T) {
 
 func TestHandlerHealthPathNotRegistered(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
@@ -90,7 +88,6 @@ func TestHandlerHealthPathNotRegistered(t *testing.T) {
 
 func TestHandlerRequiresAuthForBusinessRoutes(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
@@ -129,7 +126,6 @@ func TestHandlerRequiresAuthForBusinessRoutes(t *testing.T) {
 
 func TestHandlerRejectsMalformedBearerHeader(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
@@ -162,7 +158,6 @@ func TestHandlerRejectsMalformedBearerHeader(t *testing.T) {
 
 func TestHandlerAcceptsValidBearerToken(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
@@ -203,7 +198,6 @@ func TestHandlerAcceptsValidBearerToken(t *testing.T) {
 
 func TestHandlerRejectsExpiredDiscoveryToken(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
@@ -244,7 +238,6 @@ func TestHandlerRejectsExpiredDiscoveryToken(t *testing.T) {
 
 func TestHandlerRejectsDiscoveryDeniedToken(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
@@ -293,7 +286,6 @@ func TestHandlerRejectsMissingMLDSASignature(t *testing.T) {
 
 func TestHandlerReturns503OnValidationTimeout(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
@@ -337,7 +329,6 @@ func TestHandlerReturns503OnValidationTimeout(t *testing.T) {
 
 func TestHandlerReturns503OnValidation5xx(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
@@ -378,7 +369,6 @@ func TestHandlerReturns503OnValidation5xx(t *testing.T) {
 
 func TestHandlerRejectsValidationSuccessButMissingUserID(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
@@ -422,7 +412,6 @@ func TestHandlerRejectsValidationSuccessButMissingUserID(t *testing.T) {
 
 func TestHandlerPropagatesRequestIDToDiscoveryValidation(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
@@ -472,7 +461,6 @@ func TestHandlerPropagatesRequestIDToDiscoveryValidation(t *testing.T) {
 
 func TestHandlerFailsClosedWhenScanIDPresentButAuthzNotConfigured(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
@@ -518,7 +506,6 @@ func TestHandlerFailsClosedWhenScanIDPresentButAuthzNotConfigured(t *testing.T) 
 
 func TestHandlerContinuesWhenAuthzNotConfiguredAndNoScanID(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
@@ -601,7 +588,6 @@ func newDiscoveryValidationServer(t *testing.T, cfg discoveryValidationTestConfi
 func assertTokenRejected(t *testing.T, algorithms []string, expectedStatus int) {
 	t.Helper()
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},

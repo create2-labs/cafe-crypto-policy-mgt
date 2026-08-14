@@ -55,7 +55,7 @@ Wallet control proof for CP persistence (EOA) is specified in [`docs/CP_PERSIST.
 | `internal/app`, `internal/config` | Bootstrap and configuration |
 | `internal/domain/walletobserved` | Thin re-export of shared `cafe.discovery.wallet.observed` v0.1 wire types |
 | `internal/domain/vocabulary` | Exported strings for account kind, algorithms, PQ posture, subject type |
-| `internal/domain/policy` | Policy domain contracts (`PolicySelectionRequest`, `PolicyGraphCatalog`, `CryptoPolicyTemplate`, `CryptoPolicyInstance`, `CryptoPolicyValidationResult`, `CryptoPolicyAssessmentResult`, `PolicyCompatibilityResult` + `PolicyCompatibilityEvaluator`, and PR13 `PolicyDecision` models/evaluator) |
+| `internal/domain/policy` | Policy domain contracts (`PolicySelectionRequest`, `CryptoPolicyTemplate`, `CryptoPolicyInstance`, `CryptoPolicyValidationResult`, `CryptoPolicyAssessmentResult`, `PolicyCompatibilityResult` + `PolicyCompatibilityEvaluator`, and PR13 `PolicyDecision` models/evaluator) |
 | `internal/api` | PR17 read-only HTTP APIs for policy inspection and decision exploration |
 | `internal/persistence` | Durable CP via **cafe-persistence** (`cphttp.Client`); see [Durable CP storage](#durable-cp-storage-cpm_store). `OwnerScopedStore` is compiled **only for tests** (`-tags dev`) — not used at runtime in deployed images. |
 | `internal/walletauth` | CP-PERSIST V1 canonical wallet authorization message builder and EIP-191 / `personal_sign` verifier (PR3); used at persist time by PR4 handlers |
@@ -126,9 +126,9 @@ Golden JSON: [`internal/domain/walletobserved/testdata/discovery_wallet_observed
 
 ## Compatibility evaluation 
 
-`internal/domain/policy/compatibility_result.go` defines `PolicyCompatibilityEvaluator`, which classifies a single validated `CryptoPolicyInstance` against a `walletobserved.Payload` and `PolicySelectionRequest`. It returns `PolicyCompatibilityResult` with one of: `compatible_and_deployable`, `compatible_but_not_deployable` (e.g. empty instance scope `chain_ids`), or `incompatible`, with structured `AssessmentFinding` entries. Template-backed candidates use `required_posture` + `solution_profile_ref`; `node_path` is legacy/non-normative (removed from prod fixtures in CPM-P4b; deadcode sweep in CPM-P4c).
+`internal/domain/policy/compatibility_result.go` defines `PolicyCompatibilityEvaluator`, which classifies a single validated `CryptoPolicyInstance` against a `walletobserved.Payload` and `PolicySelectionRequest`. It returns `PolicyCompatibilityResult` with one of: `compatible_and_deployable`, `compatible_but_not_deployable` (e.g. empty instance scope `chain_ids`), or `incompatible`, with structured `AssessmentFinding` entries. Template-backed candidates use `required_posture` + `solution_profile_ref`.
 
-When `CPM_PROVIDER_MANIFEST_PATHS` is set (default: Nicetry fixture), explore resolves each instance `solution_profile_ref` and applies ADR §7 **hard** provider checks (including `required_posture` vs `solution_profile.resulting_posture`) before legacy graph rules. Hard fail → `rejected_candidate` with stable codes such as `incompatible.provider.posture`, `incompatible.provider.chain`, `incompatible.provider.rotation`, `incompatible.provider.continuity`, `incompatible.provider.new_wallet`, `incompatible.provider.wallet_type`. Soft findings (bundler / local signer) are **not** emitted yet (CPM-P5). Ranked/rejected explore candidates expose structured fields (`candidate_id`, `required_posture`, `resulting_posture`, `solution_profile_ref`, `maturity`, `claim_status`) without graph topology arrays.
+When `CPM_PROVIDER_MANIFEST_PATHS` is set (default: Nicetry fixture), explore resolves each instance `solution_profile_ref` and applies ADR §7 **hard** provider checks (including `required_posture` vs `solution_profile.resulting_posture`). Hard fail → `rejected_candidate` with stable codes such as `incompatible.provider.posture`, `incompatible.provider.chain`, `incompatible.provider.rotation`, `incompatible.provider.continuity`, `incompatible.provider.new_wallet`, `incompatible.provider.wallet_type`. Soft findings (bundler / local signer) are **not** emitted yet (CPM-P5). Ranked/rejected explore candidates expose structured fields (`candidate_id`, `required_posture`, `resulting_posture`, `solution_profile_ref`, `maturity`, `claim_status`) without graph topology arrays.
 
 ## Ranking and policy decision output 
 
@@ -226,7 +226,6 @@ CPM now exposes read-only APIs backed by local policy files loaded at startup. T
 
 Environment variables:
 
-- `CPM_POLICY_CATALOG_PATH` (default: `/app/policy/policy_graph_catalog_valid.json`)
 - `CPM_POLICY_TEMPLATE_PATHS` (comma-separated, default: `/app/policy/crypto_policy_template_pq_account_validation_v1.json`)
 - `CPM_POLICY_INSTANCE_PATHS` (comma-separated, default: `/app/policy/crypto_policy_instance_pq_account_validation_v1.json`)
 - `CPM_PROVIDER_MANIFEST_PATHS` (comma-separated, default: `/app/policy/provider_manifest_nicetry_v0_1.json`): Capability Provider manifests (`ProviderManifest` v0.1). Loaded into the explore registry for ADR §7 hard compatibility (CPM-P4). Fixture source: `internal/domain/provider/testdata/provider_manifest_nicetry_v0_1.json`. Catalogue instance `cpx_pq_account_validation_v1` carries `solution_profile_ref` → `nicetry.fors_c.erc4337.v0_1`. Soft findings / persist snapshot: later PRs (P5/P6).
@@ -524,7 +523,6 @@ With repo test fixtures and auth disabled:
 
 ```bash
 export CPM_AUTH_REQUIRED=false
-export CPM_POLICY_CATALOG_PATH=internal/domain/policy/testdata/policy_graph_catalog_valid.json
 export CPM_POLICY_TEMPLATE_PATHS=internal/domain/policy/testdata/crypto_policy_template_pq_account_validation_v1.json
 export CPM_POLICY_INSTANCE_PATHS=internal/domain/policy/testdata/crypto_policy_instance_pq_account_validation_v1.json
 export CPM_PROVIDER_MANIFEST_PATHS=internal/domain/provider/testdata/provider_manifest_nicetry_v0_1.json

@@ -22,10 +22,6 @@ var (
 	ErrTemplateRequiredPostureRequired = errors.New("template required_posture is required")
 	// ErrTemplateRequiredPostureInvalid indicates an invalid required posture.
 	ErrTemplateRequiredPostureInvalid = errors.New("template required_posture is invalid")
-	// ErrTemplateNodeUnknown indicates a node not present in the catalog (legacy path only).
-	ErrTemplateNodeUnknown = errors.New("template node_path references unknown node")
-	// ErrTemplateTransitionInvalid indicates a disallowed transition in node_path (legacy path only).
-	ErrTemplateTransitionInvalid = errors.New("template node_path transition is not allowed by catalog rules")
 	// ErrTemplateMinMaturityRange indicates a maturity value outside [1, 5].
 	ErrTemplateMinMaturityRange = errors.New("template constraints minimum_maturity must be between 1 and 5")
 	// ErrTemplateChainIDInvalid indicates non-positive target chain IDs.
@@ -39,7 +35,7 @@ var (
 )
 
 // CryptoPolicyTemplate defines a reusable CAFE intention (required posture + defaults).
-// node_path is legacy/non-normative (CPM-P4b); solution profiles carry concrete technique.
+// Concrete technique is selected via solution_profile_ref on catalogue instances.
 type CryptoPolicyTemplate struct {
 	ID              string                      `json:"id"`
 	Name            string                      `json:"name"`
@@ -47,7 +43,6 @@ type CryptoPolicyTemplate struct {
 	CatalogVersion  string                      `json:"catalog_version"`
 	Description     string                      `json:"description,omitempty"`
 	RequiredPosture vocabulary.CurrentPQPosture `json:"required_posture"`
-	NodePath        []string                    `json:"node_path,omitempty"` // legacy; not required
 	Defaults        PolicySelectionRequest      `json:"default_selection"`
 	Constraints     TemplateConstraints         `json:"constraints,omitempty"`
 	Metadata        TemplateMetadata            `json:"metadata,omitempty"`
@@ -69,8 +64,8 @@ type TemplateMetadata struct {
 }
 
 // LoadCryptoPolicyTemplateFromFile reads, decodes, normalizes, and validates a
-// template. catalog is still accepted for legacy node_path validation when present.
-func LoadCryptoPolicyTemplateFromFile(path string, catalog *PolicyGraphCatalog) (*CryptoPolicyTemplate, error) {
+// template.
+func LoadCryptoPolicyTemplateFromFile(path string) (*CryptoPolicyTemplate, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read template file: %w", err)
@@ -79,7 +74,7 @@ func LoadCryptoPolicyTemplateFromFile(path string, catalog *PolicyGraphCatalog) 
 	if err := json.Unmarshal(raw, &tpl); err != nil {
 		return nil, fmt.Errorf("decode template file: %w", err)
 	}
-	if err := tpl.NormalizeAndValidate(catalog); err != nil {
+	if err := tpl.NormalizeAndValidate(); err != nil {
 		return nil, err
 	}
 	return &tpl, nil
@@ -97,7 +92,6 @@ func (t *CryptoPolicyTemplate) Normalize() {
 	t.Defaults.AllowedProviderModes = normalizeProviderModes(t.Defaults.AllowedProviderModes)
 	t.Defaults.PreferredFamilies = normalizeStringsPreserveOrder(t.Defaults.PreferredFamilies)
 	t.Defaults.PreferredProviders = normalizeStringsPreserveOrder(t.Defaults.PreferredProviders)
-	t.NodePath = normalizeStringsPreserveOrder(t.NodePath)
 
 	if t.Constraints.MinimumMaturity == 0 {
 		t.Constraints.MinimumMaturity = defaultMinimumMaturity
@@ -116,8 +110,8 @@ func (t *CryptoPolicyTemplate) Normalize() {
 	}
 }
 
-// Validate ensures template integrity. When node_path is empty, graph rules are skipped.
-func (t *CryptoPolicyTemplate) Validate(catalog *PolicyGraphCatalog) error {
+// Validate ensures template integrity.
+func (t *CryptoPolicyTemplate) Validate() error {
 	if t == nil {
 		return errors.New("template is nil")
 	}
@@ -138,23 +132,6 @@ func (t *CryptoPolicyTemplate) Validate(catalog *PolicyGraphCatalog) error {
 	}
 	if !t.RequiredPosture.IsValid() || t.RequiredPosture == vocabulary.PQPostureUnknown {
 		return fmt.Errorf("%w: %q", ErrTemplateRequiredPostureInvalid, t.RequiredPosture)
-	}
-
-	if len(t.NodePath) > 0 {
-		if catalog == nil {
-			return errors.New("catalog is nil")
-		}
-		for _, nodeID := range t.NodePath {
-			if _, ok := catalog.Nodes[nodeID]; !ok {
-				return fmt.Errorf("%w: %q", ErrTemplateNodeUnknown, nodeID)
-			}
-		}
-		for i := 0; i < len(t.NodePath)-1; i++ {
-			from, to := t.NodePath[i], t.NodePath[i+1]
-			if !catalog.IsTransitionAllowed(from, to) {
-				return fmt.Errorf("%w: %q -> %q", ErrTemplateTransitionInvalid, from, to)
-			}
-		}
 	}
 
 	for _, id := range t.Constraints.TargetChainIDs {
@@ -182,7 +159,7 @@ func (t *CryptoPolicyTemplate) Validate(catalog *PolicyGraphCatalog) error {
 }
 
 // NormalizeAndValidate applies normalization then validates the template.
-func (t *CryptoPolicyTemplate) NormalizeAndValidate(catalog *PolicyGraphCatalog) error {
+func (t *CryptoPolicyTemplate) NormalizeAndValidate() error {
 	t.Normalize()
-	return t.Validate(catalog)
+	return t.Validate()
 }

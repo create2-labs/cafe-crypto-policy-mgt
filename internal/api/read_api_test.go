@@ -14,7 +14,6 @@ import (
 
 func TestLoadReadStoreAndRoutes(t *testing.T) {
 	store, err := LoadReadStore(ReadStoreOptions{
-		CatalogPath: fixturePath("policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
 		},
@@ -227,7 +226,6 @@ func TestDecisionExplore_optionA_policy_context(t *testing.T) {
 // once the scan is terminal (openapi WalletScanDetail + WalletScanResult).
 func TestDecisionExplore_discoveryV1WalletScanDetailEnvelope(t *testing.T) {
 	store, err := LoadReadStore(ReadStoreOptions{
-		CatalogPath: fixturePath("policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
 		},
@@ -285,7 +283,6 @@ func TestDecisionExplore_discoveryV1WalletScanDetailEnvelope(t *testing.T) {
 
 func TestDecisionExplore_targetAddressFlatPolicyContext(t *testing.T) {
 	store, err := LoadReadStore(ReadStoreOptions{
-		CatalogPath: fixturePath("policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
 		},
@@ -338,7 +335,6 @@ func TestDecisionExplore_targetAddressFlatPolicyContext(t *testing.T) {
 
 func TestDecisionExplore_doesNotMutateReadStoreInstances(t *testing.T) {
 	store, err := LoadReadStore(ReadStoreOptions{
-		CatalogPath: fixturePath("policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
 		},

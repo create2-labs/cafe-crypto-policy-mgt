@@ -17,9 +17,9 @@ import (
 )
 
 const (
-	walletChallengeTestScanID  = "550e8400-e29b-41d4-a716-446655440000"
-	walletChallengeTestWallet    = "0x742d35cc6634c0532925a3b844bc454e4438f44e"
-	walletChallengeTestDomain    = "api.example.com"
+	walletChallengeTestScanID = "550e8400-e29b-41d4-a716-446655440000"
+	walletChallengeTestWallet = "0x742d35cc6634c0532925a3b844bc454e4438f44e"
+	walletChallengeTestDomain = "api.example.com"
 )
 
 func newWalletChallengeTestHandler(t *testing.T) http.Handler {
@@ -35,7 +35,7 @@ func newWalletChallengeTestHandler(t *testing.T) http.Handler {
 	discovery := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, walletChallengeTestScanID) {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"scan_id":"`+walletChallengeTestScanID+`","status":"completed","result":{"target_address":"`+walletChallengeTestWallet+`"}}`))
+			_, _ = w.Write([]byte(`{"scan_id":"` + walletChallengeTestScanID + `","status":"completed","result":{"target_address":"` + walletChallengeTestWallet + `"}}`))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -65,7 +65,6 @@ func testReadStore(t *testing.T) (*persistence.OwnerScopedStore, *api.ReadStore)
 	// reuse paths from newAuthedTestHandler
 	store := persistence.NewOwnerScopedStore()
 	readStore, err := api.LoadReadStore(api.ReadStoreOptions{
-		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},

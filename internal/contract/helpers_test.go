@@ -38,7 +38,6 @@ func loadJSONFixture(t *testing.T, name string) map[string]any {
 func mustLoadReadStore(t *testing.T) *api.ReadStore {
 	t.Helper()
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
@@ -59,7 +58,7 @@ func validOptionASelectionRequest() map[string]any {
 		"require_multichain":          false,
 		"allow_new_wallet":            false,
 		"address_continuity_required": true,
-		"key_rotation_model": "per_userop",
+		"key_rotation_model":          "per_userop",
 		"recovery_required":           true,
 		"minimum_maturity":            1,
 		"approval_mode":               "manual",
