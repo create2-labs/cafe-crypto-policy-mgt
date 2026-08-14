@@ -1,4 +1,4 @@
-FROM golang:1.26.4 AS ci
+FROM golang:1.26.6 AS ci
 WORKDIR /app
 
 COPY go.mod ./
@@ -7,7 +7,7 @@ RUN go mod download
 COPY . .
 RUN go test ./internal/app -run TestNewPolicyStoreRejectsMemoryInProductionBuild && go test -tags dev ./...
 
-FROM golang:1.26.4 AS build
+FROM golang:1.26.6 AS build
 WORKDIR /app
 
 ARG APP_VERSION

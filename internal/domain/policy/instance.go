@@ -34,8 +34,8 @@ var (
 	ErrScopeChainIDInvalid = errors.New("scope chain_ids must contain only positive values")
 	// ErrScopeMultichainRequiresTargets indicates invalid multichain scope constraints.
 	ErrScopeMultichainRequiresTargets = errors.New("scope require_multichain requires at least two chain_ids when chain_ids is specified")
-	// ErrGlobalTargetPostureInvalid indicates invalid global target posture.
-	ErrGlobalTargetPostureInvalid = errors.New("global parameters target_posture is invalid")
+	// ErrGlobalRequiredPostureInvalid indicates invalid global required posture.
+	ErrGlobalRequiredPostureInvalid = errors.New("global parameters required_posture is invalid")
 	// ErrGlobalMaturityRange indicates maturity outside [1,5].
 	ErrGlobalMaturityRange = errors.New("global parameters minimum_maturity must be between 1 and 5")
 	// ErrGlobalApprovalModeInvalid indicates invalid approval mode.
@@ -103,7 +103,7 @@ type PolicyScope struct {
 
 // GlobalPolicyParameters stores typed global constraints/defaults.
 type GlobalPolicyParameters struct {
-	TargetPosture             vocabulary.CurrentPQPosture `json:"target_posture"`
+	RequiredPosture           vocabulary.CurrentPQPosture `json:"required_posture"`
 	MinimumMaturity           int                         `json:"minimum_maturity"`
 	ApprovalMode              ApprovalMode                `json:"approval_mode"`
 	AllowResearch             bool                        `json:"allow_research"`
@@ -135,7 +135,7 @@ type GovernanceMetadata struct {
 }
 
 // LoadCryptoPolicyInstanceFromFile reads, decodes, normalizes, and validates an
-// instance against the provided graph catalog.
+// instance. catalog is accepted only for legacy node_path/node_parameters validation.
 func LoadCryptoPolicyInstanceFromFile(path string, catalog *PolicyGraphCatalog) (*CryptoPolicyInstance, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -158,6 +158,10 @@ func (i *CryptoPolicyInstance) Normalize() {
 	}
 
 	i.NodePath = normalizeStringsPreserveOrder(i.NodePath)
+	i.SolutionProfileRef.ProviderID = strings.TrimSpace(i.SolutionProfileRef.ProviderID)
+	i.SolutionProfileRef.SolutionProfileID = strings.TrimSpace(i.SolutionProfileRef.SolutionProfileID)
+	i.SolutionProfileRef.ManifestVersion = strings.TrimSpace(i.SolutionProfileRef.ManifestVersion)
+	i.SolutionProfileRef.VerificationDate = strings.TrimSpace(i.SolutionProfileRef.VerificationDate)
 	i.Scope.ChainIDs = normalizeChainIDs(i.Scope.ChainIDs)
 	i.Scope.SubjectIDs = normalizeStringsPreserveOrder(i.Scope.SubjectIDs)
 	i.GlobalParams.AllowedProviderModes = normalizeProviderModes(i.GlobalParams.AllowedProviderModes)
@@ -174,13 +178,10 @@ func (i *CryptoPolicyInstance) Normalize() {
 	}
 }
 
-// Validate checks instance consistency and catalog/schema compatibility.
+// Validate checks instance consistency. Graph validation is legacy-only.
 func (i *CryptoPolicyInstance) Validate(catalog *PolicyGraphCatalog) error {
 	if i == nil {
 		return errors.New("instance is nil")
-	}
-	if catalog == nil {
-		return errors.New("catalog is nil")
 	}
 	if i.ID == "" {
 		return ErrInstanceIDRequired
@@ -212,6 +213,9 @@ func (i *CryptoPolicyInstance) Validate(catalog *PolicyGraphCatalog) error {
 	}
 
 	if len(i.NodePath) > 0 {
+		if catalog == nil {
+			return errors.New("catalog is nil")
+		}
 		for _, nodeID := range i.NodePath {
 			if _, ok := catalog.Nodes[nodeID]; !ok {
 				return fmt.Errorf("%w: %q", ErrInstanceNodeUnknown, nodeID)
@@ -234,6 +238,9 @@ func (i *CryptoPolicyInstance) Validate(catalog *PolicyGraphCatalog) error {
 func (i *CryptoPolicyInstance) validateNodeParameters(catalog *PolicyGraphCatalog) error {
 	if len(i.NodeParameters) == 0 {
 		return nil
+	}
+	if catalog == nil {
+		return errors.New("catalog is nil")
 	}
 
 	nodePathSet := make(map[string]struct{}, len(i.NodePath))
@@ -360,8 +367,8 @@ func (p *GlobalPolicyParameters) Validate() error {
 	if p == nil {
 		return errors.New("global parameters are nil")
 	}
-	if p.TargetPosture == "" || !p.TargetPosture.IsValid() {
-		return fmt.Errorf("%w: %q", ErrGlobalTargetPostureInvalid, p.TargetPosture)
+	if p.RequiredPosture == "" || !p.RequiredPosture.IsValid() || p.RequiredPosture == vocabulary.PQPostureUnknown {
+		return fmt.Errorf("%w: %q", ErrGlobalRequiredPostureInvalid, p.RequiredPosture)
 	}
 	if p.MinimumMaturity < 1 || p.MinimumMaturity > 5 {
 		return fmt.Errorf("%w: %d", ErrGlobalMaturityRange, p.MinimumMaturity)

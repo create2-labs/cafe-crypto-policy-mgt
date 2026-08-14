@@ -4,12 +4,7 @@
   "version": "v0.1",
   "catalog_version": "v0.1",
   "description": "CAFE intention: reach post-quantum account validation for an EVM wallet. Concrete technique is selected via solution_profile_ref on catalogue instances.",
-  "target_posture": "hybrid",
-  "node_path": [
-    "NODE_EOA_ENTRY",
-    "NODE_SIG_EIP7932",
-    "NODE_TARGET_HYBRID"
-  ],
+  "required_posture": "hybrid",
   "default_selection": {
     "target_chain_ids": [8453, 1, 8453],
     "require_multichain": true,
@@ -27,7 +22,7 @@
   },
   "metadata": {
     "owner_team": "cpm",
-    "target_posture": "hybrid",
+    "required_posture": "hybrid",
     "tags": ["pq_account_validation", "capability_provider"]
   }
 }

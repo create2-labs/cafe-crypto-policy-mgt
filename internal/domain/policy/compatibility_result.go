@@ -6,7 +6,6 @@ import (
 	"slices"
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/provider"
-	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/vocabulary"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/walletobserved"
 )
 
@@ -15,12 +14,10 @@ var (
 	ErrCompatibilityRequestNil = errors.New("compatibility: policy selection request is nil")
 	// ErrCompatibilityInstanceNil indicates a nil policy instance.
 	ErrCompatibilityInstanceNil = errors.New("compatibility: crypto policy instance is nil")
-	// ErrCompatibilityCatalogNil indicates a nil graph catalog.
-	ErrCompatibilityCatalogNil = errors.New("compatibility: policy graph catalog is nil")
-	// ErrCompatibilityNodePathRequired indicates a missing resolvable node path.
-	ErrCompatibilityNodePathRequired = errors.New("compatibility: instance needs node_path or a matching template for node_path resolution")
-	// ErrCompatibilityTemplateMismatch indicates template id / catalog mismatch.
-	ErrCompatibilityTemplateMismatch = errors.New("compatibility: template id does not match provided template or catalog version differs")
+	// ErrCompatibilityTemplateRequired indicates a candidate without its normative template.
+	ErrCompatibilityTemplateRequired = errors.New("compatibility: matching template is required")
+	// ErrCompatibilityTemplateMismatch indicates a template id mismatch.
+	ErrCompatibilityTemplateMismatch = errors.New("compatibility: instance template_id does not match provided template")
 )
 
 // PolicyCompatibilityResult is the first-version, explainable output of
@@ -35,19 +32,16 @@ type PolicyCompatibilityResult struct {
 // PolicyCompatibilityEvaluator evaluates a single policy instance against a
 // normalized wallet observation and a selection request.
 type PolicyCompatibilityEvaluator struct {
-	// Providers, when non-nil, resolves instance solution_profile_ref for ADR §7 hard checks.
-	// When nil, provider hard checks are skipped (graph/instance rules only).
+	// Providers resolves instance solution_profile_ref for ADR §7 hard checks.
+	// Evaluation fails closed when the registry or exact profile reference is unavailable.
 	Providers *provider.Registry
 }
 
-// Evaluate runs deterministic compatibility rules from the CPM v0.7 workstream.
-// tpl must be provided when the instance only references template_id and does
-// not materialize node_path, so the effective path can be resolved.
+// Evaluate runs deterministic compatibility rules for a provider candidate.
 func (e PolicyCompatibilityEvaluator) Evaluate(
 	observation walletobserved.Payload,
 	req *PolicySelectionRequest,
 	inst *CryptoPolicyInstance,
-	catalog *PolicyGraphCatalog,
 	tpl *CryptoPolicyTemplate,
 ) (PolicyCompatibilityResult, error) {
 	if req == nil {
@@ -56,254 +50,236 @@ func (e PolicyCompatibilityEvaluator) Evaluate(
 	if inst == nil {
 		return PolicyCompatibilityResult{}, ErrCompatibilityInstanceNil
 	}
-	if catalog == nil {
-		return PolicyCompatibilityResult{}, ErrCompatibilityCatalogNil
-	}
 	if err := req.NormalizeAndValidate(); err != nil {
 		return PolicyCompatibilityResult{}, err
 	}
-	if err := inst.NormalizeAndValidate(catalog); err != nil {
+	if err := inst.NormalizeAndValidate(nil); err != nil {
 		return PolicyCompatibilityResult{}, err
-	}
-	if tpl != nil {
-		if err := tpl.NormalizeAndValidate(catalog); err != nil {
-			return PolicyCompatibilityResult{}, err
-		}
-	}
-	path, err := effectiveNodePath(inst, tpl, catalog)
-	if err != nil {
-		return PolicyCompatibilityResult{}, err
-	}
-	return e.evaluateWithPath(observation, req, inst, catalog, path), nil
-}
-
-func effectiveNodePath(
-	inst *CryptoPolicyInstance,
-	tpl *CryptoPolicyTemplate,
-	catalog *PolicyGraphCatalog,
-) ([]string, error) {
-	if len(inst.NodePath) > 0 {
-		if inst.TemplateID != "" && tpl != nil && inst.TemplateID != tpl.ID {
-			return nil, fmt.Errorf("%w: instance template_id %q != template %q", ErrCompatibilityTemplateMismatch, inst.TemplateID, tpl.ID)
-		}
-		return inst.NodePath, nil
-	}
-	if inst.TemplateID == "" {
-		return nil, ErrCompatibilityNodePathRequired
 	}
 	if tpl == nil {
-		return nil, ErrCompatibilityNodePathRequired
+		return PolicyCompatibilityResult{}, ErrCompatibilityTemplateRequired
 	}
 	if tpl.ID != inst.TemplateID {
-		return nil, fmt.Errorf("%w: want template %q", ErrCompatibilityTemplateMismatch, inst.TemplateID)
+		return PolicyCompatibilityResult{}, fmt.Errorf("%w: instance template_id %q != template %q", ErrCompatibilityTemplateMismatch, inst.TemplateID, tpl.ID)
 	}
-	if tpl.CatalogVersion != inst.CatalogVersion {
-		return nil, fmt.Errorf("%w: instance catalog %q template catalog %q", ErrCompatibilityTemplateMismatch, inst.CatalogVersion, tpl.CatalogVersion)
+	if err := tpl.NormalizeAndValidate(nil); err != nil {
+		return PolicyCompatibilityResult{}, err
 	}
-	if catalog != nil && len(tpl.NodePath) > 0 {
-		for _, id := range tpl.NodePath {
-			if _, ok := catalog.Nodes[id]; !ok {
-				return nil, fmt.Errorf("template node_path: %w: %q", ErrInstanceNodeUnknown, id)
-			}
-		}
-	}
-	if len(tpl.NodePath) == 0 {
-		return nil, ErrCompatibilityNodePathRequired
-	}
-	return tpl.NodePath, nil
+	return e.evaluateProviderCandidate(observation, req, inst, tpl), nil
 }
 
-// postureRank maps PQ posture to a monotonic strength for request satisfaction.
-// unknown is -1 (cannot satisfy a concrete request by itself).
-func postureRank(p vocabulary.CurrentPQPosture) int {
-	switch p {
-	case vocabulary.PQPostureClassicalOnly:
-		return 0
-	case vocabulary.PQPostureHybrid:
-		return 1
-	case vocabulary.PQPostureFullPQ:
-		return 2
-	case vocabulary.PQPostureUnknown:
-		return -1
-	default:
-		return -1
-	}
-}
-
-func (e PolicyCompatibilityEvaluator) evaluateWithPath(
+func (e PolicyCompatibilityEvaluator) evaluateProviderCandidate(
 	observation walletobserved.Payload,
 	req *PolicySelectionRequest,
 	inst *CryptoPolicyInstance,
-	catalog *PolicyGraphCatalog,
-	nodePath []string,
+	tpl *CryptoPolicyTemplate,
 ) PolicyCompatibilityResult {
-	var findings []AssessmentFinding
-	add := func(code, msg string, sev AssessmentFindingSeverity) {
-		findings = append(findings, AssessmentFinding{Code: code, Message: msg, Severity: sev})
-	}
-	addField := func(code, msg, field string, sev AssessmentFindingSeverity) {
-		findings = append(findings, AssessmentFinding{Code: code, Message: msg, Severity: sev, Field: field})
-	}
-
-	// ADR §7 provider hard checks (before graph scoring). Soft findings are CPM-P5.
-	if e.Providers != nil && inst.SolutionProfileRef.ProviderID != "" {
-		resolved, ok := e.Providers.Lookup(provider.ProfileRef{
-			ProviderID:        inst.SolutionProfileRef.ProviderID,
-			SolutionProfileID: inst.SolutionProfileRef.SolutionProfileID,
-			ManifestVersion:   inst.SolutionProfileRef.ManifestVersion,
-		})
-		if !ok {
-			addField(provider.FindingCodeUnresolved,
-				fmt.Sprintf("solution_profile_ref %s/%s (manifest_version %q) not found in provider registry",
-					inst.SolutionProfileRef.ProviderID, inst.SolutionProfileRef.SolutionProfileID, inst.SolutionProfileRef.ManifestVersion),
-				"solution_profile_ref",
-				AssessmentFindingSeverityBlocking)
-			return PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}
-		}
-		hard := provider.EvaluateHardCompatibility(
-			provider.HardObservation{AccountKind: observation.AccountKind, ChainIDs: observation.ChainIDs},
-			provider.HardSelectionRequest{
-				TargetChainIDs:            req.TargetChainIDs,
-				AllowNewWallet:            req.AllowNewWallet,
-				AddressContinuityRequired: req.AddressContinuityRequired,
-				KeyRotationModel:          string(req.KeyRotationModel),
-			},
-			&resolved.Profile,
-		)
-		if len(hard) > 0 {
-			for _, h := range hard {
-				addField(h.Code, h.Message, h.Field, AssessmentFindingSeverityBlocking)
-			}
-			return PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}
-		}
-	}
-
-	// Policy must reach at least the posture requested for this assessment.
-	if rp, ip := postureRank(req.TargetPosture), postureRank(inst.GlobalParams.TargetPosture); ip < rp {
-		add("incompatible.target_posture", "instance target_posture does not satisfy selection target_posture", AssessmentFindingSeverityBlocking)
-		return PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}
-	}
-	if inst.GlobalParams.TargetPosture == vocabulary.PQPostureUnknown {
-		add("incompatible.target_posture", "instance target_posture is unknown", AssessmentFindingSeverityBlocking)
-		return PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}
-	}
-
-	for _, nodeID := range nodePath {
-		n := catalog.Nodes[nodeID]
-		if n.Maturity < req.MinimumMaturity {
-			add("incompatible.maturity", fmt.Sprintf("node %q below requested minimum_maturity", nodeID), AssessmentFindingSeverityBlocking)
-			return PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}
-		}
-	}
-
-	if req.KeyRotationModel != inst.GlobalParams.KeyRotationModel {
-		add("incompatible.constraint", "key_rotation_model not met by instance", AssessmentFindingSeverityBlocking)
-		return PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}
-	}
-	if req.AddressContinuityRequired && !inst.GlobalParams.AddressContinuityRequired {
-		add("incompatible.constraint", "address_continuity_required not met by instance", AssessmentFindingSeverityBlocking)
-		return PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}
-	}
-	if req.RecoveryRequired && !inst.GlobalParams.RecoveryRequired {
-		add("incompatible.constraint", "recovery_required not met by instance", AssessmentFindingSeverityBlocking)
-		return PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}
-	}
-	if req.RequireBundlerAvailable && !inst.GlobalParams.RequireBundlerAvailable {
-		add("incompatible.constraint", "require_bundler_available not met by instance", AssessmentFindingSeverityBlocking)
-		return PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}
-	}
-	if req.RequirePaymasterAvailable && !inst.GlobalParams.RequirePaymasterAvailable {
-		add("incompatible.constraint", "require_paymaster_available not met by instance", AssessmentFindingSeverityBlocking)
-		return PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}
-	}
-
-	if !req.AllowNewWallet && inst.GlobalParams.AllowNewWallet {
-		add("incompatible.new_wallet", "instance allows new wallet but selection disallows it", AssessmentFindingSeverityBlocking)
-		return PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}
-	}
-
-	if len(req.AllowedProviderModes) > 0 {
-		allowed := make(map[ProviderMode]struct{}, len(req.AllowedProviderModes))
-		for _, m := range req.AllowedProviderModes {
-			allowed[m] = struct{}{}
-		}
-		for _, m := range inst.GlobalParams.AllowedProviderModes {
-			if _, ok := allowed[m]; !ok {
-				add("incompatible.provider_mode", fmt.Sprintf("instance provider mode %q not allowed by selection", m), AssessmentFindingSeverityBlocking)
-				return PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}
-			}
-		}
-	}
-
-	// Target (last) node must advertise the instance global target posture when constrained.
-	if len(nodePath) > 0 {
-		lastID := nodePath[len(nodePath)-1]
-		last := catalog.Nodes[lastID]
-		if len(last.SupportedPostures) > 0 && !slices.Contains(last.SupportedPostures, inst.GlobalParams.TargetPosture) {
-			add("incompatible.path_posture", "last path node does not support instance target_posture", AssessmentFindingSeverityBlocking)
-			return PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}
-		}
-	}
-
 	obsChains := normalizeChainSet(observation.ChainIDs)
-	scope := inst.Scope.ChainIDs
-	T := req.TargetChainIDs
-	P := scope
 
-	if len(P) == 0 {
-		return PolicyCompatibilityResult{Status: AssessmentStatusCompatibleButNotDeployable, Findings: []AssessmentFinding{{
-			Code:     "compatible_but_not_deployable",
-			Message:  "instance scope has no chain_ids; route is not deployable to concrete chains",
-			Severity: AssessmentFindingSeverityInfo,
-		}}}
+	checks := []func() *PolicyCompatibilityResult{
+		func() *PolicyCompatibilityResult { return checkPostureCompatibility(req, tpl) },
+		func() *PolicyCompatibilityResult { return e.checkProviderCompatibility(observation, req, inst, tpl) },
+		func() *PolicyCompatibilityResult { return checkRequiredCapabilities(req, inst) },
+		func() *PolicyCompatibilityResult { return checkProviderModes(req, inst) },
+		func() *PolicyCompatibilityResult {
+			return checkChainCompatibility(req.TargetChainIDs, inst.Scope.ChainIDs, obsChains)
+		},
+		func() *PolicyCompatibilityResult {
+			return checkMultichainCompatibility(req, inst.Scope.ChainIDs, obsChains)
+		},
 	}
-
-	if len(T) > 0 {
-		for _, c := range T {
-			if !slices.Contains(P, c) {
-				add("incompatible.chain_scope", fmt.Sprintf("target_chain_id %d not covered by instance scope", c), AssessmentFindingSeverityBlocking)
-				return PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}
-			}
-			if !obsChains[c] {
-				add("incompatible.chain_not_observed", fmt.Sprintf("target_chain_id %d not present in wallet observation", c), AssessmentFindingSeverityBlocking)
-				return PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}
-			}
-		}
-	} else {
-		// No explicit request targets: every scope chain must still be observed for deployability.
-		for _, c := range P {
-			if !obsChains[c] {
-				add("incompatible.chain_not_observed", fmt.Sprintf("scope chain_id %d not present in wallet observation", c), AssessmentFindingSeverityBlocking)
-				return PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}
-			}
+	for _, check := range checks {
+		if result := check(); result != nil {
+			return *result
 		}
 	}
 
-	if req.RequireMultichain {
-		var candidateChains []int64
-		if len(T) > 0 {
-			candidateChains = T
-		} else {
-			candidateChains = P
-		}
-		seenID := make(map[int64]struct{})
-		matching := 0
-		for _, c := range candidateChains {
-			if _, dup := seenID[c]; dup {
-				continue
-			}
-			seenID[c] = struct{}{}
-			if slices.Contains(P, c) && obsChains[c] {
-				matching++
-			}
-		}
-		if matching < 2 {
-			add("incompatible.multichain", "require_multichain not satisfied: fewer than two matching observed chains in scope", AssessmentFindingSeverityBlocking)
-			return PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}
-		}
+	return PolicyCompatibilityResult{Status: AssessmentStatusCompatibleAndDeployable}
+}
+
+func checkPostureCompatibility(req *PolicySelectionRequest, tpl *CryptoPolicyTemplate) *PolicyCompatibilityResult {
+	if req.TargetPosture == tpl.RequiredPosture {
+		return nil
+	}
+	return incompatibleResult(fieldFinding(
+		provider.FindingCodePosture,
+		fmt.Sprintf("selection target_posture %q does not equal template required_posture %q", req.TargetPosture, tpl.RequiredPosture),
+		"required_posture",
+	))
+}
+
+// checkProviderCompatibility performs the ADR §7 provider hard checks.
+// Soft findings are CPM-P5.
+func (e PolicyCompatibilityEvaluator) checkProviderCompatibility(
+	observation walletobserved.Payload,
+	req *PolicySelectionRequest,
+	inst *CryptoPolicyInstance,
+	tpl *CryptoPolicyTemplate,
+) *PolicyCompatibilityResult {
+	if e.Providers == nil {
+		return incompatibleResult(fieldFinding(provider.FindingCodeUnresolved, "provider registry is unavailable", "solution_profile_ref"))
 	}
 
-	return PolicyCompatibilityResult{Status: AssessmentStatusCompatibleAndDeployable, Findings: findings}
+	ref := provider.ProfileRef{
+		ProviderID:        inst.SolutionProfileRef.ProviderID,
+		SolutionProfileID: inst.SolutionProfileRef.SolutionProfileID,
+		ManifestVersion:   inst.SolutionProfileRef.ManifestVersion,
+	}
+	resolved, ok := e.Providers.Lookup(ref)
+	if !ok {
+		return incompatibleResult(fieldFinding(
+			provider.FindingCodeUnresolved,
+			fmt.Sprintf("solution_profile_ref %s/%s (manifest_version %q) not found in provider registry",
+				ref.ProviderID, ref.SolutionProfileID, ref.ManifestVersion),
+			"solution_profile_ref",
+		))
+	}
+
+	hard := provider.EvaluateHardCompatibility(
+		provider.HardObservation{AccountKind: observation.AccountKind, ChainIDs: observation.ChainIDs},
+		provider.HardSelectionRequest{
+			RequiredPosture:           string(tpl.RequiredPosture),
+			TargetChainIDs:            req.TargetChainIDs,
+			AllowNewWallet:            req.AllowNewWallet,
+			AddressContinuityRequired: req.AddressContinuityRequired,
+			KeyRotationModel:          string(req.KeyRotationModel),
+		},
+		&resolved.Profile,
+	)
+	if len(hard) == 0 {
+		return nil
+	}
+
+	findings := make([]AssessmentFinding, 0, len(hard))
+	for _, finding := range hard {
+		findings = append(findings, fieldFinding(finding.Code, finding.Message, finding.Field))
+	}
+	return incompatibleResult(findings...)
+}
+
+func checkRequiredCapabilities(req *PolicySelectionRequest, inst *CryptoPolicyInstance) *PolicyCompatibilityResult {
+	switch {
+	case req.RecoveryRequired && !inst.GlobalParams.RecoveryRequired:
+		return incompatibleResult(blockingFinding("incompatible.constraint", "recovery_required not met by instance"))
+	case req.RequireBundlerAvailable && !inst.GlobalParams.RequireBundlerAvailable:
+		return incompatibleResult(blockingFinding("incompatible.constraint", "require_bundler_available not met by instance"))
+	case req.RequirePaymasterAvailable && !inst.GlobalParams.RequirePaymasterAvailable:
+		return incompatibleResult(blockingFinding("incompatible.constraint", "require_paymaster_available not met by instance"))
+	default:
+		return nil
+	}
+}
+
+func checkProviderModes(req *PolicySelectionRequest, inst *CryptoPolicyInstance) *PolicyCompatibilityResult {
+	if len(req.AllowedProviderModes) == 0 {
+		return nil
+	}
+	allowed := make(map[ProviderMode]struct{}, len(req.AllowedProviderModes))
+	for _, mode := range req.AllowedProviderModes {
+		allowed[mode] = struct{}{}
+	}
+	for _, mode := range inst.GlobalParams.AllowedProviderModes {
+		if _, ok := allowed[mode]; !ok {
+			return incompatibleResult(blockingFinding(
+				"incompatible.provider_mode",
+				fmt.Sprintf("instance provider mode %q not allowed by selection", mode),
+			))
+		}
+	}
+	return nil
+}
+
+func checkChainCompatibility(targets, scope []int64, observed map[int64]bool) *PolicyCompatibilityResult {
+	if len(scope) == 0 {
+		return &PolicyCompatibilityResult{
+			Status: AssessmentStatusCompatibleButNotDeployable,
+			Findings: []AssessmentFinding{{
+				Code:     "compatible_but_not_deployable",
+				Message:  "instance scope has no chain_ids; route is not deployable to concrete chains",
+				Severity: AssessmentFindingSeverityInfo,
+			}},
+		}
+	}
+	if len(targets) == 0 {
+		return checkObservedScopeChains(scope, observed)
+	}
+	for _, chainID := range targets {
+		if !slices.Contains(scope, chainID) {
+			return incompatibleResult(blockingFinding(
+				"incompatible.chain_scope",
+				fmt.Sprintf("target_chain_id %d not covered by instance scope", chainID),
+			))
+		}
+		if !observed[chainID] {
+			return incompatibleResult(blockingFinding(
+				"incompatible.chain_not_observed",
+				fmt.Sprintf("target_chain_id %d not present in wallet observation", chainID),
+			))
+		}
+	}
+	return nil
+}
+
+func checkObservedScopeChains(scope []int64, observed map[int64]bool) *PolicyCompatibilityResult {
+	for _, chainID := range scope {
+		if !observed[chainID] {
+			return incompatibleResult(blockingFinding(
+				"incompatible.chain_not_observed",
+				fmt.Sprintf("scope chain_id %d not present in wallet observation", chainID),
+			))
+		}
+	}
+	return nil
+}
+
+func checkMultichainCompatibility(
+	req *PolicySelectionRequest,
+	scope []int64,
+	observed map[int64]bool,
+) *PolicyCompatibilityResult {
+	if !req.RequireMultichain {
+		return nil
+	}
+	candidates := req.TargetChainIDs
+	if len(candidates) == 0 {
+		candidates = scope
+	}
+	if countMatchingChains(candidates, scope, observed) >= 2 {
+		return nil
+	}
+	return incompatibleResult(blockingFinding(
+		"incompatible.multichain",
+		"require_multichain not satisfied: fewer than two matching observed chains in scope",
+	))
+}
+
+func countMatchingChains(candidates, scope []int64, observed map[int64]bool) int {
+	seen := make(map[int64]struct{}, len(candidates))
+	matching := 0
+	for _, chainID := range candidates {
+		if _, duplicate := seen[chainID]; duplicate {
+			continue
+		}
+		seen[chainID] = struct{}{}
+		if slices.Contains(scope, chainID) && observed[chainID] {
+			matching++
+		}
+	}
+	return matching
+}
+
+func blockingFinding(code, message string) AssessmentFinding {
+	return AssessmentFinding{Code: code, Message: message, Severity: AssessmentFindingSeverityBlocking}
+}
+
+func fieldFinding(code, message, field string) AssessmentFinding {
+	finding := blockingFinding(code, message)
+	finding.Field = field
+	return finding
+}
+
+func incompatibleResult(findings ...AssessmentFinding) *PolicyCompatibilityResult {
+	return &PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}
 }
 
 func normalizeChainSet(ids []int64) map[int64]bool {

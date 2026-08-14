@@ -3,7 +3,7 @@
   "name": "Invalid unknown node template",
   "version": "v0.1",
   "catalog_version": "v0.1",
-  "target_posture": "hybrid",
+  "required_posture": "hybrid",
   "node_path": [
     "NODE_EOA_ENTRY",
     "NODE_UNKNOWN",

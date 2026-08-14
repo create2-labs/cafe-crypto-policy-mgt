@@ -10,12 +10,7 @@ import (
 )
 
 func TestLoadCryptoPolicyInstanceFromFile_Valid(t *testing.T) {
-	catalog, err := LoadPolicyGraphCatalogFromFile(filepath.Join("testdata", "policy_graph_catalog_valid.json"))
-	if err != nil {
-		t.Fatalf("LoadPolicyGraphCatalogFromFile: %v", err)
-	}
-
-	instance, err := LoadCryptoPolicyInstanceFromFile(filepath.Join("testdata", "crypto_policy_instance_pq_account_validation_v1.json"), catalog)
+	instance, err := LoadCryptoPolicyInstanceFromFile(filepath.Join("testdata", "crypto_policy_instance_pq_account_validation_v1.json"), nil)
 	if err != nil {
 		t.Fatalf("LoadCryptoPolicyInstanceFromFile: %v", err)
 	}
@@ -37,6 +32,15 @@ func TestLoadCryptoPolicyInstanceFromFile_Valid(t *testing.T) {
 	}
 	if instance.SolutionProfileRef.SolutionProfileID != "nicetry.fors_c.erc4337.v0_1" {
 		t.Fatalf("solution_profile_ref.solution_profile_id: got %q", instance.SolutionProfileRef.SolutionProfileID)
+	}
+	if instance.GlobalParams.RequiredPosture != vocabulary.PQPostureHybrid {
+		t.Fatalf("global_parameters.required_posture: got %q", instance.GlobalParams.RequiredPosture)
+	}
+	if !instance.GlobalParams.AllowNewWallet {
+		t.Fatal("Nicetry requires_new_account=true requires allow_new_wallet=true")
+	}
+	if instance.GlobalParams.AddressContinuityRequired {
+		t.Fatal("Nicetry address_continuity_supported=false requires address_continuity_required=false")
 	}
 	if !reflect.DeepEqual(instance.Governance.Tags, []string{"pq_account_validation", "nicetry"}) {
 		t.Fatalf("governance.tags: %#v", instance.Governance.Tags)
@@ -74,7 +78,7 @@ func TestCryptoPolicyInstance_Validate_ReferenceRules(t *testing.T) {
 				Name: "prod",
 			},
 			GlobalParams: GlobalPolicyParameters{
-				TargetPosture:        vocabulary.PQPostureHybrid,
+				RequiredPosture:      vocabulary.PQPostureHybrid,
 				MinimumMaturity:      1,
 				ApprovalMode:         ApprovalModeManual,
 				KeyRotationModel:     KeyRotationNone,
@@ -141,7 +145,7 @@ func TestCryptoPolicyInstance_Validate_NodeSchemaAndTransitions(t *testing.T) {
 				ChainIDs: []int64{8453, 1},
 			},
 			GlobalParams: GlobalPolicyParameters{
-				TargetPosture:        vocabulary.PQPostureHybrid,
+				RequiredPosture:      vocabulary.PQPostureHybrid,
 				MinimumMaturity:      1,
 				ApprovalMode:         ApprovalModeManual,
 				KeyRotationModel:     KeyRotationNone,
@@ -225,7 +229,7 @@ func TestCryptoPolicyInstance_Validate_SolutionProfileRef(t *testing.T) {
 		TemplateID:     "tpl_pq_account_validation_v1",
 		Scope:          PolicyScope{Name: "catalogue"},
 		GlobalParams: GlobalPolicyParameters{
-			TargetPosture:    vocabulary.PQPostureHybrid,
+			RequiredPosture:  vocabulary.PQPostureHybrid,
 			MinimumMaturity:  1,
 			ApprovalMode:     ApprovalModeManual,
 			KeyRotationModel: KeyRotationNone,
@@ -249,6 +253,19 @@ func TestCryptoPolicyInstance_Validate_SolutionProfileRef(t *testing.T) {
 		err := in.Validate(catalog)
 		if !errors.Is(err, ErrSolutionProfileRefProviderIDRequired) {
 			t.Fatalf("error = %v, want %v", err, ErrSolutionProfileRefProviderIDRequired)
+		}
+	})
+
+	t.Run("whitespace manifest_version", func(t *testing.T) {
+		in := base
+		in.SolutionProfileRef = SolutionProfileRef{
+			ProviderID:        "nicetry",
+			SolutionProfileID: "nicetry.fors_c.erc4337.v0_1",
+			ManifestVersion:   " \t ",
+		}
+		err := in.NormalizeAndValidate(nil)
+		if !errors.Is(err, ErrSolutionProfileRefManifestVersionRequired) {
+			t.Fatalf("error = %v, want %v", err, ErrSolutionProfileRefManifestVersionRequired)
 		}
 	})
 

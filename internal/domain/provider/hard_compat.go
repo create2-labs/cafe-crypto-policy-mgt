@@ -12,6 +12,7 @@ const (
 	FindingCodeContinuity  = "incompatible.provider.continuity"
 	FindingCodeChain       = "incompatible.provider.chain"
 	FindingCodeRotation    = "incompatible.provider.rotation"
+	FindingCodePosture     = "incompatible.provider.posture"
 	FindingCodeUnresolved  = "incompatible.provider.unresolved"
 )
 
@@ -24,6 +25,7 @@ type HardFinding struct {
 
 // HardSelectionRequest is the subset of PolicySelectionRequest needed for ADR §7 hard checks.
 type HardSelectionRequest struct {
+	RequiredPosture           string // CAFE classical_only|hybrid|full_pq (from template/selection)
 	TargetChainIDs            []int64
 	AllowNewWallet            bool
 	AddressContinuityRequired bool
@@ -47,6 +49,20 @@ func EvaluateHardCompatibility(obs HardObservation, req HardSelectionRequest, pr
 	}
 
 	var findings []HardFinding
+
+	// v0.1: strict equality required_posture ↔ resulting_posture (not via scheme/family).
+	wantPosture := strings.TrimSpace(req.RequiredPosture)
+	gotPosture := strings.TrimSpace(profile.ResultingPosture)
+	if wantPosture != "" && gotPosture != wantPosture {
+		findings = append(findings, HardFinding{
+			Code: FindingCodePosture,
+			Message: fmt.Sprintf(
+				"required_posture %q not satisfied by solution_profile.resulting_posture %q",
+				wantPosture, gotPosture,
+			),
+			Field: "required_posture",
+		})
+	}
 
 	if !walletTypeAccepted(obs.AccountKind, profile.InputRequirements.WalletTypes) {
 		findings = append(findings, HardFinding{

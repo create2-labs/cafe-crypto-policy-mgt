@@ -73,6 +73,7 @@ type SolutionProfile struct {
 	DisplayName       string             `json:"display_name"`
 	Maturity          Maturity           `json:"maturity"`
 	ClaimStatus       ClaimStatus        `json:"claim_status"`
+	ResultingPosture  string             `json:"resulting_posture"` // CAFE: classical_only|hybrid|full_pq
 	InputRequirements InputRequirements  `json:"input_requirements"`
 	Signature         SignatureProfile   `json:"signature"`
 	AccountModel      AccountModel       `json:"account_model"`
@@ -88,10 +89,9 @@ type InputRequirements struct {
 }
 
 type SignatureProfile struct {
-	Scheme                   string           `json:"scheme"`
-	Family                   string           `json:"family"`
-	AccountValidationPosture string           `json:"account_validation_posture"`
-	KeyRotationModel         KeyRotationModel `json:"key_rotation_model"`
+	Scheme           string           `json:"scheme"`
+	Family           string           `json:"family"`
+	KeyRotationModel KeyRotationModel `json:"key_rotation_model"`
 }
 
 type AccountModel struct {
@@ -157,10 +157,10 @@ func normalizeSolutionProfile(p *SolutionProfile) {
 	p.DisplayName = strings.TrimSpace(p.DisplayName)
 	p.Maturity = Maturity(strings.TrimSpace(string(p.Maturity)))
 	p.ClaimStatus = ClaimStatus(strings.TrimSpace(string(p.ClaimStatus)))
+	p.ResultingPosture = strings.TrimSpace(p.ResultingPosture)
 	p.InputRequirements.WalletTypes = dedupeStrings(p.InputRequirements.WalletTypes)
 	p.Signature.Scheme = strings.TrimSpace(p.Signature.Scheme)
 	p.Signature.Family = strings.TrimSpace(p.Signature.Family)
-	p.Signature.AccountValidationPosture = strings.TrimSpace(p.Signature.AccountValidationPosture)
 	p.Signature.KeyRotationModel = KeyRotationModel(strings.TrimSpace(string(p.Signature.KeyRotationModel)))
 	p.AccountModel.Standard = strings.TrimSpace(p.AccountModel.Standard)
 	p.AccountModel.ExecutionModel = strings.TrimSpace(p.AccountModel.ExecutionModel)
@@ -248,12 +248,15 @@ func validateSolutionProfile(p *SolutionProfile) error {
 	if !oneOf(string(p.ClaimStatus), "declared", "cafe_reviewed", "externally_audited", "executed_observed") {
 		return fmt.Errorf("%w: %q", ErrClaimStatusInvalid, p.ClaimStatus)
 	}
+	if !oneOf(p.ResultingPosture, "classical_only", "hybrid", "full_pq") {
+		return fmt.Errorf("%w: resulting_posture %q", ErrInvalidManifest, p.ResultingPosture)
+	}
 	if len(p.InputRequirements.WalletTypes) == 0 {
 		return fmt.Errorf("%w: wallet_types required", ErrInvalidManifest)
 	}
 	sig := p.Signature
-	if sig.Scheme == "" || sig.Family == "" || sig.AccountValidationPosture == "" {
-		return fmt.Errorf("%w: signature fields required", ErrInvalidManifest)
+	if sig.Scheme == "" || sig.Family == "" {
+		return fmt.Errorf("%w: signature scheme and family required", ErrInvalidManifest)
 	}
 	if !oneOf(string(sig.KeyRotationModel), "none", "per_userop") {
 		return fmt.Errorf("%w: key_rotation_model %q", ErrInvalidManifest, sig.KeyRotationModel)

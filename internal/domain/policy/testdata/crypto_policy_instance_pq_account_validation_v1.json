@@ -17,12 +17,12 @@
     "require_multichain": true
   },
   "global_parameters": {
-    "target_posture": "hybrid",
+    "required_posture": "hybrid",
     "minimum_maturity": 0,
     "approval_mode": "",
     "allow_research": true,
-    "allow_new_wallet": false,
-    "address_continuity_required": true,
+    "allow_new_wallet": true,
+    "address_continuity_required": false,
     "key_rotation_model": "per_userop",
     "recovery_required": true,
     "allowed_provider_modes": ["third_party", "user_managed"],
