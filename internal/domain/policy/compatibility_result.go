@@ -53,7 +53,7 @@ func (e PolicyCompatibilityEvaluator) Evaluate(
 	if err := req.NormalizeAndValidate(); err != nil {
 		return PolicyCompatibilityResult{}, err
 	}
-	if err := inst.NormalizeAndValidate(nil); err != nil {
+	if err := inst.NormalizeAndValidate(); err != nil {
 		return PolicyCompatibilityResult{}, err
 	}
 	if tpl == nil {
@@ -62,7 +62,7 @@ func (e PolicyCompatibilityEvaluator) Evaluate(
 	if tpl.ID != inst.TemplateID {
 		return PolicyCompatibilityResult{}, fmt.Errorf("%w: instance template_id %q != template %q", ErrCompatibilityTemplateMismatch, inst.TemplateID, tpl.ID)
 	}
-	if err := tpl.NormalizeAndValidate(nil); err != nil {
+	if err := tpl.NormalizeAndValidate(); err != nil {
 		return PolicyCompatibilityResult{}, err
 	}
 	return e.evaluateProviderCandidate(observation, req, inst, tpl), nil

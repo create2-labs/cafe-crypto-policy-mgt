@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"slices"
 	"strings"
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/vocabulary"
@@ -18,16 +17,8 @@ var (
 	ErrInstanceNameRequired = errors.New("instance name is required")
 	// ErrInstanceCatalogVersionRequired indicates a missing catalog version.
 	ErrInstanceCatalogVersionRequired = errors.New("instance catalog_version is required")
-	// ErrInstanceReferenceMissing indicates no template or path was supplied.
-	ErrInstanceReferenceMissing = errors.New("instance must define template_id or node_path")
-	// ErrInstanceReferenceAmbiguous indicates both template and explicit path were supplied.
-	ErrInstanceReferenceAmbiguous = errors.New("instance cannot define both template_id and node_path")
-	// ErrInstanceNodePathRequired indicates missing node path when node parameters are provided.
-	ErrInstanceNodePathRequired = errors.New("instance node_path is required when node_parameters are provided")
-	// ErrInstanceNodeUnknown indicates node path references unknown nodes.
-	ErrInstanceNodeUnknown = errors.New("instance node_path references unknown node")
-	// ErrInstanceTransitionInvalid indicates a transition not allowed by catalog rules.
-	ErrInstanceTransitionInvalid = errors.New("instance node_path transition is not allowed by catalog rules")
+	// ErrInstanceTemplateIDRequired indicates a missing template identifier.
+	ErrInstanceTemplateIDRequired = errors.New("instance template_id is required")
 	// ErrScopeNameRequired indicates missing scope name.
 	ErrScopeNameRequired = errors.New("scope name is required")
 	// ErrScopeChainIDInvalid indicates non-positive chain IDs in scope.
@@ -44,18 +35,6 @@ var (
 	ErrGlobalProviderModeInvalid = errors.New("global parameters allowed_provider_modes contains an invalid value")
 	// ErrGlobalKeyRotationModelInvalid indicates invalid key rotation model.
 	ErrGlobalKeyRotationModelInvalid = errors.New("global parameters key_rotation_model is invalid")
-	// ErrNodeParameterNodeUnknown indicates parameter map references unknown node.
-	ErrNodeParameterNodeUnknown = errors.New("node_parameters references unknown node")
-	// ErrNodeParameterNodeNotInPath indicates parameter map references node not selected in path.
-	ErrNodeParameterNodeNotInPath = errors.New("node_parameters references a node that is not part of node_path")
-	// ErrNodeParameterUnknown indicates unknown parameter for a node.
-	ErrNodeParameterUnknown = errors.New("node parameter is not defined in catalog schema")
-	// ErrNodeParameterRequiredMissing indicates missing required schema parameter.
-	ErrNodeParameterRequiredMissing = errors.New("required node parameter is missing")
-	// ErrNodeParameterTypeMismatch indicates node parameter type mismatch.
-	ErrNodeParameterTypeMismatch = errors.New("node parameter value does not match catalog schema type")
-	// ErrNodeParameterEnumValueInvalid indicates enum value outside schema.
-	ErrNodeParameterEnumValueInvalid = errors.New("node parameter enum value is not allowed by catalog schema")
 	// ErrSolutionProfileRefRequired indicates a missing solution profile reference.
 	ErrSolutionProfileRefRequired = errors.New("instance solution_profile_ref is required")
 	// ErrSolutionProfileRefProviderIDRequired indicates a missing provider_id.
@@ -67,19 +46,15 @@ var (
 )
 
 // CryptoPolicyInstance is the concrete, scope-bound policy document used by CPM.
-// It intentionally has no edge-level configurable parameters; transition semantics
-// are enforced by catalog/template compatibility rules.
 type CryptoPolicyInstance struct {
-	ID                 string                      `json:"id"`
-	Name               string                      `json:"name"`
-	CatalogVersion     string                      `json:"catalog_version"`
-	TemplateID         string                      `json:"template_id,omitempty"`
-	NodePath           []string                    `json:"node_path,omitempty"`
-	SolutionProfileRef SolutionProfileRef          `json:"solution_profile_ref"`
-	Scope              PolicyScope                 `json:"scope"`
-	GlobalParams       GlobalPolicyParameters      `json:"global_parameters"`
-	NodeParameters     map[string]NodeParameterMap `json:"node_parameters,omitempty"`
-	Governance         GovernanceMetadata          `json:"governance,omitempty"`
+	ID                 string                 `json:"id"`
+	Name               string                 `json:"name"`
+	CatalogVersion     string                 `json:"catalog_version"`
+	TemplateID         string                 `json:"template_id"`
+	SolutionProfileRef SolutionProfileRef     `json:"solution_profile_ref"`
+	Scope              PolicyScope            `json:"scope"`
+	GlobalParams       GlobalPolicyParameters `json:"global_parameters"`
+	Governance         GovernanceMetadata     `json:"governance,omitempty"`
 }
 
 // SolutionProfileRef binds a catalogue instance to a Capability Provider solution
@@ -116,17 +91,6 @@ type GlobalPolicyParameters struct {
 	RequirePaymasterAvailable bool                        `json:"require_paymaster_available"`
 }
 
-// NodeParameterMap is the typed per-node parameter assignment.
-type NodeParameterMap map[string]NodeParameterValue
-
-// NodeParameterValue is a typed container for node parameter values.
-type NodeParameterValue struct {
-	Type        PolicyParamType `json:"type"`
-	StringValue string          `json:"string_value,omitempty"`
-	BoolValue   *bool           `json:"bool_value,omitempty"`
-	IntValue    *int64          `json:"int_value,omitempty"`
-}
-
 // GovernanceMetadata stores optional instance governance attributes.
 type GovernanceMetadata struct {
 	OwnerTeam      string   `json:"owner_team,omitempty"`
@@ -135,8 +99,8 @@ type GovernanceMetadata struct {
 }
 
 // LoadCryptoPolicyInstanceFromFile reads, decodes, normalizes, and validates an
-// instance. catalog is accepted only for legacy node_path/node_parameters validation.
-func LoadCryptoPolicyInstanceFromFile(path string, catalog *PolicyGraphCatalog) (*CryptoPolicyInstance, error) {
+// instance.
+func LoadCryptoPolicyInstanceFromFile(path string) (*CryptoPolicyInstance, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read instance file: %w", err)
@@ -145,7 +109,7 @@ func LoadCryptoPolicyInstanceFromFile(path string, catalog *PolicyGraphCatalog) 
 	if err := json.Unmarshal(raw, &in); err != nil {
 		return nil, fmt.Errorf("decode instance file: %w", err)
 	}
-	if err := in.NormalizeAndValidate(catalog); err != nil {
+	if err := in.NormalizeAndValidate(); err != nil {
 		return nil, err
 	}
 	return &in, nil
@@ -157,7 +121,6 @@ func (i *CryptoPolicyInstance) Normalize() {
 		return
 	}
 
-	i.NodePath = normalizeStringsPreserveOrder(i.NodePath)
 	i.SolutionProfileRef.ProviderID = strings.TrimSpace(i.SolutionProfileRef.ProviderID)
 	i.SolutionProfileRef.SolutionProfileID = strings.TrimSpace(i.SolutionProfileRef.SolutionProfileID)
 	i.SolutionProfileRef.ManifestVersion = strings.TrimSpace(i.SolutionProfileRef.ManifestVersion)
@@ -178,8 +141,8 @@ func (i *CryptoPolicyInstance) Normalize() {
 	}
 }
 
-// Validate checks instance consistency. Graph validation is legacy-only.
-func (i *CryptoPolicyInstance) Validate(catalog *PolicyGraphCatalog) error {
+// Validate checks instance consistency.
+func (i *CryptoPolicyInstance) Validate() error {
 	if i == nil {
 		return errors.New("instance is nil")
 	}
@@ -192,14 +155,8 @@ func (i *CryptoPolicyInstance) Validate(catalog *PolicyGraphCatalog) error {
 	if i.CatalogVersion == "" {
 		return ErrInstanceCatalogVersionRequired
 	}
-	if len(i.NodeParameters) > 0 && len(i.NodePath) == 0 {
-		return ErrInstanceNodePathRequired
-	}
-	if i.TemplateID == "" && len(i.NodePath) == 0 {
-		return ErrInstanceReferenceMissing
-	}
-	if i.TemplateID != "" && len(i.NodePath) > 0 {
-		return ErrInstanceReferenceAmbiguous
+	if i.TemplateID == "" {
+		return ErrInstanceTemplateIDRequired
 	}
 	if err := i.SolutionProfileRef.Validate(); err != nil {
 		return err
@@ -210,118 +167,6 @@ func (i *CryptoPolicyInstance) Validate(catalog *PolicyGraphCatalog) error {
 	}
 	if err := i.GlobalParams.Validate(); err != nil {
 		return fmt.Errorf("global_parameters: %w", err)
-	}
-
-	if len(i.NodePath) > 0 {
-		if catalog == nil {
-			return errors.New("catalog is nil")
-		}
-		for _, nodeID := range i.NodePath {
-			if _, ok := catalog.Nodes[nodeID]; !ok {
-				return fmt.Errorf("%w: %q", ErrInstanceNodeUnknown, nodeID)
-			}
-		}
-		for idx := 0; idx < len(i.NodePath)-1; idx++ {
-			from, to := i.NodePath[idx], i.NodePath[idx+1]
-			if !catalog.IsTransitionAllowed(from, to) {
-				return fmt.Errorf("%w: %q -> %q", ErrInstanceTransitionInvalid, from, to)
-			}
-		}
-	}
-
-	if err := i.validateNodeParameters(catalog); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (i *CryptoPolicyInstance) validateNodeParameters(catalog *PolicyGraphCatalog) error {
-	if len(i.NodeParameters) == 0 {
-		return nil
-	}
-	if catalog == nil {
-		return errors.New("catalog is nil")
-	}
-
-	nodePathSet := make(map[string]struct{}, len(i.NodePath))
-	for _, nodeID := range i.NodePath {
-		nodePathSet[nodeID] = struct{}{}
-	}
-
-	for nodeID, params := range i.NodeParameters {
-		nodeDef, ok := catalog.Nodes[nodeID]
-		if !ok {
-			return fmt.Errorf("%w: %q", ErrNodeParameterNodeUnknown, nodeID)
-		}
-		if len(i.NodePath) > 0 {
-			if _, inPath := nodePathSet[nodeID]; !inPath {
-				return fmt.Errorf("%w: %q", ErrNodeParameterNodeNotInPath, nodeID)
-			}
-		}
-
-		paramSchemaByName := make(map[string]PolicyNodeParameterSchema, len(nodeDef.ParameterSchemas))
-		for _, schema := range nodeDef.ParameterSchemas {
-			paramSchemaByName[schema.Name] = schema
-		}
-
-		for paramName, value := range params {
-			schema, exists := paramSchemaByName[paramName]
-			if !exists {
-				return fmt.Errorf("%w: node=%q param=%q", ErrNodeParameterUnknown, nodeID, paramName)
-			}
-			if err := value.ValidateAgainstSchema(schema); err != nil {
-				return fmt.Errorf("node=%q param=%q: %w", nodeID, paramName, err)
-			}
-		}
-
-		for _, schema := range nodeDef.ParameterSchemas {
-			if !schema.Required {
-				continue
-			}
-			if _, exists := params[schema.Name]; !exists {
-				return fmt.Errorf("%w: node=%q param=%q", ErrNodeParameterRequiredMissing, nodeID, schema.Name)
-			}
-		}
-	}
-
-	return nil
-}
-
-// ValidateAgainstSchema validates a typed value against a node parameter schema.
-func (v NodeParameterValue) ValidateAgainstSchema(schema PolicyNodeParameterSchema) error {
-	if v.Type != schema.Type {
-		return fmt.Errorf("%w: got=%q want=%q", ErrNodeParameterTypeMismatch, v.Type, schema.Type)
-	}
-	switch schema.Type {
-	case ParamTypeString:
-		if v.BoolValue != nil || v.IntValue != nil {
-			return fmt.Errorf("%w: string value cannot include bool/int payload", ErrNodeParameterTypeMismatch)
-		}
-	case ParamTypeBool:
-		if v.BoolValue == nil || v.IntValue != nil || v.StringValue != "" {
-			return fmt.Errorf("%w: bool value must use bool_value only", ErrNodeParameterTypeMismatch)
-		}
-	case ParamTypeInt:
-		if v.IntValue == nil || v.BoolValue != nil || v.StringValue != "" {
-			return fmt.Errorf("%w: int value must use int_value only", ErrNodeParameterTypeMismatch)
-		}
-	case ParamTypeEnum:
-		if v.BoolValue != nil || v.IntValue != nil {
-			return fmt.Errorf("%w: enum value must use string_value only", ErrNodeParameterTypeMismatch)
-		}
-		if len(schema.AllowedValues) == 0 {
-			return fmt.Errorf("%w: schema has no allowed values", ErrNodeParameterEnumValueInvalid)
-		}
-		normalized := make([]string, len(schema.AllowedValues))
-		copy(normalized, schema.AllowedValues)
-		for idx := range normalized {
-			normalized[idx] = strings.TrimSpace(normalized[idx])
-		}
-		if !slices.Contains(normalized, v.StringValue) {
-			return fmt.Errorf("%w: %q", ErrNodeParameterEnumValueInvalid, v.StringValue)
-		}
-	default:
-		return fmt.Errorf("%w: unsupported schema type %q", ErrNodeParameterTypeMismatch, schema.Type)
 	}
 	return nil
 }
@@ -388,7 +233,7 @@ func (p *GlobalPolicyParameters) Validate() error {
 }
 
 // NormalizeAndValidate applies deterministic canonicalization then validation.
-func (i *CryptoPolicyInstance) NormalizeAndValidate(catalog *PolicyGraphCatalog) error {
+func (i *CryptoPolicyInstance) NormalizeAndValidate() error {
 	i.Normalize()
-	return i.Validate(catalog)
+	return i.Validate()
 }

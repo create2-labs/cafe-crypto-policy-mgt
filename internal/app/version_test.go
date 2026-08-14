@@ -18,7 +18,6 @@ func TestHandlerVersionReturnsJSON(t *testing.T) {
 	t.Cleanup(func() { _ = os.Unsetenv("APP_VERSION") })
 
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},

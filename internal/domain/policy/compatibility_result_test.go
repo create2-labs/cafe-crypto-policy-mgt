@@ -17,11 +17,11 @@ func testdataPath(t *testing.T, name string) string {
 
 func mustLoadFixtures(t *testing.T) (*CryptoPolicyTemplate, *CryptoPolicyInstance) {
 	t.Helper()
-	tpl, err := LoadCryptoPolicyTemplateFromFile(testdataPath(t, "crypto_policy_template_pq_account_validation_v1.json"), nil)
+	tpl, err := LoadCryptoPolicyTemplateFromFile(testdataPath(t, "crypto_policy_template_pq_account_validation_v1.json"))
 	if err != nil {
 		t.Fatalf("template: %v", err)
 	}
-	inst, err := LoadCryptoPolicyInstanceFromFile(testdataPath(t, "crypto_policy_instance_pq_account_validation_v1.json"), nil)
+	inst, err := LoadCryptoPolicyInstanceFromFile(testdataPath(t, "crypto_policy_instance_pq_account_validation_v1.json"))
 	if err != nil {
 		t.Fatalf("instance: %v", err)
 	}
@@ -111,7 +111,7 @@ func TestPolicyCompatibilityEvaluator_compatButNotDeployable(t *testing.T) {
 	req := baseSelection()
 	req.TargetChainIDs = nil
 	req.RequireMultichain = false
-	if err := inst.NormalizeAndValidate(nil); err != nil {
+	if err := inst.NormalizeAndValidate(); err != nil {
 		t.Fatalf("instance: %v", err)
 	}
 	ev := PolicyCompatibilityEvaluator{Providers: mustLoadProviderRegistry(t)}
@@ -129,7 +129,7 @@ func TestPolicyCompatibilityEvaluator_incompatibleChainScope(t *testing.T) {
 	inst = shallowCopyInstance(inst)
 	inst.Scope.ChainIDs = []int64{1}
 	inst.Scope.RequireMultichain = false
-	if err := inst.NormalizeAndValidate(nil); err != nil {
+	if err := inst.NormalizeAndValidate(); err != nil {
 		t.Fatalf("instance: %v", err)
 	}
 

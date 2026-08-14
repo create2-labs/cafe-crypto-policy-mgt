@@ -11,8 +11,8 @@ import (
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/api"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/config"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
-	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/metrics"
 	cpmmats "github.com/create2-labs/cafe-crypto-policy-mgt/internal/integration/nats"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/metrics"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/persistence"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/version"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -21,7 +21,6 @@ import (
 // Run starts a minimal HTTP server used as bootstrap for CPM.
 func Run(cfg config.Config) error {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		CatalogPath:           cfg.PolicyCatalogPath,
 		TemplatePaths:         cfg.PolicyTemplatePaths,
 		InstancePaths:         cfg.PolicyInstancePaths,
 		ProviderManifestPaths: cfg.ProviderManifestPaths,
@@ -47,18 +46,18 @@ func Run(cfg config.Config) error {
 	}
 
 	h, err := handler(cfg, store, ownerStore, authConfig{
-		Required:                            cfg.AuthRequired,
-		SessionValidationURL:                cfg.SessionValidationURL,
-		SessionValidationTimeoutSec:         cfg.SessionValidationTimeoutSec,
-		SessionValidationServiceToken:       cfg.SessionValidationServiceToken,
-		ScanAuthorizationURL:                cfg.ScanAuthorizationURL,
-		ScanAuthorizationTimeoutSec:         cfg.ScanAuthorizationTimeoutSec,
-		ScanAuthorizationServiceToken:       cfg.ScanAuthorizationServiceToken,
-		ClockSkewSec:                        cfg.AuthClockSkewSec,
-		DiscoveryHTTPBaseURL:                cfg.DiscoveryHTTPBaseURL,
-		DiscoveryHTTPTimeoutSec:             cfg.DiscoveryHTTPTimeoutSec,
-		AssessmentNATSPublish:               assessmentPublish,
-		WalletAuthDomain:                    cfg.WalletAuthDomain,
+		Required:                      cfg.AuthRequired,
+		SessionValidationURL:          cfg.SessionValidationURL,
+		SessionValidationTimeoutSec:   cfg.SessionValidationTimeoutSec,
+		SessionValidationServiceToken: cfg.SessionValidationServiceToken,
+		ScanAuthorizationURL:          cfg.ScanAuthorizationURL,
+		ScanAuthorizationTimeoutSec:   cfg.ScanAuthorizationTimeoutSec,
+		ScanAuthorizationServiceToken: cfg.ScanAuthorizationServiceToken,
+		ClockSkewSec:                  cfg.AuthClockSkewSec,
+		DiscoveryHTTPBaseURL:          cfg.DiscoveryHTTPBaseURL,
+		DiscoveryHTTPTimeoutSec:       cfg.DiscoveryHTTPTimeoutSec,
+		AssessmentNATSPublish:         assessmentPublish,
+		WalletAuthDomain:              cfg.WalletAuthDomain,
 	})
 	if err != nil {
 		return err

@@ -42,9 +42,6 @@ func TestLoadFromEnvDefaults(t *testing.T) {
 	if cfg.ScanAuthorizationServiceToken != "" {
 		t.Fatalf("expected empty scan authorization service token default, got %q", cfg.ScanAuthorizationServiceToken)
 	}
-	if cfg.PolicyCatalogPath != defaultPolicyCatalogPath {
-		t.Fatalf("expected default policy catalog path %q, got %q", defaultPolicyCatalogPath, cfg.PolicyCatalogPath)
-	}
 	if len(cfg.PolicyTemplatePaths) != 1 {
 		t.Fatalf("expected 1 default policy template path, got %#v", cfg.PolicyTemplatePaths)
 	}
@@ -95,7 +92,6 @@ func TestLoadFromEnvOverrides(t *testing.T) {
 	t.Setenv("CAFE_SCAN_AUTHORIZATION_TIMEOUT_SEC", "9")
 	t.Setenv("CAFE_SCAN_AUTHORIZATION_SERVICE_TOKEN", "scan-authz-service-token")
 	t.Setenv("CPM_AUTH_CLOCK_SKEW_SEC", "45")
-	t.Setenv("CPM_POLICY_CATALOG_PATH", "catalog.json")
 	t.Setenv("CPM_POLICY_TEMPLATE_PATHS", "tpl-a.json, tpl-b.json")
 	t.Setenv("CPM_POLICY_INSTANCE_PATHS", "inst-a.json,inst-b.json")
 	t.Setenv("CPM_PROVIDER_MANIFEST_PATHS", "provider-a.json, provider-b.json")
@@ -141,9 +137,6 @@ func TestLoadFromEnvOverrides(t *testing.T) {
 	}
 	if cfg.AuthClockSkewSec != 45 {
 		t.Fatalf("expected auth clock skew override, got %d", cfg.AuthClockSkewSec)
-	}
-	if cfg.PolicyCatalogPath != "catalog.json" {
-		t.Fatalf("expected policy catalog path override, got %q", cfg.PolicyCatalogPath)
 	}
 	if len(cfg.PolicyTemplatePaths) != 2 || cfg.PolicyTemplatePaths[0] != "tpl-a.json" || cfg.PolicyTemplatePaths[1] != "tpl-b.json" {
 		t.Fatalf("expected policy template paths override, got %#v", cfg.PolicyTemplatePaths)

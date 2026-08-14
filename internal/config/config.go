@@ -14,7 +14,6 @@ const (
 	defaultDiscoveryHTTPTimeoutSec     = 5
 	defaultSessionValidationTimeoutSec = 3
 	defaultScanAuthorizationTimeoutSec = 3
-	defaultPolicyCatalogPath           = ""
 	defaultPolicyTemplatePaths         = "/app/policy/crypto_policy_template_pq_account_validation_v1.json"
 	defaultPolicyInstancePaths         = "/app/policy/crypto_policy_instance_pq_account_validation_v1.json"
 	defaultProviderManifestPaths       = "/app/policy/provider_manifest_nicetry_v0_1.json"
@@ -39,7 +38,6 @@ type Config struct {
 	DiscoveryHTTPTimeoutSec int
 	// NATSURL enables publishing policy.assessment.requested from POST …/policies/assessment/request (PR13g).
 	NATSURL             string
-	PolicyCatalogPath   string
 	PolicyTemplatePaths []string
 	PolicyInstancePaths []string
 	// ProviderManifestPaths lists ProviderManifest JSON files (CPM_PROVIDER_MANIFEST_PATHS).
@@ -74,7 +72,6 @@ func LoadFromEnv() Config {
 		DiscoveryHTTPBaseURL:          getEnv("CAFE_DISCOVERY_HTTP_BASE", ""),
 		DiscoveryHTTPTimeoutSec:       getEnvInt("CAFE_DISCOVERY_HTTP_TIMEOUT_SEC", defaultDiscoveryHTTPTimeoutSec),
 		NATSURL:                       getEnv("CPM_NATS_URL", ""),
-		PolicyCatalogPath:             getEnv("CPM_POLICY_CATALOG_PATH", defaultPolicyCatalogPath),
 		PolicyTemplatePaths:           parseCommaList(getEnv("CPM_POLICY_TEMPLATE_PATHS", defaultPolicyTemplatePaths)),
 		PolicyInstancePaths:           parseCommaList(getEnv("CPM_POLICY_INSTANCE_PATHS", defaultPolicyInstancePaths)),
 		ProviderManifestPaths:         parseCommaList(getEnv("CPM_PROVIDER_MANIFEST_PATHS", defaultProviderManifestPaths)),

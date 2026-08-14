@@ -24,8 +24,8 @@ func TestPoliciesAssessmentRequest_policyContextForbidden(t *testing.T) {
 	h := newAssessmentTestHandler(t, assessmentHarness{})
 	token := mustAssessmentToken(t)
 	body := map[string]any{
-		"scan_id":        testAssessmentScanID,
-		"policy_context": map[string]any{"wallet_address": "0x1"},
+		"scan_id":           testAssessmentScanID,
+		"policy_context":    map[string]any{"wallet_address": "0x1"},
 		"selection_request": validAssessmentSelectionRequest(),
 	}
 	res := postAssessment(t, h, token, body)
@@ -150,7 +150,6 @@ type assessmentHarness struct {
 func newAssessmentTestHandler(t *testing.T, harness assessmentHarness) http.Handler {
 	t.Helper()
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		CatalogPath: filepath.Join("..", "domain", "policy", "testdata", "policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
 		},
@@ -270,7 +269,7 @@ func validAssessmentSelectionRequest() map[string]any {
 		"require_multichain":          false,
 		"allow_new_wallet":            false,
 		"address_continuity_required": true,
-		"key_rotation_model": "per_userop",
+		"key_rotation_model":          "per_userop",
 		"recovery_required":           true,
 		"minimum_maturity":            1,
 		"approval_mode":               "manual",

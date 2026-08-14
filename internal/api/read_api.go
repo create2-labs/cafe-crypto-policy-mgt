@@ -17,8 +17,6 @@ var (
 )
 
 type ReadStoreOptions struct {
-	// CatalogPath is retained as a no-op compatibility option until CPM-P4c.
-	CatalogPath           string
 	TemplatePaths         []string
 	InstancePaths         []string
 	ProviderManifestPaths []string
@@ -42,7 +40,7 @@ func LoadReadStore(opts ReadStoreOptions) (*ReadStore, error) {
 	templates := make([]*policy.CryptoPolicyTemplate, 0, len(opts.TemplatePaths))
 	templateByID := make(map[string]*policy.CryptoPolicyTemplate, len(opts.TemplatePaths))
 	for _, path := range opts.TemplatePaths {
-		tpl, loadErr := policy.LoadCryptoPolicyTemplateFromFile(path, nil)
+		tpl, loadErr := policy.LoadCryptoPolicyTemplateFromFile(path)
 		if loadErr != nil {
 			return nil, fmt.Errorf("load template %q: %w", path, loadErr)
 		}
@@ -56,7 +54,7 @@ func LoadReadStore(opts ReadStoreOptions) (*ReadStore, error) {
 	instances := make([]*policy.CryptoPolicyInstance, 0, len(opts.InstancePaths))
 	instanceIDs := make(map[string]struct{}, len(opts.InstancePaths))
 	for _, path := range opts.InstancePaths {
-		inst, loadErr := policy.LoadCryptoPolicyInstanceFromFile(path, nil)
+		inst, loadErr := policy.LoadCryptoPolicyInstanceFromFile(path)
 		if loadErr != nil {
 			return nil, fmt.Errorf("load instance %q: %w", path, loadErr)
 		}

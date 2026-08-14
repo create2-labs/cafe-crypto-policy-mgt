@@ -16,7 +16,7 @@ func TestPolicyDecisionEvaluator_RanksCompatibleByCandidateIDAndKeepsRejected(t 
 	best.ID = "cp002"
 	best.GlobalParams.MinimumMaturity = 4
 	best.GlobalParams.AllowNewWallet = false
-	if err := best.NormalizeAndValidate(nil); err != nil {
+	if err := best.NormalizeAndValidate(); err != nil {
 		t.Fatalf("best instance: %v", err)
 	}
 
@@ -24,14 +24,14 @@ func TestPolicyDecisionEvaluator_RanksCompatibleByCandidateIDAndKeepsRejected(t 
 	second.ID = "cp001"
 	second.GlobalParams.MinimumMaturity = 2
 	second.GlobalParams.AllowNewWallet = true
-	if err := second.NormalizeAndValidate(nil); err != nil {
+	if err := second.NormalizeAndValidate(); err != nil {
 		t.Fatalf("second instance: %v", err)
 	}
 
 	rejected := shallowCopyInstance(base)
 	rejected.ID = "cp003"
 	rejected.SolutionProfileRef.ManifestVersion = "unresolved"
-	if err := rejected.NormalizeAndValidate(nil); err != nil {
+	if err := rejected.NormalizeAndValidate(); err != nil {
 		t.Fatalf("rejected instance: %v", err)
 	}
 
@@ -79,13 +79,13 @@ func TestPolicyDecisionEvaluator_DeterministicNormalizedPolicyIDTieBreak(t *test
 
 	first := shallowCopyInstance(base)
 	first.ID = "cp010"
-	if err := first.NormalizeAndValidate(nil); err != nil {
+	if err := first.NormalizeAndValidate(); err != nil {
 		t.Fatalf("first instance: %v", err)
 	}
 
 	second := shallowCopyInstance(base)
 	second.ID = "CP002"
-	if err := second.NormalizeAndValidate(nil); err != nil {
+	if err := second.NormalizeAndValidate(); err != nil {
 		t.Fatalf("second instance: %v", err)
 	}
 
@@ -123,7 +123,7 @@ func TestPolicyDecisionEvaluator_RankingIgnoresLegacyMaturityAndPostureCopies(t 
 	exact.ID = "cp100"
 	exact.GlobalParams.RequiredPosture = vocabulary.PQPostureHybrid
 	exact.GlobalParams.MinimumMaturity = 1
-	if err := exact.NormalizeAndValidate(nil); err != nil {
+	if err := exact.NormalizeAndValidate(); err != nil {
 		t.Fatalf("exact instance: %v", err)
 	}
 
@@ -131,7 +131,7 @@ func TestPolicyDecisionEvaluator_RankingIgnoresLegacyMaturityAndPostureCopies(t 
 	over.ID = "cp101"
 	over.GlobalParams.RequiredPosture = vocabulary.PQPostureFullPQ
 	over.GlobalParams.MinimumMaturity = 5
-	if err := over.NormalizeAndValidate(nil); err != nil {
+	if err := over.NormalizeAndValidate(); err != nil {
 		t.Fatalf("over instance: %v", err)
 	}
 
