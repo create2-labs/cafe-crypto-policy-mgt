@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/provider"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/vocabulary"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/walletobserved"
 )
@@ -14,30 +15,37 @@ func testdataPath(t *testing.T, name string) string {
 	return filepath.Join("testdata", name)
 }
 
-func mustLoadFixtures(t *testing.T) (*PolicyGraphCatalog, *CryptoPolicyTemplate, *CryptoPolicyInstance) {
+func mustLoadFixtures(t *testing.T) (*CryptoPolicyTemplate, *CryptoPolicyInstance) {
 	t.Helper()
-	cat, err := LoadPolicyGraphCatalogFromFile(testdataPath(t, "policy_graph_catalog_valid.json"))
-	if err != nil {
-		t.Fatalf("catalog: %v", err)
-	}
-	tpl, err := LoadCryptoPolicyTemplateFromFile(testdataPath(t, "crypto_policy_template_pq_account_validation_v1.json"), cat)
+	tpl, err := LoadCryptoPolicyTemplateFromFile(testdataPath(t, "crypto_policy_template_pq_account_validation_v1.json"), nil)
 	if err != nil {
 		t.Fatalf("template: %v", err)
 	}
-	inst, err := LoadCryptoPolicyInstanceFromFile(testdataPath(t, "crypto_policy_instance_pq_account_validation_v1.json"), cat)
+	inst, err := LoadCryptoPolicyInstanceFromFile(testdataPath(t, "crypto_policy_instance_pq_account_validation_v1.json"), nil)
 	if err != nil {
 		t.Fatalf("instance: %v", err)
 	}
-	return cat, tpl, inst
+	return tpl, inst
+}
+
+func mustLoadProviderRegistry(t *testing.T) *provider.Registry {
+	t.Helper()
+	reg, err := provider.LoadRegistryFromFiles([]string{
+		filepath.Join("..", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
+	})
+	if err != nil {
+		t.Fatalf("provider registry: %v", err)
+	}
+	return reg
 }
 
 func baseObservation() walletobserved.Payload {
 	return walletobserved.Payload{
-		ChainIDs:         []int64{1, 8453},
+		ChainIDs:         []int64{11155111},
 		AccountKind:      "eoa",
 		CurrentAlgorithm: "secp256k1_ecrecover",
 		PublicKeyExposed: true,
-		IsMultichain:     true,
+		IsMultichain:     false,
 		ObservedAt:       time.Date(2026, 4, 17, 9, 59, 58, 0, time.UTC),
 		CurrentPQPosture: string(vocabulary.PQPostureClassicalOnly),
 	}
@@ -46,10 +54,10 @@ func baseObservation() walletobserved.Payload {
 func baseSelection() PolicySelectionRequest {
 	return PolicySelectionRequest{
 		TargetPosture:             vocabulary.PQPostureHybrid,
-		TargetChainIDs:            []int64{1, 8453},
-		RequireMultichain:         true,
+		TargetChainIDs:            []int64{11155111},
+		RequireMultichain:         false,
 		AllowNewWallet:            true,
-		AddressContinuityRequired: true,
+		AddressContinuityRequired: false,
 		KeyRotationModel:          KeyRotationPerUserOp,
 		RecoveryRequired:          true,
 		MinimumMaturity:           1,
@@ -61,11 +69,11 @@ func baseSelection() PolicySelectionRequest {
 }
 
 func TestPolicyCompatibilityEvaluator_happyPath(t *testing.T) {
-	cat, tpl, inst := mustLoadFixtures(t)
+	tpl, inst := mustLoadFixtures(t)
 	obs := baseObservation()
 	req := baseSelection()
-	var ev PolicyCompatibilityEvaluator
-	res, err := ev.Evaluate(obs, &req, inst, cat, tpl)
+	ev := PolicyCompatibilityEvaluator{Providers: mustLoadProviderRegistry(t)}
+	res, err := ev.Evaluate(obs, &req, inst, tpl)
 	if err != nil {
 		t.Fatalf("Evaluate: %v", err)
 	}
@@ -74,36 +82,40 @@ func TestPolicyCompatibilityEvaluator_happyPath(t *testing.T) {
 	}
 }
 
-func TestPolicyCompatibilityEvaluator_incompatibleTargetPosture(t *testing.T) {
-	cat, tpl, inst := mustLoadFixtures(t)
+func TestPolicyCompatibilityEvaluator_requiredPostureMustEqualResultingPosture(t *testing.T) {
+	tpl, inst := mustLoadFixtures(t)
+	tpl.RequiredPosture = vocabulary.PQPostureFullPQ
+	tpl.Defaults.TargetPosture = vocabulary.PQPostureFullPQ
+	tpl.Metadata.RequiredPosture = vocabulary.PQPostureFullPQ
 	obs := baseObservation()
 	req := baseSelection()
 	req.TargetPosture = vocabulary.PQPostureFullPQ
-	var ev PolicyCompatibilityEvaluator
-	res, err := ev.Evaluate(obs, &req, inst, cat, tpl)
+	ev := PolicyCompatibilityEvaluator{Providers: mustLoadProviderRegistry(t)}
+	res, err := ev.Evaluate(obs, &req, inst, tpl)
 	if err != nil {
 		t.Fatalf("Evaluate: %v", err)
 	}
 	if res.Status != AssessmentStatusIncompatible {
 		t.Fatalf("want incompatible, got %q %+v", res.Status, res.Findings)
 	}
+	if len(res.Findings) == 0 || res.Findings[0].Code != provider.FindingCodePosture {
+		t.Fatalf("want %s, got %+v", provider.FindingCodePosture, res.Findings)
+	}
 }
 
 func TestPolicyCompatibilityEvaluator_compatButNotDeployable(t *testing.T) {
-	cat, _, inst := mustLoadFixtures(t)
+	tpl, inst := mustLoadFixtures(t)
 	inst = shallowCopyInstance(inst)
-	inst.TemplateID = ""
-	inst.NodePath = []string{"NODE_EOA_ENTRY", "NODE_SIG_EIP7932", "NODE_TARGET_HYBRID"}
 	inst.Scope.ChainIDs = nil
 	obs := baseObservation()
 	req := baseSelection()
 	req.TargetChainIDs = nil
 	req.RequireMultichain = false
-	if err := inst.NormalizeAndValidate(cat); err != nil {
+	if err := inst.NormalizeAndValidate(nil); err != nil {
 		t.Fatalf("instance: %v", err)
 	}
-	var ev PolicyCompatibilityEvaluator
-	res, err := ev.Evaluate(obs, &req, inst, cat, nil)
+	ev := PolicyCompatibilityEvaluator{Providers: mustLoadProviderRegistry(t)}
+	res, err := ev.Evaluate(obs, &req, inst, tpl)
 	if err != nil {
 		t.Fatalf("Evaluate: %v", err)
 	}
@@ -113,20 +125,19 @@ func TestPolicyCompatibilityEvaluator_compatButNotDeployable(t *testing.T) {
 }
 
 func TestPolicyCompatibilityEvaluator_incompatibleChainScope(t *testing.T) {
-	cat, tpl, inst := mustLoadFixtures(t)
+	tpl, inst := mustLoadFixtures(t)
 	inst = shallowCopyInstance(inst)
-	inst.Scope.ChainIDs = []int64{1, 3, 5}
-	if err := inst.NormalizeAndValidate(cat); err != nil {
+	inst.Scope.ChainIDs = []int64{1}
+	inst.Scope.RequireMultichain = false
+	if err := inst.NormalizeAndValidate(nil); err != nil {
 		t.Fatalf("instance: %v", err)
 	}
 
 	obs := baseObservation()
-	obs.ChainIDs = []int64{1, 2, 5}
 	req := baseSelection()
-	req.TargetChainIDs = []int64{1, 2, 5}
 
-	var ev PolicyCompatibilityEvaluator
-	res, err := ev.Evaluate(obs, &req, inst, cat, tpl)
+	ev := PolicyCompatibilityEvaluator{Providers: mustLoadProviderRegistry(t)}
+	res, err := ev.Evaluate(obs, &req, inst, tpl)
 	if err != nil {
 		t.Fatalf("Evaluate: %v", err)
 	}
@@ -146,12 +157,12 @@ func TestPolicyCompatibilityEvaluator_incompatibleChainScope(t *testing.T) {
 }
 
 func TestPolicyCompatibilityEvaluator_chainNotObserved(t *testing.T) {
-	cat, tpl, inst := mustLoadFixtures(t)
+	tpl, inst := mustLoadFixtures(t)
 	obs := baseObservation()
-	obs.ChainIDs = []int64{1}
+	obs.ChainIDs = nil
 	req := baseSelection()
-	var ev PolicyCompatibilityEvaluator
-	res, err := ev.Evaluate(obs, &req, inst, cat, tpl)
+	ev := PolicyCompatibilityEvaluator{Providers: mustLoadProviderRegistry(t)}
+	res, err := ev.Evaluate(obs, &req, inst, tpl)
 	if err != nil {
 		t.Fatalf("Evaluate: %v", err)
 	}
@@ -160,62 +171,68 @@ func TestPolicyCompatibilityEvaluator_chainNotObserved(t *testing.T) {
 	}
 }
 
-func TestPolicyCompatibilityEvaluator_requiresTemplateForPath(t *testing.T) {
-	cat, _, inst := mustLoadFixtures(t)
+func TestPolicyCompatibilityEvaluator_requiresTemplate(t *testing.T) {
+	_, inst := mustLoadFixtures(t)
 	obs := baseObservation()
 	req := baseSelection()
-	var ev PolicyCompatibilityEvaluator
-	// Instance uses template_id only; nil template must error.
-	_, err := ev.Evaluate(obs, &req, inst, cat, nil)
+	ev := PolicyCompatibilityEvaluator{Providers: mustLoadProviderRegistry(t)}
+	_, err := ev.Evaluate(obs, &req, inst, nil)
 	if err == nil {
 		t.Fatal("expected error for missing template")
 	}
 }
 
-func TestEffectiveNodePath_explicitPath(t *testing.T) {
-	cat, _, inst := mustLoadFixtures(t)
-	inst = shallowCopyInstance(inst)
-	inst.NodePath = []string{"NODE_EOA_ENTRY", "NODE_SIG_EIP7932", "NODE_TARGET_HYBRID"}
-	inst.TemplateID = ""
-	if err := inst.NormalizeAndValidate(cat); err != nil {
-		t.Fatalf("instance: %v", err)
-	}
+func TestPolicyCompatibilityEvaluator_missingRegistryFailsClosed(t *testing.T) {
+	tpl, inst := mustLoadFixtures(t)
 	obs := baseObservation()
 	req := baseSelection()
 	var ev PolicyCompatibilityEvaluator
-	res, err := ev.Evaluate(obs, &req, inst, cat, nil)
+	res, err := ev.Evaluate(obs, &req, inst, tpl)
+	if err != nil {
+		t.Fatalf("Evaluate: %v", err)
+	}
+	if res.Status != AssessmentStatusIncompatible ||
+		len(res.Findings) == 0 ||
+		res.Findings[0].Code != provider.FindingCodeUnresolved {
+		t.Fatalf("want fail-closed unresolved, got %+v", res)
+	}
+}
+
+func TestPolicyCompatibilityEvaluator_unresolvedProfileFailsClosed(t *testing.T) {
+	tpl, inst := mustLoadFixtures(t)
+	inst.SolutionProfileRef.ManifestVersion = "missing-version"
+	obs := baseObservation()
+	req := baseSelection()
+	ev := PolicyCompatibilityEvaluator{Providers: mustLoadProviderRegistry(t)}
+	res, err := ev.Evaluate(obs, &req, inst, tpl)
+	if err != nil {
+		t.Fatalf("Evaluate: %v", err)
+	}
+	if res.Status != AssessmentStatusIncompatible ||
+		len(res.Findings) == 0 ||
+		res.Findings[0].Code != provider.FindingCodeUnresolved {
+		t.Fatalf("want unresolved rejection, got %+v", res)
+	}
+}
+
+func TestPolicyCompatibilityEvaluator_providerProfileIsConstraintAuthority(t *testing.T) {
+	tpl, inst := mustLoadFixtures(t)
+	inst.GlobalParams.AllowNewWallet = false
+	inst.GlobalParams.AddressContinuityRequired = true
+	inst.GlobalParams.KeyRotationModel = KeyRotationNone
+
+	res, err := (PolicyCompatibilityEvaluator{Providers: mustLoadProviderRegistry(t)}).
+		Evaluate(baseObservation(), ptrSelection(baseSelection()), inst, tpl)
 	if err != nil {
 		t.Fatalf("Evaluate: %v", err)
 	}
 	if res.Status != AssessmentStatusCompatibleAndDeployable {
-		t.Fatalf("status: got %q", res.Status)
+		t.Fatalf("legacy global provider copies must not override profile: %+v", res)
 	}
 }
 
-func TestPolicyCompatibilityEvaluator_incompatibleKeyRotationModel(t *testing.T) {
-	cat, tpl, inst := mustLoadFixtures(t)
-	obs := baseObservation()
-	req := baseSelection()
-	req.KeyRotationModel = KeyRotationNone
-	var ev PolicyCompatibilityEvaluator
-	res, err := ev.Evaluate(obs, &req, inst, cat, tpl)
-	if err != nil {
-		t.Fatalf("Evaluate: %v", err)
-	}
-	if res.Status != AssessmentStatusIncompatible {
-		t.Fatalf("want incompatible, got %q %+v", res.Status, res.Findings)
-	}
-	found := false
-	for _, finding := range res.Findings {
-		if finding.Code == "incompatible.constraint" &&
-			finding.Message == "key_rotation_model not met by instance" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("expected key_rotation_model finding, got %+v", res.Findings)
-	}
+func ptrSelection(req PolicySelectionRequest) *PolicySelectionRequest {
+	return &req
 }
 
 func shallowCopyInstance(i *CryptoPolicyInstance) *CryptoPolicyInstance {

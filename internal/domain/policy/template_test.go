@@ -10,12 +10,7 @@ import (
 )
 
 func TestLoadCryptoPolicyTemplateFromFile_Valid(t *testing.T) {
-	catalog, err := LoadPolicyGraphCatalogFromFile(filepath.Join("testdata", "policy_graph_catalog_valid.json"))
-	if err != nil {
-		t.Fatalf("LoadPolicyGraphCatalogFromFile: %v", err)
-	}
-
-	tpl, err := LoadCryptoPolicyTemplateFromFile(filepath.Join("testdata", "crypto_policy_template_pq_account_validation_v1.json"), catalog)
+	tpl, err := LoadCryptoPolicyTemplateFromFile(filepath.Join("testdata", "crypto_policy_template_pq_account_validation_v1.json"), nil)
 	if err != nil {
 		t.Fatalf("LoadCryptoPolicyTemplateFromFile: %v", err)
 	}

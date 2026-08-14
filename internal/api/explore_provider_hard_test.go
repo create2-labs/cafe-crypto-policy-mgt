@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"testing"
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
@@ -15,7 +14,6 @@ import (
 
 func TestDecisionExplore_providerHard_sepoliaRankedMainnetRejected(t *testing.T) {
 	store, err := LoadReadStore(ReadStoreOptions{
-		CatalogPath: fixturePath("policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
 		},
@@ -23,7 +21,7 @@ func TestDecisionExplore_providerHard_sepoliaRankedMainnetRejected(t *testing.T)
 			fixturePath("crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 		ProviderManifestPaths: []string{
-			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
+			providerManifestFixturePath(),
 		},
 	})
 	if err != nil {
@@ -73,9 +71,9 @@ func TestDecisionExplore_providerHard_sepoliaRankedMainnetRejected(t *testing.T)
 			Decision struct {
 				RankedCandidates   []any `json:"ranked_candidates"`
 				RejectedCandidates []struct {
-					RejectionReasons []struct {
+					CompatibilityFindings []struct {
 						Code string `json:"code"`
-					} `json:"rejection_reasons"`
+					} `json:"compatibility_findings"`
 				} `json:"rejected_candidates"`
 			} `json:"decision"`
 		}
@@ -83,7 +81,7 @@ func TestDecisionExplore_providerHard_sepoliaRankedMainnetRejected(t *testing.T)
 			t.Fatalf("decode: %v", err)
 		}
 		for _, c := range response.Decision.RejectedCandidates {
-			for _, r := range c.RejectionReasons {
+			for _, r := range c.CompatibilityFindings {
 				codes = append(codes, r.Code)
 			}
 		}
@@ -141,7 +139,10 @@ func TestDecisionExplore_providerHard_sepoliaRankedMainnetRejected(t *testing.T)
 		t.Fatalf("structured ranked len: %d", len(structured.Decision.RankedCandidates))
 	}
 	c := structured.Decision.RankedCandidates[0]
-	for _, absent := range []string{"nodeInstances", "graphEdges", "edgeIds", "node_path"} {
+	for _, absent := range []string{
+		"nodeInstances", "graphEdges", "edgeIds", "node_path",
+		"target_posture_alignment", "maturity_score", "chain_coverage_score",
+	} {
 		if _, ok := c[absent]; ok {
 			t.Fatalf("ranked candidate must not expose %q", absent)
 		}
@@ -149,14 +150,22 @@ func TestDecisionExplore_providerHard_sepoliaRankedMainnetRejected(t *testing.T)
 	if c["candidate_id"] != "cpx_pq_account_validation_v1" {
 		t.Fatalf("candidate_id: %#v", c["candidate_id"])
 	}
+	if c["template_id"] != "tpl_pq_account_validation_v1" {
+		t.Fatalf("template_id: %#v", c["template_id"])
+	}
 	if c["required_posture"] != "hybrid" || c["resulting_posture"] != "hybrid" {
 		t.Fatalf("postures: required=%v resulting=%v", c["required_posture"], c["resulting_posture"])
+	}
+	if findings, ok := c["compatibility_findings"].([]any); !ok || len(findings) != 0 {
+		t.Fatalf("compatibility_findings: %#v", c["compatibility_findings"])
 	}
 	if c["maturity"] != "research" || c["claim_status"] != "declared" {
 		t.Fatalf("maturity/claim: %#v %#v", c["maturity"], c["claim_status"])
 	}
 	ref, _ := c["solution_profile_ref"].(map[string]any)
-	if ref["provider_id"] != "nicetry" || ref["solution_profile_id"] != "nicetry.fors_c.erc4337.v0_1" {
+	if ref["provider_id"] != "nicetry" ||
+		ref["solution_profile_id"] != "nicetry.fors_c.erc4337.v0_1" ||
+		ref["manifest_version"] != "2026-08" {
 		t.Fatalf("solution_profile_ref: %#v", c["solution_profile_ref"])
 	}
 

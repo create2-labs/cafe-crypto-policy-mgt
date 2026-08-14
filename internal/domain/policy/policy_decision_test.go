@@ -3,11 +3,12 @@ package policy
 import (
 	"testing"
 
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/provider"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/vocabulary"
 )
 
-func TestPolicyDecisionEvaluator_SelectsBestCompatibleAndKeepsRejected(t *testing.T) {
-	catalog, tpl, base := mustLoadFixtures(t)
+func TestPolicyDecisionEvaluator_RanksCompatibleByCandidateIDAndKeepsRejected(t *testing.T) {
+	tpl, base := mustLoadFixtures(t)
 	req := baseSelection()
 	obs := baseObservation()
 
@@ -15,7 +16,7 @@ func TestPolicyDecisionEvaluator_SelectsBestCompatibleAndKeepsRejected(t *testin
 	best.ID = "cp002"
 	best.GlobalParams.MinimumMaturity = 4
 	best.GlobalParams.AllowNewWallet = false
-	if err := best.NormalizeAndValidate(catalog); err != nil {
+	if err := best.NormalizeAndValidate(nil); err != nil {
 		t.Fatalf("best instance: %v", err)
 	}
 
@@ -23,18 +24,20 @@ func TestPolicyDecisionEvaluator_SelectsBestCompatibleAndKeepsRejected(t *testin
 	second.ID = "cp001"
 	second.GlobalParams.MinimumMaturity = 2
 	second.GlobalParams.AllowNewWallet = true
-	if err := second.NormalizeAndValidate(catalog); err != nil {
+	if err := second.NormalizeAndValidate(nil); err != nil {
 		t.Fatalf("second instance: %v", err)
 	}
 
 	rejected := shallowCopyInstance(base)
 	rejected.ID = "cp003"
-	rejected.GlobalParams.RequiredPosture = vocabulary.PQPostureClassicalOnly
-	if err := rejected.NormalizeAndValidate(catalog); err != nil {
+	rejected.SolutionProfileRef.ManifestVersion = "unresolved"
+	if err := rejected.NormalizeAndValidate(nil); err != nil {
 		t.Fatalf("rejected instance: %v", err)
 	}
 
-	decision, err := (PolicyDecisionEvaluator{}).Evaluate(
+	decision, err := (PolicyDecisionEvaluator{
+		CompatibilityEvaluator: PolicyCompatibilityEvaluator{Providers: mustLoadProviderRegistry(t)},
+	}).Evaluate(
 		obs,
 		&req,
 		[]PolicyDecisionCandidate{
@@ -42,13 +45,12 @@ func TestPolicyDecisionEvaluator_SelectsBestCompatibleAndKeepsRejected(t *testin
 			{Instance: rejected, Template: tpl},
 			{Instance: best, Template: tpl},
 		},
-		catalog,
 	)
 	if err != nil {
 		t.Fatalf("Evaluate: %v", err)
 	}
 
-	if got, want := decision.SelectedPolicyID, "CP002"; got != want {
+	if got, want := decision.SelectedPolicyID, "CP001"; got != want {
 		t.Fatalf("selected_policy_id: got %q want %q", got, want)
 	}
 	if got, want := len(decision.RankedCandidates), 2; got != want {
@@ -60,33 +62,42 @@ func TestPolicyDecisionEvaluator_SelectsBestCompatibleAndKeepsRejected(t *testin
 	if decision.RejectedCandidates[0].PolicyID != "CP003" {
 		t.Fatalf("rejected policy id: got %q", decision.RejectedCandidates[0].PolicyID)
 	}
+	if got := decision.RejectedCandidates[0].RejectionReasons[0].Code; got != provider.FindingCodeUnresolved {
+		t.Fatalf("rejected finding: got %q want %q", got, provider.FindingCodeUnresolved)
+	}
+	for _, candidate := range decision.RankedCandidates {
+		if candidate.CandidateID == rejected.ID {
+			t.Fatalf("unresolved provider candidate %q must never be ranked", rejected.ID)
+		}
+	}
 }
 
 func TestPolicyDecisionEvaluator_DeterministicNormalizedPolicyIDTieBreak(t *testing.T) {
-	catalog, tpl, base := mustLoadFixtures(t)
+	tpl, base := mustLoadFixtures(t)
 	req := baseSelection()
 	obs := baseObservation()
 
 	first := shallowCopyInstance(base)
 	first.ID = "cp010"
-	if err := first.NormalizeAndValidate(catalog); err != nil {
+	if err := first.NormalizeAndValidate(nil); err != nil {
 		t.Fatalf("first instance: %v", err)
 	}
 
 	second := shallowCopyInstance(base)
 	second.ID = "CP002"
-	if err := second.NormalizeAndValidate(catalog); err != nil {
+	if err := second.NormalizeAndValidate(nil); err != nil {
 		t.Fatalf("second instance: %v", err)
 	}
 
-	decision, err := (PolicyDecisionEvaluator{}).Evaluate(
+	decision, err := (PolicyDecisionEvaluator{
+		CompatibilityEvaluator: PolicyCompatibilityEvaluator{Providers: mustLoadProviderRegistry(t)},
+	}).Evaluate(
 		obs,
 		&req,
 		[]PolicyDecisionCandidate{
 			{Instance: first, Template: tpl},
 			{Instance: second, Template: tpl},
 		},
-		catalog,
 	)
 	if err != nil {
 		t.Fatalf("Evaluate: %v", err)
@@ -103,33 +114,36 @@ func TestPolicyDecisionEvaluator_DeterministicNormalizedPolicyIDTieBreak(t *test
 	}
 }
 
-func TestPolicyDecisionEvaluator_PrefersBetterTargetPostureAlignment(t *testing.T) {
-	catalog, tpl, base := mustLoadFixtures(t)
+func TestPolicyDecisionEvaluator_RankingIgnoresLegacyMaturityAndPostureCopies(t *testing.T) {
+	tpl, base := mustLoadFixtures(t)
 	req := baseSelection()
 	obs := baseObservation()
 
 	exact := shallowCopyInstance(base)
 	exact.ID = "cp100"
 	exact.GlobalParams.RequiredPosture = vocabulary.PQPostureHybrid
-	if err := exact.NormalizeAndValidate(catalog); err != nil {
+	exact.GlobalParams.MinimumMaturity = 1
+	if err := exact.NormalizeAndValidate(nil); err != nil {
 		t.Fatalf("exact instance: %v", err)
 	}
 
 	over := shallowCopyInstance(base)
 	over.ID = "cp101"
 	over.GlobalParams.RequiredPosture = vocabulary.PQPostureFullPQ
-	if err := over.NormalizeAndValidate(catalog); err != nil {
+	over.GlobalParams.MinimumMaturity = 5
+	if err := over.NormalizeAndValidate(nil); err != nil {
 		t.Fatalf("over instance: %v", err)
 	}
 
-	decision, err := (PolicyDecisionEvaluator{}).Evaluate(
+	decision, err := (PolicyDecisionEvaluator{
+		CompatibilityEvaluator: PolicyCompatibilityEvaluator{Providers: mustLoadProviderRegistry(t)},
+	}).Evaluate(
 		obs,
 		&req,
 		[]PolicyDecisionCandidate{
 			{Instance: over, Template: tpl},
 			{Instance: exact, Template: tpl},
 		},
-		catalog,
 	)
 	if err != nil {
 		t.Fatalf("Evaluate: %v", err)

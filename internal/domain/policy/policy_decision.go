@@ -14,8 +14,6 @@ import (
 var (
 	// ErrPolicyDecisionRequestNil indicates a missing selection request.
 	ErrPolicyDecisionRequestNil = errors.New("policy decision: policy selection request is nil")
-	// ErrPolicyDecisionCatalogNil indicates a missing policy graph catalog.
-	ErrPolicyDecisionCatalogNil = errors.New("policy decision: policy graph catalog is nil")
 )
 
 // PolicyDecisionCandidate groups one candidate policy instance and its optional template.
@@ -26,23 +24,17 @@ type PolicyDecisionCandidate struct {
 
 // RankedPolicy stores one compatible candidate after deterministic ranking.
 type RankedPolicy struct {
-	CandidateID              string                      `json:"candidate_id"`
-	PolicyID                 string                      `json:"policy_id"`
-	CryptoPolicyInstanceID   string                      `json:"crypto_policy_instance_id"`
-	TemplateID               string                      `json:"template_id,omitempty"`
-	RequiredPosture          vocabulary.CurrentPQPosture `json:"required_posture,omitempty"`
-	ResultingPosture         vocabulary.CurrentPQPosture `json:"resulting_posture,omitempty"`
-	SolutionProfileRef       SolutionProfileRef          `json:"solution_profile_ref,omitempty"`
-	Maturity                 string                      `json:"maturity,omitempty"`
-	ClaimStatus              string                      `json:"claim_status,omitempty"`
-	CompatibilityStatus      AssessmentStatus            `json:"compatibility_status"`
-	CompatibilityFindings    []AssessmentFinding         `json:"compatibility_findings,omitempty"`
-	TargetPostureAlignment   int                         `json:"target_posture_alignment"`
-	MaturityScore            int                         `json:"maturity_score"`
-	ChainCoverageScore       int                         `json:"chain_coverage_score"`
-	AddressContinuityMatched bool                        `json:"address_continuity_matched"`
-	AvoidsNewWalletCreation  bool                        `json:"avoids_new_wallet_creation"`
-	RankingReasons           []string                    `json:"ranking_reasons,omitempty"`
+	CandidateID            string                      `json:"candidate_id"`
+	PolicyID               string                      `json:"policy_id"`
+	CryptoPolicyInstanceID string                      `json:"crypto_policy_instance_id"`
+	TemplateID             string                      `json:"template_id,omitempty"`
+	RequiredPosture        vocabulary.CurrentPQPosture `json:"required_posture,omitempty"`
+	ResultingPosture       vocabulary.CurrentPQPosture `json:"resulting_posture,omitempty"`
+	SolutionProfileRef     SolutionProfileRef          `json:"solution_profile_ref,omitempty"`
+	Maturity               string                      `json:"maturity,omitempty"`
+	ClaimStatus            string                      `json:"claim_status,omitempty"`
+	CompatibilityStatus    AssessmentStatus            `json:"compatibility_status"`
+	CompatibilityFindings  []AssessmentFinding         `json:"compatibility_findings"`
 }
 
 // RejectedPolicy stores one incompatible candidate and explainable reasons.
@@ -57,7 +49,8 @@ type RejectedPolicy struct {
 	Maturity               string                      `json:"maturity,omitempty"`
 	ClaimStatus            string                      `json:"claim_status,omitempty"`
 	CompatibilityStatus    AssessmentStatus            `json:"compatibility_status"`
-	RejectionReasons       []AssessmentFinding         `json:"rejection_reasons,omitempty"`
+	CompatibilityFindings  []AssessmentFinding         `json:"compatibility_findings"`
+	RejectionReasons       []AssessmentFinding         `json:"-"`
 }
 
 // ObservedWalletSummary is a compact decision-facing projection of wallet input.
@@ -97,13 +90,9 @@ func (e PolicyDecisionEvaluator) Evaluate(
 	observation walletobserved.Payload,
 	req *PolicySelectionRequest,
 	candidates []PolicyDecisionCandidate,
-	catalog *PolicyGraphCatalog,
 ) (PolicyDecision, error) {
 	if req == nil {
 		return PolicyDecision{}, ErrPolicyDecisionRequestNil
-	}
-	if catalog == nil {
-		return PolicyDecision{}, ErrPolicyDecisionCatalogNil
 	}
 	if err := req.NormalizeAndValidate(); err != nil {
 		return PolicyDecision{}, err
@@ -132,7 +121,7 @@ func (e PolicyDecisionEvaluator) Evaluate(
 			continue
 		}
 
-		compatibility, err := e.CompatibilityEvaluator.Evaluate(observation, req, candidate.Instance, catalog, candidate.Template)
+		compatibility, err := e.CompatibilityEvaluator.Evaluate(observation, req, candidate.Instance, candidate.Template)
 		if err != nil {
 			return PolicyDecision{}, fmt.Errorf("candidate[%d] compatibility: %w", idx, err)
 		}
@@ -151,12 +140,13 @@ func (e PolicyDecisionEvaluator) Evaluate(
 				Maturity:               profileView.Maturity,
 				ClaimStatus:            profileView.ClaimStatus,
 				CompatibilityStatus:    compatibility.Status,
+				CompatibilityFindings:  findingsOrEmpty(compatibility.Findings),
 				RejectionReasons:       compatibility.Findings,
 			})
 			continue
 		}
 
-		ranked := buildRankedCandidate(policyID, observation, req, candidate, compatibility, catalog, profileView)
+		ranked := buildRankedCandidate(policyID, candidate, compatibility, profileView)
 		decision.RankedCandidates = append(decision.RankedCandidates, ranked)
 	}
 
@@ -178,49 +168,30 @@ func (e PolicyDecisionEvaluator) Evaluate(
 
 func buildRankedCandidate(
 	policyID string,
-	observation walletobserved.Payload,
-	req *PolicySelectionRequest,
 	candidate PolicyDecisionCandidate,
 	compatibility PolicyCompatibilityResult,
-	catalog *PolicyGraphCatalog,
 	profileView candidateProfileView,
 ) RankedPolicy {
-	path, err := effectiveNodePath(candidate.Instance, candidate.Template, catalog)
-	if err != nil {
-		// Compatibility passed, so this should never happen. Keep an explicit fallback.
-		path = nil
+	return RankedPolicy{
+		CandidateID:            candidate.Instance.ID,
+		PolicyID:               policyID,
+		CryptoPolicyInstanceID: candidate.Instance.ID,
+		TemplateID:             candidate.Instance.TemplateID,
+		RequiredPosture:        profileView.RequiredPosture,
+		ResultingPosture:       profileView.ResultingPosture,
+		SolutionProfileRef:     candidate.Instance.SolutionProfileRef,
+		Maturity:               profileView.Maturity,
+		ClaimStatus:            profileView.ClaimStatus,
+		CompatibilityStatus:    compatibility.Status,
+		CompatibilityFindings:  findingsOrEmpty(compatibility.Findings),
 	}
+}
 
-	r := RankedPolicy{
-		CandidateID:              candidate.Instance.ID,
-		PolicyID:                 policyID,
-		CryptoPolicyInstanceID:   candidate.Instance.ID,
-		TemplateID:               candidate.Instance.TemplateID,
-		RequiredPosture:          profileView.RequiredPosture,
-		ResultingPosture:         profileView.ResultingPosture,
-		SolutionProfileRef:       candidate.Instance.SolutionProfileRef,
-		Maturity:                 profileView.Maturity,
-		ClaimStatus:              profileView.ClaimStatus,
-		CompatibilityStatus:      compatibility.Status,
-		CompatibilityFindings:    compatibility.Findings,
-		TargetPostureAlignment:   computeTargetPostureAlignment(req, candidate.Instance),
-		MaturityScore:            computeMaturityScore(path, candidate.Instance, catalog),
-		ChainCoverageScore:       computeChainCoverageScore(observation, req, candidate.Instance),
-		AddressContinuityMatched: candidate.Instance.GlobalParams.AddressContinuityRequired == req.AddressContinuityRequired,
-		AvoidsNewWalletCreation:  !candidate.Instance.GlobalParams.AllowNewWallet,
-		RankingReasons: []string{
-			"compatible route retained after incompatibility filtering",
-		},
+func findingsOrEmpty(findings []AssessmentFinding) []AssessmentFinding {
+	if findings == nil {
+		return []AssessmentFinding{}
 	}
-
-	if r.AddressContinuityMatched {
-		r.RankingReasons = append(r.RankingReasons, "address continuity preference matched request")
-	}
-	if req.AllowNewWallet && r.AvoidsNewWalletCreation {
-		r.RankingReasons = append(r.RankingReasons, "prefers route that avoids new wallet creation")
-	}
-
-	return r
+	return findings
 }
 
 type candidateProfileView struct {
@@ -256,80 +227,14 @@ func resolveProfileView(reg *provider.Registry, candidate PolicyDecisionCandidat
 }
 
 func compareRanked(a, b RankedPolicy) int {
-	// 2) Better alignment first: lower delta to requested posture wins.
-	if a.TargetPostureAlignment != b.TargetPostureAlignment {
-		return cmpIntAsc(a.TargetPostureAlignment, b.TargetPostureAlignment)
-	}
-	// 3) Higher maturity wins.
-	if a.MaturityScore != b.MaturityScore {
-		return cmpIntDesc(a.MaturityScore, b.MaturityScore)
-	}
-	// 4) Better chain coverage wins.
-	if a.ChainCoverageScore != b.ChainCoverageScore {
-		return cmpIntDesc(a.ChainCoverageScore, b.ChainCoverageScore)
-	}
-	// 5) Better address continuity requirement satisfaction wins.
-	if a.AddressContinuityMatched != b.AddressContinuityMatched {
-		if a.AddressContinuityMatched {
-			return -1
-		}
-		return 1
-	}
-	// 6) Prefer avoiding new wallet creation when request allows choice.
-	if a.AvoidsNewWalletCreation != b.AvoidsNewWalletCreation {
-		if a.AvoidsNewWalletCreation {
-			return -1
-		}
-		return 1
-	}
-	// 7) Final stable tie-break on normalized policy_id.
-	if a.PolicyID < b.PolicyID {
+	// P4b: compatibility is a hard filter; ranked candidates use only a stable ID.
+	if a.CandidateID < b.CandidateID {
 		return -1
 	}
-	if a.PolicyID > b.PolicyID {
+	if a.CandidateID > b.CandidateID {
 		return 1
 	}
 	return 0
-}
-
-func computeTargetPostureAlignment(req *PolicySelectionRequest, inst *CryptoPolicyInstance) int {
-	return postureRank(inst.GlobalParams.RequiredPosture) - postureRank(req.TargetPosture)
-}
-
-func computeMaturityScore(path []string, inst *CryptoPolicyInstance, catalog *PolicyGraphCatalog) int {
-	if len(path) == 0 || catalog == nil {
-		return inst.GlobalParams.MinimumMaturity
-	}
-	score := 0
-	for idx, nodeID := range path {
-		node := catalog.Nodes[nodeID]
-		if idx == 0 || node.Maturity < score {
-			score = node.Maturity
-		}
-	}
-	return score
-}
-
-func computeChainCoverageScore(
-	observation walletobserved.Payload,
-	req *PolicySelectionRequest,
-	inst *CryptoPolicyInstance,
-) int {
-	target := req.TargetChainIDs
-	if len(target) == 0 {
-		target = observation.ChainIDs
-	}
-
-	targetSet := normalizeChainSet(target)
-	scopeSet := normalizeChainSet(inst.Scope.ChainIDs)
-
-	score := 0
-	for id := range targetSet {
-		if scopeSet[id] {
-			score++
-		}
-	}
-	return score
 }
 
 func deriveStablePolicyID(inst *CryptoPolicyInstance) string {
@@ -354,18 +259,4 @@ func normalizeASCIIUpper(value string) string {
 		b.WriteByte(ch)
 	}
 	return b.String()
-}
-
-func cmpIntAsc(a, b int) int {
-	if a < b {
-		return -1
-	}
-	if a > b {
-		return 1
-	}
-	return 0
-}
-
-func cmpIntDesc(a, b int) int {
-	return cmpIntAsc(b, a)
 }

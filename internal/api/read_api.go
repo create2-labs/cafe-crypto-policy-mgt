@@ -17,6 +17,7 @@ var (
 )
 
 type ReadStoreOptions struct {
+	// CatalogPath is retained as a no-op compatibility option until CPM-P4c.
 	CatalogPath           string
 	TemplatePaths         []string
 	InstancePaths         []string
@@ -24,7 +25,6 @@ type ReadStoreOptions struct {
 }
 
 type ReadStore struct {
-	catalog      *policy.PolicyGraphCatalog
 	templates    []*policy.CryptoPolicyTemplate
 	instances    []*policy.CryptoPolicyInstance
 	templateByID map[string]*policy.CryptoPolicyTemplate
@@ -32,9 +32,6 @@ type ReadStore struct {
 }
 
 func LoadReadStore(opts ReadStoreOptions) (*ReadStore, error) {
-	if opts.CatalogPath == "" {
-		return nil, errors.New("catalog path is required")
-	}
 	if len(opts.TemplatePaths) == 0 {
 		return nil, errors.New("at least one template path is required")
 	}
@@ -42,15 +39,10 @@ func LoadReadStore(opts ReadStoreOptions) (*ReadStore, error) {
 		return nil, errors.New("at least one instance path is required")
 	}
 
-	catalog, err := policy.LoadPolicyGraphCatalogFromFile(opts.CatalogPath)
-	if err != nil {
-		return nil, fmt.Errorf("load catalog: %w", err)
-	}
-
 	templates := make([]*policy.CryptoPolicyTemplate, 0, len(opts.TemplatePaths))
 	templateByID := make(map[string]*policy.CryptoPolicyTemplate, len(opts.TemplatePaths))
 	for _, path := range opts.TemplatePaths {
-		tpl, loadErr := policy.LoadCryptoPolicyTemplateFromFile(path, catalog)
+		tpl, loadErr := policy.LoadCryptoPolicyTemplateFromFile(path, nil)
 		if loadErr != nil {
 			return nil, fmt.Errorf("load template %q: %w", path, loadErr)
 		}
@@ -64,7 +56,7 @@ func LoadReadStore(opts ReadStoreOptions) (*ReadStore, error) {
 	instances := make([]*policy.CryptoPolicyInstance, 0, len(opts.InstancePaths))
 	instanceIDs := make(map[string]struct{}, len(opts.InstancePaths))
 	for _, path := range opts.InstancePaths {
-		inst, loadErr := policy.LoadCryptoPolicyInstanceFromFile(path, catalog)
+		inst, loadErr := policy.LoadCryptoPolicyInstanceFromFile(path, nil)
 		if loadErr != nil {
 			return nil, fmt.Errorf("load instance %q: %w", path, loadErr)
 		}
@@ -77,14 +69,14 @@ func LoadReadStore(opts ReadStoreOptions) (*ReadStore, error) {
 
 	var providers *provider.Registry
 	if len(opts.ProviderManifestPaths) > 0 {
-		providers, err = provider.LoadRegistryFromFiles(opts.ProviderManifestPaths)
-		if err != nil {
-			return nil, fmt.Errorf("load provider manifests: %w", err)
+		var loadErr error
+		providers, loadErr = provider.LoadRegistryFromFiles(opts.ProviderManifestPaths)
+		if loadErr != nil {
+			return nil, fmt.Errorf("load provider manifests: %w", loadErr)
 		}
 	}
 
 	return &ReadStore{
-		catalog:      catalog,
 		templates:    templates,
 		instances:    instances,
 		templateByID: templateByID,
@@ -105,7 +97,10 @@ func RegisterReadRoutes(mux *http.ServeMux, store *ReadStore) error {
 
 func registerReadRoutesForPrefix(mux *http.ServeMux, store *ReadStore, prefix string) {
 	mux.HandleFunc("GET "+prefix+"/catalog", func(w http.ResponseWriter, _ *http.Request) {
-		respondJSON(w, http.StatusOK, map[string]any{"catalog": store.catalog})
+		respondJSON(w, http.StatusOK, map[string]any{
+			"templates": store.templates,
+			"instances": store.instances,
+		})
 	})
 	mux.HandleFunc("GET "+prefix+"/templates", func(w http.ResponseWriter, _ *http.Request) {
 		respondJSON(w, http.StatusOK, map[string]any{"items": store.templates})
@@ -141,7 +136,6 @@ func registerReadRoutesForPrefix(mux *http.ServeMux, store *ReadStore, prefix st
 			observation,
 			&req.SelectionRequest,
 			candidates,
-			store.catalog,
 		)
 		if err != nil {
 			respondJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})

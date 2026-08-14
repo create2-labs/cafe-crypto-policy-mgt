@@ -44,7 +44,7 @@ tags:
   - name: drafts
     description: Policy drafts (§0.2).
   - name: catalog
-    description: Static catalogue reads (graph, templates, reference instances).
+    description: Static catalogue reads (templates and reference instances).
   - name: decisions
     description: Non-persisted decision exploration (`explore`).
   - name: wallet-authorization
@@ -60,11 +60,11 @@ paths:
   /policies/catalog:
     get:
       tags: [catalog]
-      summary: Get policy catalog (static)
+      summary: Get graph-free policy catalogue (static)
       operationId: getPoliciesCatalog
       responses:
         "200":
-          description: Catalogue payload (format as implemented; typically JSON or YAML-backed).
+          description: Catalogue templates and reference instances; no policy graph topology.
           content:
             application/json:
               schema:
@@ -803,7 +803,15 @@ components:
 
     RankedPolicyCandidate:
       type: object
-      required: [candidate_id, crypto_policy_instance_id, compatibility_status]
+      required:
+        - candidate_id
+        - crypto_policy_instance_id
+        - template_id
+        - required_posture
+        - solution_profile_ref
+        - resulting_posture
+        - compatibility_status
+        - compatibility_findings
       properties:
         candidate_id:
           type: string
@@ -836,24 +844,17 @@ components:
           items:
             type: object
             additionalProperties: true
-        target_posture_alignment:
-          type: integer
-        maturity_score:
-          type: integer
-        chain_coverage_score:
-          type: integer
-        address_continuity_matched:
-          type: boolean
-        avoids_new_wallet_creation:
-          type: boolean
-        ranking_reasons:
-          type: array
-          items:
-            type: string
 
     RejectedPolicyCandidate:
       type: object
-      required: [candidate_id, crypto_policy_instance_id, compatibility_status]
+      required:
+        - candidate_id
+        - crypto_policy_instance_id
+        - template_id
+        - required_posture
+        - solution_profile_ref
+        - compatibility_status
+        - compatibility_findings
       properties:
         candidate_id:
           type: string
@@ -879,7 +880,7 @@ components:
           enum: [declared, cafe_reviewed, externally_audited, executed_observed]
         compatibility_status:
           type: string
-        rejection_reasons:
+        compatibility_findings:
           type: array
           items:
             type: object

@@ -11,7 +11,7 @@ import (
 )
 
 func TestPolicyDecisionEvaluator_providerHard_rankedVsRejected(t *testing.T) {
-	cat, tpl, inst := mustLoadFixtures(t)
+	tpl, inst := mustLoadFixtures(t)
 	reg, err := provider.LoadRegistryFromFiles([]string{
 		filepath.Join("..", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
 	})
@@ -41,7 +41,7 @@ func TestPolicyDecisionEvaluator_providerHard_rankedVsRejected(t *testing.T) {
 		RequireBundlerAvailable:   true,
 		ApprovalMode:              ApprovalModeManual,
 	}
-	decision, err := ev.Evaluate(obs, &okReq, []PolicyDecisionCandidate{{Instance: inst, Template: tpl}}, cat)
+	decision, err := ev.Evaluate(obs, &okReq, []PolicyDecisionCandidate{{Instance: inst, Template: tpl}})
 	if err != nil {
 		t.Fatalf("Evaluate: %v", err)
 	}
@@ -51,7 +51,7 @@ func TestPolicyDecisionEvaluator_providerHard_rankedVsRejected(t *testing.T) {
 
 	bad := okReq
 	bad.KeyRotationModel = KeyRotationNone
-	decision, err = ev.Evaluate(obs, &bad, []PolicyDecisionCandidate{{Instance: inst, Template: tpl}}, cat)
+	decision, err = ev.Evaluate(obs, &bad, []PolicyDecisionCandidate{{Instance: inst, Template: tpl}})
 	if err != nil {
 		t.Fatalf("Evaluate reject: %v", err)
 	}

@@ -50,7 +50,6 @@ func TestLoadReadStoreAndRoutes(t *testing.T) {
 
 func TestLoadReadStore_RAZCatalogue(t *testing.T) {
 	store, err := LoadReadStore(ReadStoreOptions{
-		CatalogPath: fixturePath("policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
 		},
@@ -81,13 +80,13 @@ func TestLoadReadStore_RAZCatalogue(t *testing.T) {
 
 func TestDecisionExplorePreservesDeployabilityDistinction(t *testing.T) {
 	store, err := LoadReadStore(ReadStoreOptions{
-		CatalogPath: fixturePath("policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
 			fixturePath("crypto_policy_instance_pq_account_validation_v1.json"),
 		},
+		ProviderManifestPaths: []string{providerManifestFixturePath()},
 	})
 	if err != nil {
 		t.Fatalf("LoadReadStore: %v", err)
@@ -102,18 +101,18 @@ func TestDecisionExplorePreservesDeployabilityDistinction(t *testing.T) {
 		"policy_context": map[string]any{
 			"wallet_address":     "0x742d35cc6634c0532925a3b844bc454e4438f44e",
 			"wallet_type":        "eoa",
-			"chain_ids":          []int{1, 8453},
+			"chain_ids":          []int64{11155111},
 			"current_algorithm":  "secp256k1_ecrecover",
 			"current_pq_posture": "classical_only",
 			"scanned_at":         "2026-04-17T09:59:58Z",
 		},
 		"selection_request": map[string]any{
 			"target_posture":              string(vocabulary.PQPostureHybrid),
-			"target_chain_ids":            []int64{1, 8453},
-			"require_multichain":          true,
-			"allow_new_wallet":            false,
-			"address_continuity_required": true,
-			"key_rotation_model": "per_userop",
+			"target_chain_ids":            []int64{11155111},
+			"require_multichain":          false,
+			"allow_new_wallet":            true,
+			"address_continuity_required": false,
+			"key_rotation_model":          "per_userop",
 			"recovery_required":           true,
 			"minimum_maturity":            1,
 			"approval_mode":               "manual",
@@ -159,13 +158,13 @@ func TestDecisionExplorePreservesDeployabilityDistinction(t *testing.T) {
 
 func TestDecisionExplore_optionA_policy_context(t *testing.T) {
 	store, err := LoadReadStore(ReadStoreOptions{
-		CatalogPath: fixturePath("policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
 			fixturePath("crypto_policy_instance_pq_account_validation_v1.json"),
 		},
+		ProviderManifestPaths: []string{providerManifestFixturePath()},
 	})
 	if err != nil {
 		t.Fatalf("LoadReadStore: %v", err)
@@ -182,18 +181,18 @@ func TestDecisionExplore_optionA_policy_context(t *testing.T) {
 			"scan_id":            "705c9704-9428-45e0-882d-fae4cb9d2a0b",
 			"wallet_address":     "0x0802b015613ef6701192811e595e085a9c560caf",
 			"wallet_type":        "EOA",
-			"chain_ids":          []int{1},
+			"chain_ids":          []int64{11155111},
 			"current_pq_posture": "classical_only",
 			"scanned_at":         "2026-05-11T10:27:10.187512Z",
 			"status":             "completed",
 		},
 		"selection_request": map[string]any{
 			"target_posture":              string(vocabulary.PQPostureHybrid),
-			"target_chain_ids":            []int64{1},
+			"target_chain_ids":            []int64{11155111},
 			"require_multichain":          false,
-			"allow_new_wallet":            false,
-			"address_continuity_required": true,
-			"key_rotation_model": "per_userop",
+			"allow_new_wallet":            true,
+			"address_continuity_required": false,
+			"key_rotation_model":          "per_userop",
 			"recovery_required":           true,
 			"minimum_maturity":            1,
 			"approval_mode":               "manual",
@@ -265,7 +264,7 @@ func TestDecisionExplore_discoveryV1WalletScanDetailEnvelope(t *testing.T) {
 			"require_multichain":          false,
 			"allow_new_wallet":            false,
 			"address_continuity_required": true,
-			"key_rotation_model": "per_userop",
+			"key_rotation_model":          "per_userop",
 			"recovery_required":           true,
 			"minimum_maturity":            1,
 			"approval_mode":               "manual",
@@ -318,7 +317,7 @@ func TestDecisionExplore_targetAddressFlatPolicyContext(t *testing.T) {
 			"require_multichain":          false,
 			"allow_new_wallet":            false,
 			"address_continuity_required": true,
-			"key_rotation_model": "per_userop",
+			"key_rotation_model":          "per_userop",
 			"recovery_required":           true,
 			"minimum_maturity":            1,
 			"approval_mode":               "manual",
@@ -377,7 +376,7 @@ func TestDecisionExplore_doesNotMutateReadStoreInstances(t *testing.T) {
 			"require_multichain":          true,
 			"allow_new_wallet":            false,
 			"address_continuity_required": true,
-			"key_rotation_model": "per_userop",
+			"key_rotation_model":          "per_userop",
 			"recovery_required":           true,
 			"minimum_maturity":            1,
 			"approval_mode":               "manual",
@@ -405,4 +404,8 @@ func TestDecisionExplore_doesNotMutateReadStoreInstances(t *testing.T) {
 
 func fixturePath(name string) string {
 	return filepath.Join("..", "domain", "policy", "testdata", name)
+}
+
+func providerManifestFixturePath() string {
+	return filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json")
 }

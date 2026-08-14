@@ -212,13 +212,13 @@ func TestExploreObservability_skipsWhenRejectedEmpty(t *testing.T) {
 
 func TestDecisionExplore_noDeployableCandidateObservabilityIntegration(t *testing.T) {
 	store, err := LoadReadStore(ReadStoreOptions{
-		CatalogPath: fixturePath("policy_graph_catalog_valid.json"),
 		TemplatePaths: []string{
 			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
 			fixturePath("crypto_policy_instance_pq_account_validation_v1.json"),
 		},
+		ProviderManifestPaths: []string{providerManifestFixturePath()},
 	})
 	if err != nil {
 		t.Fatalf("LoadReadStore: %v", err)
@@ -228,7 +228,8 @@ func TestDecisionExplore_noDeployableCandidateObservabilityIntegration(t *testin
 	restore := setExploreObservabilityForTest(exploreObservability{metrics: metrics})
 	defer restore()
 
-	store.instances[0].Scope.ChainIDs = []int64{1, 3, 5}
+	store.instances[0].Scope.ChainIDs = []int64{1}
+	store.instances[0].Scope.RequireMultichain = false
 
 	mux := http.NewServeMux()
 	if err := RegisterReadRoutes(mux, store); err != nil {
@@ -240,18 +241,18 @@ func TestDecisionExplore_noDeployableCandidateObservabilityIntegration(t *testin
 		"policy_context": map[string]any{
 			"wallet_address":     "0x742d35cc6634c0532925a3b844bc454e4438f44e",
 			"wallet_type":        "eoa",
-			"chain_ids":          []int64{1, 2, 5},
+			"chain_ids":          []int64{11155111},
 			"current_algorithm":  "secp256k1_ecrecover",
 			"current_pq_posture": "classical_only",
 			"scanned_at":         "2026-04-17T09:59:58Z",
 		},
 		"selection_request": map[string]any{
 			"target_posture":              string(vocabulary.PQPostureHybrid),
-			"target_chain_ids":            []int64{1, 2, 5},
-			"require_multichain":          true,
-			"allow_new_wallet":            false,
-			"address_continuity_required": true,
-			"key_rotation_model": "per_userop",
+			"target_chain_ids":            []int64{11155111},
+			"require_multichain":          false,
+			"allow_new_wallet":            true,
+			"address_continuity_required": false,
+			"key_rotation_model":          "per_userop",
 			"recovery_required":           true,
 			"minimum_maturity":            1,
 			"approval_mode":               "manual",
@@ -274,9 +275,9 @@ func TestDecisionExplore_noDeployableCandidateObservabilityIntegration(t *testin
 			SelectedPolicyID   string `json:"selected_policy_id"`
 			RankedCandidates   []any  `json:"ranked_candidates"`
 			RejectedCandidates []struct {
-				RejectionReasons []struct {
+				CompatibilityFindings []struct {
 					Code string `json:"code"`
-				} `json:"rejection_reasons"`
+				} `json:"compatibility_findings"`
 			} `json:"rejected_candidates"`
 		} `json:"decision"`
 	}
@@ -294,7 +295,7 @@ func TestDecisionExplore_noDeployableCandidateObservabilityIntegration(t *testin
 	}
 	foundChainScope := false
 	for _, rejected := range response.Decision.RejectedCandidates {
-		for _, reason := range rejected.RejectionReasons {
+		for _, reason := range rejected.CompatibilityFindings {
 			if reason.Code == rejectionCodeChainScope {
 				foundChainScope = true
 			}

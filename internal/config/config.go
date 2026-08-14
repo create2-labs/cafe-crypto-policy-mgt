@@ -14,7 +14,7 @@ const (
 	defaultDiscoveryHTTPTimeoutSec     = 5
 	defaultSessionValidationTimeoutSec = 3
 	defaultScanAuthorizationTimeoutSec = 3
-	defaultPolicyCatalogPath           = "/app/policy/policy_graph_catalog_valid.json"
+	defaultPolicyCatalogPath           = ""
 	defaultPolicyTemplatePaths         = "/app/policy/crypto_policy_template_pq_account_validation_v1.json"
 	defaultPolicyInstancePaths         = "/app/policy/crypto_policy_instance_pq_account_validation_v1.json"
 	defaultProviderManifestPaths       = "/app/policy/provider_manifest_nicetry_v0_1.json"
@@ -33,12 +33,12 @@ type Config struct {
 	ScanAuthorizationURL          string
 	ScanAuthorizationTimeoutSec   int
 	ScanAuthorizationServiceToken string
-	AuthClockSkewSec                    int
+	AuthClockSkewSec              int
 	// DiscoveryHTTPBaseURL is the Discovery service origin for server-side GET /discovery/v1/... (PR13g).
-	DiscoveryHTTPBaseURL string
+	DiscoveryHTTPBaseURL    string
 	DiscoveryHTTPTimeoutSec int
 	// NATSURL enables publishing policy.assessment.requested from POST …/policies/assessment/request (PR13g).
-	NATSURL string
+	NATSURL             string
 	PolicyCatalogPath   string
 	PolicyTemplatePaths []string
 	PolicyInstancePaths []string
@@ -60,29 +60,29 @@ type Config struct {
 
 func LoadFromEnv() Config {
 	return Config{
-		ServiceName:                         getEnv("CPM_SERVICE_NAME", defaultService),
-		HTTPAddr:                            getEnv("CPM_HTTP_ADDR", defaultHTTPAddr),
-		LogLevel:                            getEnv("CPM_LOG_LEVEL", defaultLogLevel),
-		AuthRequired:                        getEnvBool("CPM_AUTH_REQUIRED", defaultAuthRequired),
-		SessionValidationURL:                getEnv("CAFE_SESSION_JWT_VALIDATION_URL", ""),
-		SessionValidationTimeoutSec:         getEnvInt("CAFE_SESSION_JWT_VALIDATION_TIMEOUT_SEC", defaultSessionValidationTimeoutSec),
-		SessionValidationServiceToken:       getEnv("CAFE_SESSION_JWT_VALIDATION_SERVICE_TOKEN", ""),
-		ScanAuthorizationURL:                getEnv("CAFE_SCAN_AUTHORIZATION_URL", ""),
-		ScanAuthorizationTimeoutSec:         getEnvInt("CAFE_SCAN_AUTHORIZATION_TIMEOUT_SEC", defaultScanAuthorizationTimeoutSec),
-		ScanAuthorizationServiceToken:       getEnv("CAFE_SCAN_AUTHORIZATION_SERVICE_TOKEN", ""),
-		AuthClockSkewSec:                    getEnvInt("CPM_AUTH_CLOCK_SKEW_SEC", defaultAuthClockSkewSec),
-		DiscoveryHTTPBaseURL:                getEnv("CAFE_DISCOVERY_HTTP_BASE", ""),
-		DiscoveryHTTPTimeoutSec:             getEnvInt("CAFE_DISCOVERY_HTTP_TIMEOUT_SEC", defaultDiscoveryHTTPTimeoutSec),
-		NATSURL:                             getEnv("CPM_NATS_URL", ""),
-		PolicyCatalogPath:                   getEnv("CPM_POLICY_CATALOG_PATH", defaultPolicyCatalogPath),
-		PolicyTemplatePaths:                 parseCommaList(getEnv("CPM_POLICY_TEMPLATE_PATHS", defaultPolicyTemplatePaths)),
-		PolicyInstancePaths:                 parseCommaList(getEnv("CPM_POLICY_INSTANCE_PATHS", defaultPolicyInstancePaths)),
-		ProviderManifestPaths:               parseCommaList(getEnv("CPM_PROVIDER_MANIFEST_PATHS", defaultProviderManifestPaths)),
-		WalletAuthDomain:                    getEnv("CPM_WALLET_AUTH_DOMAIN", ""),
-		Store:                               getEnv("CPM_STORE", defaultCPMStore),
-		PersistenceURL:                      getEnv("CPM_PERSISTENCE_URL", ""),
-		PersistenceTimeoutSec:             getEnvInt("CPM_PERSISTENCE_TIMEOUT_SEC", defaultPersistenceTimeoutSec),
-		PersistenceServiceToken:             getEnv("CAFE_PERSISTENCE_SERVICE_TOKEN", ""),
+		ServiceName:                   getEnv("CPM_SERVICE_NAME", defaultService),
+		HTTPAddr:                      getEnv("CPM_HTTP_ADDR", defaultHTTPAddr),
+		LogLevel:                      getEnv("CPM_LOG_LEVEL", defaultLogLevel),
+		AuthRequired:                  getEnvBool("CPM_AUTH_REQUIRED", defaultAuthRequired),
+		SessionValidationURL:          getEnv("CAFE_SESSION_JWT_VALIDATION_URL", ""),
+		SessionValidationTimeoutSec:   getEnvInt("CAFE_SESSION_JWT_VALIDATION_TIMEOUT_SEC", defaultSessionValidationTimeoutSec),
+		SessionValidationServiceToken: getEnv("CAFE_SESSION_JWT_VALIDATION_SERVICE_TOKEN", ""),
+		ScanAuthorizationURL:          getEnv("CAFE_SCAN_AUTHORIZATION_URL", ""),
+		ScanAuthorizationTimeoutSec:   getEnvInt("CAFE_SCAN_AUTHORIZATION_TIMEOUT_SEC", defaultScanAuthorizationTimeoutSec),
+		ScanAuthorizationServiceToken: getEnv("CAFE_SCAN_AUTHORIZATION_SERVICE_TOKEN", ""),
+		AuthClockSkewSec:              getEnvInt("CPM_AUTH_CLOCK_SKEW_SEC", defaultAuthClockSkewSec),
+		DiscoveryHTTPBaseURL:          getEnv("CAFE_DISCOVERY_HTTP_BASE", ""),
+		DiscoveryHTTPTimeoutSec:       getEnvInt("CAFE_DISCOVERY_HTTP_TIMEOUT_SEC", defaultDiscoveryHTTPTimeoutSec),
+		NATSURL:                       getEnv("CPM_NATS_URL", ""),
+		PolicyCatalogPath:             getEnv("CPM_POLICY_CATALOG_PATH", defaultPolicyCatalogPath),
+		PolicyTemplatePaths:           parseCommaList(getEnv("CPM_POLICY_TEMPLATE_PATHS", defaultPolicyTemplatePaths)),
+		PolicyInstancePaths:           parseCommaList(getEnv("CPM_POLICY_INSTANCE_PATHS", defaultPolicyInstancePaths)),
+		ProviderManifestPaths:         parseCommaList(getEnv("CPM_PROVIDER_MANIFEST_PATHS", defaultProviderManifestPaths)),
+		WalletAuthDomain:              getEnv("CPM_WALLET_AUTH_DOMAIN", ""),
+		Store:                         getEnv("CPM_STORE", defaultCPMStore),
+		PersistenceURL:                getEnv("CPM_PERSISTENCE_URL", ""),
+		PersistenceTimeoutSec:         getEnvInt("CPM_PERSISTENCE_TIMEOUT_SEC", defaultPersistenceTimeoutSec),
+		PersistenceServiceToken:       getEnv("CAFE_PERSISTENCE_SERVICE_TOKEN", ""),
 	}
 }
 
