@@ -6,6 +6,6 @@
 // hard compatibility against solution_profile_ref, including required_posture vs
 // resulting_posture (CPM-P4 / CPM-P4b). Ranked candidates also expose soft
 // findings requires_bundler / requires_local_signer_state (CPM-P5). Persist
-// snapshot gates arrive in CPM-P6. account_validation_posture is not part of
-// the schema.
+// gates (accepted_provider_snapshot + pinned refs) live in package policy
+// (CPM-P6). account_validation_posture is not part of the schema.
 package provider

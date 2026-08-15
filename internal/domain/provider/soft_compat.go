@@ -1,8 +1,8 @@
 package provider
 
 // Stable soft-finding codes (ADR §7 / CPM-P5). These do not block ranking.
-// Persist acceptance of these codes is CPM-P6. Wallet-control proof is persist-only
-// and is never emitted as an explore finding.
+// Persist acceptance of these codes is enforced by policy.ValidateDraftPayloadForPersist (CPM-P6).
+// Wallet-control proof is persist-only and is never emitted as an explore finding.
 const (
 	FindingCodeRequiresBundler          = "requires_bundler"
 	FindingCodeRequiresLocalSignerState = "requires_local_signer_state"

@@ -41,7 +41,7 @@ func newWalletChallengeTestHandlerWithWallet(t *testing.T, wallet, scanID, domai
 	discovery := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, scanID) {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"scan_id":"`+scanID+`","status":"completed","result":{"target_address":"`+wallet+`"}}`))
+			_, _ = w.Write([]byte(`{"scan_id":"` + scanID + `","status":"completed","result":{"target_address":"` + wallet + `"}}`))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -100,7 +100,12 @@ func buildDraftPersistSignedRequest(t *testing.T, draftID string, issued, expire
 
 func createDraftPersistBoundDraft(t *testing.T, h http.Handler, token, draftID string) {
 	t.Helper()
-	body := `{"id":"` + draftID + `","scan_id":"` + draftPersistTestScanID + `","payload":{"policy_context":{"wallet_address":"` + draftPersistTestWallet + `","wallet_type":"eoa"}}}`
+	createDraftPersistBoundDraftWithPayload(t, h, token, draftID, draftPersistValidPayloadJSON())
+}
+
+func createDraftPersistBoundDraftWithPayload(t *testing.T, h http.Handler, token, draftID, payloadJSON string) {
+	t.Helper()
+	body := `{"id":"` + draftID + `","scan_id":"` + draftPersistTestScanID + `","payload":` + payloadJSON + `}`
 	req := httptest.NewRequest(http.MethodPost, cpmroutes.Drafts, strings.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
@@ -109,6 +114,67 @@ func createDraftPersistBoundDraft(t *testing.T, h http.Handler, token, draftID s
 	if rec.Code != http.StatusOK {
 		t.Fatalf("create draft: %d %s", rec.Code, rec.Body.String())
 	}
+}
+
+// draftPersistValidPayloadJSON is a cafe.crypto_policy.v0.2 draft body with pinned refs (CPM-P6).
+func draftPersistValidPayloadJSON() string {
+	return `{
+		"schema_version":"cafe.crypto_policy.v0.2",
+		"policy_kind":"wallet_migration_policy",
+		"template_id":"tpl_pq_account_validation_v1",
+		"required_posture":"hybrid",
+		"solution_profile_ref":{
+			"provider_id":"nicetry",
+			"solution_profile_id":"nicetry.fors_c.erc4337.v0_1",
+			"manifest_version":"2026-08",
+			"verification_date":"2026-08-03"
+		},
+		"accepted_provider_snapshot":{
+			"maturity":"research",
+			"claim_status":"declared",
+			"resulting_posture":"hybrid",
+			"input_requirements":{"wallet_types":["EOA"],"requires_wallet_control_proof":true},
+			"signature":{"scheme":"FORS+C","family":"hash_based","key_rotation_model":"per_userop"},
+			"account_model":{"standard":"ERC-4337","execution_model":"erc4337_bundler","requires_bundler":true,"requires_entrypoint":true,"entrypoint_versions":["0.7"]},
+			"constraints":{"requires_new_account":true,"address_continuity_supported":false,"requires_local_signer_state":true},
+			"chain_support_used":{"chain_id":11155111,"status":"testnet_supported","capabilities":["deploy","sign_userop","rotate_signer"]},
+			"references":[
+				{"kind":"source_repo","url":"https://github.com/RivaLabs-Core/NiceTry","commit":"abc123deadbeef"},
+				{"kind":"protocol_spec","url":"https://github.com/RivaLabs-Core/Ephemeral-Keys-Protocol","version":"v0.1.0-test"}
+			],
+			"accepted_findings":["requires_bundler","requires_local_signer_state"],
+			"accepted_risk_notes":["test note"]
+		},
+		"policy_context":{"wallet_address":"` + draftPersistTestWallet + `","wallet_type":"eoa"}
+	}`
+}
+
+func draftPersistUnpinnedPayloadJSON() string {
+	return `{
+		"schema_version":"cafe.crypto_policy.v0.2",
+		"template_id":"tpl_pq_account_validation_v1",
+		"required_posture":"hybrid",
+		"solution_profile_ref":{
+			"provider_id":"nicetry",
+			"solution_profile_id":"nicetry.fors_c.erc4337.v0_1",
+			"manifest_version":"2026-08"
+		},
+		"accepted_provider_snapshot":{
+			"maturity":"research",
+			"claim_status":"declared",
+			"resulting_posture":"hybrid",
+			"input_requirements":{"wallet_types":["EOA"],"requires_wallet_control_proof":true},
+			"signature":{"scheme":"FORS+C","family":"hash_based","key_rotation_model":"per_userop"},
+			"account_model":{"standard":"ERC-4337","execution_model":"erc4337_bundler","requires_bundler":true,"requires_entrypoint":true},
+			"constraints":{"requires_new_account":true,"address_continuity_supported":false,"requires_local_signer_state":true},
+			"chain_support_used":{"chain_id":11155111,"status":"testnet_supported"},
+			"references":[
+				{"kind":"source_repo","url":"https://github.com/RivaLabs-Core/NiceTry","commit":"unpinned_pending_fixture"}
+			],
+			"accepted_findings":["requires_bundler","requires_local_signer_state"]
+		},
+		"policy_context":{"wallet_address":"` + draftPersistTestWallet + `","wallet_type":"eoa"}
+	}`
 }
 
 func TestDraftPersist_happyPath(t *testing.T) {
@@ -189,6 +255,51 @@ func TestDraftPersist_replayReturnsAlreadyPersisted(t *testing.T) {
 		t.Fatalf("replay status = %d want 409 body=%s", second.Code, second.Body.String())
 	}
 	assertAuthErrorPayload(t, second, walletAuthCodeDraftAlreadyPersisted)
+}
+
+func TestDraftPersist_rejectsUnpinnedProviderRefs(t *testing.T) {
+	h := newDraftPersistTestHandler(t)
+	token := mustToken(t, "draft-persist-unpinned")
+	draftID := "draft-persist-unpinned"
+	createDraftPersistBoundDraftWithPayload(t, h, token, draftID, draftPersistUnpinnedPayloadJSON())
+
+	issued := time.Now().UTC().Truncate(time.Second)
+	expires := issued.Add(10 * time.Minute)
+	message, signature := buildDraftPersistSignedRequest(t, draftID, issued, expires)
+	body := `{"wallet_address":"` + draftPersistTestWallet + `","chain_id":1,"scan_id":"` + draftPersistTestScanID + `","signed_message":` + jsonString(message) + `,"signature":"` + signature + `"}`
+
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.DraftPersistPath(draftID), strings.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d want 400 body=%s", rec.Code, rec.Body.String())
+	}
+	assertAuthErrorPayload(t, rec, persistCodeProviderRefsUnpinned)
+}
+
+func TestDraftPersist_rejectsMissingSnapshot(t *testing.T) {
+	h := newDraftPersistTestHandler(t)
+	token := mustToken(t, "draft-persist-no-snap")
+	draftID := "draft-persist-no-snap"
+	minimal := `{"policy_context":{"wallet_address":"` + draftPersistTestWallet + `","wallet_type":"eoa"}}`
+	createDraftPersistBoundDraftWithPayload(t, h, token, draftID, minimal)
+
+	issued := time.Now().UTC().Truncate(time.Second)
+	expires := issued.Add(10 * time.Minute)
+	message, signature := buildDraftPersistSignedRequest(t, draftID, issued, expires)
+	body := `{"wallet_address":"` + draftPersistTestWallet + `","chain_id":1,"scan_id":"` + draftPersistTestScanID + `","signed_message":` + jsonString(message) + `,"signature":"` + signature + `"}`
+
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.DraftPersistPath(draftID), strings.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d want 400 body=%s", rec.Code, rec.Body.String())
+	}
+	assertAuthErrorPayload(t, rec, persistCodeCryptoPolicyPayloadInvalid)
 }
 
 func TestPersistPolicyRequiresWalletSignatureForEOA(t *testing.T) {

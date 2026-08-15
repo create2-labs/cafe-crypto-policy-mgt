@@ -3,17 +3,23 @@ package app
 import "net/http"
 
 const (
-	walletAuthCodeAddressRequired     = "WALLET_ADDRESS_REQUIRED"
-	walletAuthCodeInvalidAddress      = "INVALID_WALLET_ADDRESS"
-	walletAuthCodeChainIDRequired     = "CHAIN_ID_REQUIRED"
-	walletAuthCodeDraftNotFound       = "DRAFT_NOT_FOUND"
-	walletAuthCodeScanNotFound        = "SCAN_NOT_FOUND"
-	walletAuthCodeDraftScanMismatch   = "DRAFT_SCAN_MISMATCH"
-	walletAuthCodeDraftWalletMismatch = "DRAFT_WALLET_MISMATCH"
-	walletAuthCodeUnsupportedWallet   = "UNSUPPORTED_WALLET_TYPE"
+	walletAuthCodeAddressRequired       = "WALLET_ADDRESS_REQUIRED"
+	walletAuthCodeInvalidAddress        = "INVALID_WALLET_ADDRESS"
+	walletAuthCodeChainIDRequired       = "CHAIN_ID_REQUIRED"
+	walletAuthCodeDraftNotFound         = "DRAFT_NOT_FOUND"
+	walletAuthCodeScanNotFound          = "SCAN_NOT_FOUND"
+	walletAuthCodeDraftScanMismatch     = "DRAFT_SCAN_MISMATCH"
+	walletAuthCodeDraftWalletMismatch   = "DRAFT_WALLET_MISMATCH"
+	walletAuthCodeUnsupportedWallet     = "UNSUPPORTED_WALLET_TYPE"
 	walletAuthCodeActionRequired        = "WALLET_AUTHORIZATION_ACTION_MISMATCH"
 	walletAuthCodeControlProofRequired  = "WALLET_CONTROL_PROOF_REQUIRED"
 	walletAuthCodeDraftAlreadyPersisted = "DRAFT_ALREADY_PERSISTED"
+
+	// CPM-P6 provider snapshot gates (ADR §9) — returned on draft persist before store write.
+	persistCodeCryptoPolicyPayloadInvalid   = "CRYPTO_POLICY_PAYLOAD_INVALID"
+	persistCodeProviderRefsUnpinned         = "PROVIDER_REFS_UNPINNED"
+	persistCodeProviderSoftFindingsRequired = "PROVIDER_SOFT_FINDINGS_REQUIRED"
+	persistCodeProviderChainPlanned         = "PROVIDER_CHAIN_PLANNED"
 )
 
 func writeWalletAuthorizationError(w http.ResponseWriter, r *http.Request, obs *authObservability, status int, code string, message string) {
