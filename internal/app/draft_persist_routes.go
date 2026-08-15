@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/policy"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/persistence"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/walletauth"
 )
@@ -109,6 +110,13 @@ func handleDraftPersist(w http.ResponseWriter, r *http.Request, store persistenc
 	draftScan := strings.TrimSpace(draft.ScanID)
 	if draftScan == "" || !strings.EqualFold(draftScan, normScanID) {
 		writeWalletAuthorizationError(w, r, obs, http.StatusConflict, walletAuthCodeDraftScanMismatch, "draft scan does not match requested scan")
+		return
+	}
+
+	// CPM-P6: ADR §9 persist gate (snapshot + pinned refs + soft findings). Store stays opaque.
+	if gateErr := policy.ValidateDraftPayloadForPersist(draft.Payload); gateErr != nil {
+		status, code, message := mapPersistProviderGateError(gateErr)
+		writeWalletAuthorizationError(w, r, obs, status, code, message)
 		return
 	}
 
@@ -230,5 +238,21 @@ func mapWalletAuthorizationVerificationError(err error) (status int, code string
 		return http.StatusConflict, code, message
 	default:
 		return http.StatusBadRequest, code, message
+	}
+}
+
+func mapPersistProviderGateError(err error) (status int, code string, message string) {
+	message = err.Error()
+	switch {
+	case errors.Is(err, policy.ErrProviderRefsUnpinned):
+		return http.StatusBadRequest, persistCodeProviderRefsUnpinned, message
+	case errors.Is(err, policy.ErrProviderSoftFindingsRequired):
+		return http.StatusBadRequest, persistCodeProviderSoftFindingsRequired, message
+	case errors.Is(err, policy.ErrProviderChainPlanned):
+		return http.StatusBadRequest, persistCodeProviderChainPlanned, message
+	case errors.Is(err, policy.ErrCryptoPolicyPayloadInvalid):
+		return http.StatusBadRequest, persistCodeCryptoPolicyPayloadInvalid, message
+	default:
+		return http.StatusBadRequest, persistCodeCryptoPolicyPayloadInvalid, message
 	}
 }
