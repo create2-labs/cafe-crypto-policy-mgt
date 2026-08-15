@@ -65,7 +65,11 @@ func (e PolicyCompatibilityEvaluator) Evaluate(
 	if err := tpl.NormalizeAndValidate(); err != nil {
 		return PolicyCompatibilityResult{}, err
 	}
-	return e.evaluateProviderCandidate(observation, req, inst, tpl), nil
+	result := e.evaluateProviderCandidate(observation, req, inst, tpl)
+	if result.Status != AssessmentStatusIncompatible {
+		result.Findings = append(result.Findings, e.providerSoftFindings(inst)...)
+	}
+	return result, nil
 }
 
 func (e PolicyCompatibilityEvaluator) evaluateProviderCandidate(
@@ -109,7 +113,6 @@ func checkPostureCompatibility(req *PolicySelectionRequest, tpl *CryptoPolicyTem
 }
 
 // checkProviderCompatibility performs the ADR §7 provider hard checks.
-// Soft findings are CPM-P5.
 func (e PolicyCompatibilityEvaluator) checkProviderCompatibility(
 	observation walletobserved.Payload,
 	req *PolicySelectionRequest,
@@ -266,6 +269,31 @@ func countMatchingChains(candidates, scope []int64, observed map[int64]bool) int
 		}
 	}
 	return matching
+}
+
+func (e PolicyCompatibilityEvaluator) providerSoftFindings(inst *CryptoPolicyInstance) []AssessmentFinding {
+	if e.Providers == nil || inst == nil {
+		return nil
+	}
+	resolved, ok := e.Providers.Lookup(provider.ProfileRef{
+		ProviderID:        inst.SolutionProfileRef.ProviderID,
+		SolutionProfileID: inst.SolutionProfileRef.SolutionProfileID,
+		ManifestVersion:   inst.SolutionProfileRef.ManifestVersion,
+	})
+	if !ok {
+		return nil
+	}
+	soft := provider.EvaluateSoftFindings(&resolved.Profile)
+	findings := make([]AssessmentFinding, 0, len(soft))
+	for _, finding := range soft {
+		findings = append(findings, AssessmentFinding{
+			Code:     finding.Code,
+			Message:  finding.Message,
+			Severity: AssessmentFindingSeverityWarning,
+			Field:    finding.Field,
+		})
+	}
+	return findings
 }
 
 func blockingFinding(code, message string) AssessmentFinding {

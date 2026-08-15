@@ -80,6 +80,7 @@ func TestPolicyCompatibilityEvaluator_happyPath(t *testing.T) {
 	if res.Status != AssessmentStatusCompatibleAndDeployable {
 		t.Fatalf("status: got %q findings %+v", res.Status, res.Findings)
 	}
+	assertSoftFindings(t, res.Findings)
 }
 
 func TestPolicyCompatibilityEvaluator_requiredPostureMustEqualResultingPosture(t *testing.T) {
@@ -228,6 +229,26 @@ func TestPolicyCompatibilityEvaluator_providerProfileIsConstraintAuthority(t *te
 	}
 	if res.Status != AssessmentStatusCompatibleAndDeployable {
 		t.Fatalf("legacy global provider copies must not override profile: %+v", res)
+	}
+}
+
+func assertSoftFindings(t *testing.T, findings []AssessmentFinding) {
+	t.Helper()
+	got := map[string]AssessmentFinding{}
+	for _, f := range findings {
+		got[f.Code] = f
+		if f.Code == "requires_wallet_control_proof" {
+			t.Fatal("requires_wallet_control_proof must not appear on explore findings")
+		}
+	}
+	for _, code := range []string{provider.FindingCodeRequiresBundler, provider.FindingCodeRequiresLocalSignerState} {
+		f, ok := got[code]
+		if !ok {
+			t.Fatalf("missing soft finding %q in %+v", code, findings)
+		}
+		if f.Severity != AssessmentFindingSeverityWarning {
+			t.Fatalf("%s severity: got %q want warning", code, f.Severity)
+		}
 	}
 }
 

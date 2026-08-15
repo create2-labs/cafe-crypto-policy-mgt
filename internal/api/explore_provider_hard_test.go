@@ -156,8 +156,21 @@ func TestDecisionExplore_providerHard_sepoliaRankedMainnetRejected(t *testing.T)
 	if c["required_posture"] != "hybrid" || c["resulting_posture"] != "hybrid" {
 		t.Fatalf("postures: required=%v resulting=%v", c["required_posture"], c["resulting_posture"])
 	}
-	if findings, ok := c["compatibility_findings"].([]any); !ok || len(findings) != 0 {
+	if findings, ok := c["compatibility_findings"].([]any); !ok || len(findings) != 2 {
 		t.Fatalf("compatibility_findings: %#v", c["compatibility_findings"])
+	}
+	softCodes := map[string]string{}
+	for _, raw := range c["compatibility_findings"].([]any) {
+		f, _ := raw.(map[string]any)
+		code, _ := f["code"].(string)
+		softCodes[code], _ = f["severity"].(string)
+	}
+	if softCodes[provider.FindingCodeRequiresBundler] != "warning" ||
+		softCodes[provider.FindingCodeRequiresLocalSignerState] != "warning" {
+		t.Fatalf("soft findings: %#v", c["compatibility_findings"])
+	}
+	if _, ok := softCodes["requires_wallet_control_proof"]; ok {
+		t.Fatal("wallet-control proof must not be an explore finding")
 	}
 	if c["maturity"] != "research" || c["claim_status"] != "declared" {
 		t.Fatalf("maturity/claim: %#v %#v", c["maturity"], c["claim_status"])
