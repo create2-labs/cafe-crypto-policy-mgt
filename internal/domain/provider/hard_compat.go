@@ -5,15 +5,15 @@ import (
 	"strings"
 )
 
-// Stable hard-finding codes (ADR §7 / CPM-P4). Soft findings are CPM-P5.
+// Stable hard-finding codes (ADR §7 / CPM-P4). Soft findings: soft_compat.go.
 const (
-	FindingCodeWalletType  = "incompatible.provider.wallet_type"
-	FindingCodeNewWallet   = "incompatible.provider.new_wallet"
-	FindingCodeContinuity  = "incompatible.provider.continuity"
-	FindingCodeChain       = "incompatible.provider.chain"
-	FindingCodeRotation    = "incompatible.provider.rotation"
-	FindingCodePosture     = "incompatible.provider.posture"
-	FindingCodeUnresolved  = "incompatible.provider.unresolved"
+	FindingCodeWalletType = "incompatible.provider.wallet_type"
+	FindingCodeNewWallet  = "incompatible.provider.new_wallet"
+	FindingCodeContinuity = "incompatible.provider.continuity"
+	FindingCodeChain      = "incompatible.provider.chain"
+	FindingCodeRotation   = "incompatible.provider.rotation"
+	FindingCodePosture    = "incompatible.provider.posture"
+	FindingCodeUnresolved = "incompatible.provider.unresolved"
 )
 
 // HardFinding is an explainable provider hard incompatibility signal.
@@ -39,7 +39,7 @@ type HardObservation struct {
 }
 
 // EvaluateHardCompatibility applies ADR §7 hard constraints against a solution profile.
-// An empty findings slice means hard pass (candidate may still fail instance/graph checks).
+// An empty findings slice means hard pass (soft findings still attach on ranked candidates).
 func EvaluateHardCompatibility(obs HardObservation, req HardSelectionRequest, profile *SolutionProfile) []HardFinding {
 	if profile == nil {
 		return []HardFinding{{

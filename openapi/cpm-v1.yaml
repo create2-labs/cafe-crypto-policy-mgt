@@ -60,7 +60,7 @@ paths:
   /policies/catalog:
     get:
       tags: [catalog]
-      summary: Get graph-free policy catalogue (static)
+      summary: Get policy catalogue (static)
       operationId: getPoliciesCatalog
       responses:
         "200":
@@ -116,7 +116,9 @@ paths:
         wallet scan **detail** envelope (`scan_id`, `status`, **`result`** with `WalletScanResult` fields
         as in `cafe-discovery` `openapi/discovery-v1.yaml`). Discovery **`current_pq_posture`** labels
         `pq_ready` / `not_pq_ready` map to evaluator exports; `wallet_type` **`smart_account`** maps like
-        Option A `AA`.
+        Option A `AA`. Ranked candidates include non-blocking ADR §7 soft findings
+        `requires_bundler` and `requires_local_signer_state` (severity `warning`).
+        `requires_wallet_control_proof` is persist-only and is not an explore finding.
       operationId: postPoliciesDecisionsExplore
       requestBody:
         required: true
@@ -841,9 +843,14 @@ components:
           type: string
         compatibility_findings:
           type: array
+          description: |
+            Explainable compatibility signals. Ranked Nicetry candidates include
+            ADR §7 soft findings `requires_bundler` and `requires_local_signer_state`
+            (severity `warning`; they do not block ranking). Hard provider codes use
+            `incompatible.provider.*` (severity `blocking`) on rejected candidates.
+            `requires_wallet_control_proof` is persist-only (CPM-P6), not explore.
           items:
-            type: object
-            additionalProperties: true
+            $ref: "#/components/schemas/CompatibilityFinding"
 
     RejectedPolicyCandidate:
       type: object
@@ -882,9 +889,30 @@ components:
           type: string
         compatibility_findings:
           type: array
+          description: Blocking hard-compatibility findings (severity `blocking`).
           items:
-            type: object
-            additionalProperties: true
+            $ref: "#/components/schemas/CompatibilityFinding"
+
+    CompatibilityFinding:
+      type: object
+      required: [code, severity]
+      properties:
+        code:
+          type: string
+          description: |
+            Stable finding code. Soft (ranked, non-blocking): `requires_bundler`,
+            `requires_local_signer_state`. Hard (rejected): `incompatible.provider.*`.
+        message:
+          type: string
+        severity:
+          type: string
+          enum: [info, warning, blocking]
+        field:
+          type: string
+        details:
+          type: object
+          additionalProperties:
+            type: string
 
     SolutionProfileRef:
       type: object

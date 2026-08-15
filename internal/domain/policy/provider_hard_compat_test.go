@@ -48,6 +48,10 @@ func TestPolicyDecisionEvaluator_providerHard_rankedVsRejected(t *testing.T) {
 	if len(decision.RankedCandidates) != 1 || len(decision.RejectedCandidates) != 0 {
 		t.Fatalf("want ranked, got ranked=%d rejected=%d", len(decision.RankedCandidates), len(decision.RejectedCandidates))
 	}
+	assertSoftFindings(t, decision.RankedCandidates[0].CompatibilityFindings)
+	if decision.RankedCandidates[0].ClaimStatus != "declared" {
+		t.Fatalf("claim_status: got %q", decision.RankedCandidates[0].ClaimStatus)
+	}
 
 	bad := okReq
 	bad.KeyRotationModel = KeyRotationNone
@@ -60,5 +64,10 @@ func TestPolicyDecisionEvaluator_providerHard_rankedVsRejected(t *testing.T) {
 	}
 	if decision.RejectedCandidates[0].RejectionReasons[0].Code != provider.FindingCodeRotation {
 		t.Fatalf("rejection: %+v", decision.RejectedCandidates[0].RejectionReasons)
+	}
+	for _, f := range decision.RejectedCandidates[0].CompatibilityFindings {
+		if f.Code == provider.FindingCodeRequiresBundler || f.Code == provider.FindingCodeRequiresLocalSignerState {
+			t.Fatalf("rejected candidate must not carry explore soft findings: %+v", decision.RejectedCandidates[0].CompatibilityFindings)
+		}
 	}
 }

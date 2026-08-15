@@ -6,7 +6,7 @@ Items deferred; not blocking current IMM work unless noted.
 
 ## Capability Providers (ADR 2026-08-03)
 
-See [ADR](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction.md) / [PR plan](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction_PR_PLAN.md). **CPM-P4c** removed leftover policy-graph runtime. Next: CPM-P5 soft findings + explore enrichment.
+See [ADR](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction.md) / [PR plan](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction_PR_PLAN.md). **CPM-P5** exposes ranked soft findings `requires_bundler` / `requires_local_signer_state`. Next: CPM-P6 persist snapshot + pinned-ref gate.
 
 ---
 
