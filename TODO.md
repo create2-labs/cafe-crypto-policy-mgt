@@ -6,10 +6,9 @@ Items deferred; not blocking current IMM work unless noted.
 
 ## Capability Providers (ADR 2026-08-03)
 
-See [ADR](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction.md) / [PR plan](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction_PR_PLAN.md). **CPM-P6** gates normative persist on `cafe.crypto_policy.v0.2` + `accepted_provider_snapshot` (soft findings listed, provider refs pinned). Next: CPM-P6b README Capability Providers (docs-only), then FE train.
+See [ADR](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction.md) / [PR plan](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction_PR_PLAN.md). **CPM-P1–P6** delivered: `ProviderManifest`, catalogue without business graph, `key_rotation_model`, hard/soft Nicetry compat, persist gate on `cafe.crypto_policy.v0.2` + `accepted_provider_snapshot` (pinned refs). **CPM-P6b:** maintainer README Capability Providers section (docs-only) — see [README § Capability Providers](./README.md#capability-providers-adr-2026-08-03). Next: FE train (FE-P1b+); production pin of Nicetry fixture refs = **CPM-P7**.
 
 ---
-
 ## Open — Retirer entièrement le mode CPM mock (frontend)
 
 **Décision produit :** supprimer **tout** le mock CPM côté `**cafe-frontend`** — pas seulement le switch runtime `VITE_CPM_DATA_SOURCE=mock`, mais aussi `**mockCpmDataSource.ts**`, le placeholder `mock-discovery-scan-placeholder`, et l’UI / composables dédiés au parcours démo sans stack.

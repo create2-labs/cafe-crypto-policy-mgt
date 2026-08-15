@@ -5,47 +5,90 @@
 
 1. [CAFE Crypto Policy Management](#cafe-crypto-policy-management)
    1. [Role and boundaries](#role-and-boundaries)
-   2. [Repository layout](#repository-layout)
-   3. [Discovery → CPM contract (`cafe.discovery.wallet.observed` v0.1)](#discovery--cpm-contract-cafediscoverywalletobserved-v01)
+   2. [Capability Providers (ADR 2026-08-03)](#capability-providers-adr-2026-08-03)
+   3. [Repository layout](#repository-layout)
+   4. [Discovery → CPM contract (`cafe.discovery.wallet.observed` v0.1)](#discovery--cpm-contract-cafediscoverywalletobserved-v01)
       1. [Envelope (`walletobserved.Event`)](#envelope-walletobservedevent)
       2. [Payload (`walletobserved.Payload`)](#payload-walletobservedpayload)
       3. [Exported vocabulary](#exported-vocabulary)
       4. [Canonical fixture](#canonical-fixture)
-   4. [Assessment output model](#assessment-output-model)
-   5. [Compatibility evaluation](#compatibility-evaluation)
-   6. [Ranking and policy decision output](#ranking-and-policy-decision-output)
-   7. [Inbound explicit assessment request](#inbound-explicit-assessment-request)
-   8. [Health and metrics endpoints](#health-and-metrics-endpoints)
+   5. [Assessment output model](#assessment-output-model)
+   6. [Compatibility evaluation](#compatibility-evaluation)
+   7. [Ranking and policy decision output](#ranking-and-policy-decision-output)
+   8. [Inbound explicit assessment request](#inbound-explicit-assessment-request)
+   9. [Health and metrics endpoints](#health-and-metrics-endpoints)
       1. [Version endpoint (CPM-OPS-3)](#version-endpoint-cpm-ops-3)
          1. [Version flow (end-to-end)](#version-flow-end-to-end)
-   9. [Outbound CPM events](#outbound-cpm-events)
+   10. [Outbound CPM events](#outbound-cpm-events)
       1. [Producer-side documentation](#producer-side-documentation)
-   10. [Read APIs](#read-apis)
-   11. [Explore no-deployable-candidate observability (IMM-OPS-1)](#explore-no-deployable-candidate-observability-imm-ops-1)
-   12. [Auth/Authz contract (AUTH-00)](#authauthz-contract-auth-00)
-   13. [AUTH-01 runtime authentication wiring](#auth-01-runtime-authentication-wiring)
+   11. [Read APIs](#read-apis)
+   12. [Explore no-deployable-candidate observability (IMM-OPS-1)](#explore-no-deployable-candidate-observability-imm-ops-1)
+   13. [Auth/Authz contract (AUTH-00)](#authauthz-contract-auth-00)
+   14. [AUTH-01 runtime authentication wiring](#auth-01-runtime-authentication-wiring)
        1. [CP-PERSIST runtime](#cp-persist-runtime)
        2. [Platform drafts API (CPM-DRAFT-1 contract)](#platform-drafts-api-cpm-draft-1-contract)
-   14. [AUTH-03 owner-scoped persistence](#auth-03-owner-scoped-persistence)
-   15. [Durable CP storage (`CPM_STORE`)](#durable-cp-storage-cpm_store)
-   16. [AUTH-04 auth error contract and observability](#auth-04-auth-error-contract-and-observability)
-   17. [Option A integration (Discovery v1 wallet scans)](#option-a-integration-discovery-v1-wallet-scans)
-   18. [Run locally](#run-locally)
-   19. [IMM-OPS-1 smoke script (`scripts/test-imm-ops-1.sh`)](#imm-ops-1-smoke-script-scriptstest-imm-ops-1sh)
+   15. [AUTH-03 owner-scoped persistence](#auth-03-owner-scoped-persistence)
+   16. [Durable CP storage (`CPM_STORE`)](#durable-cp-storage-cpm_store)
+   17. [AUTH-04 auth error contract and observability](#auth-04-auth-error-contract-and-observability)
+   18. [Option A integration (Discovery v1 wallet scans)](#option-a-integration-discovery-v1-wallet-scans)
+   19. [Run locally](#run-locally)
+   20. [IMM-OPS-1 smoke script (`scripts/test-imm-ops-1.sh`)](#imm-ops-1-smoke-script-scriptstest-imm-ops-1sh)
 
 ## Role and boundaries
 
 - Discovery observes wallets, persists scan artifacts, and maps observations to the shared wire contract from `cafe-contracts`.
-- CPM validates policy documents, selects compatible routes, assesses observations, and emits policy outcomes. 
-- Remediation consumes policy outcomes and plans or executes migration work.
+- CPM validates policy documents, selects compatible Capability Provider routes, assesses observations, and emits policy outcomes.
+- Remediation consumes policy outcomes and plans or executes migration work — **it is not a Capability Provider** and does not live in CPM.
+
+**Separation (ADR 2026-08-03):** a **Crypto Policy (CP)** is CAFE’s persisted intent + accepted snapshot; a **Capability Provider** is an external solution profile (e.g. Nicetry) described by `ProviderManifest`; **remediation** is a downstream consumer. CPM owns provider compatibility/ranking/persist gates; `cafe-persistence` stores CP JSON **opaquely** (no Nicetry / provider logic).
 
 CPM does not depend on Discovery’s database or internal domain structs. CPM depends on Discovery only through the HTTP/JWT contracts required by the product workflow (session validation, scan authorization). Inbound integration is explicitly user-triggered via `policy.assessment.requested.v0.1`; `cafe.discovery.wallet.observed` remains informational.
+
+Normative provider model: [ADR — Capability Provider abstraction](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction.md) and [PR plan](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction_PR_PLAN.md). Field-level schemas: [`openapi/cpm-v1.yaml`](./openapi/cpm-v1.yaml) (do not treat this README as a second OpenAPI).
 
 Wallet control proof for CP persistence (EOA) is specified in [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md). **CP-PERSIST V1 is signed off independently** through that document (Part VI frozen decisions); [`workplans/WORKPLAN_API.md`](./workplans/WORKPLAN_API.md) remains the broader API workplan.
 
 **CP-PERSIST V1 (stateless):** clients **must** obtain the canonical authorization message from CPM via `POST /api/cpm/v1/wallet-challenges` before signing (stateless helper — stores nothing server-side). Normative persist is `POST /api/cpm/v1/drafts/{draft_id}/persist` with `signed_message` + `signature`. At persist time, CPM verifies the submitted message exactly matches the expected canonical message, then EIP-191 / `personal_sign`. Advanced clients must not invent an alternative message format. **No V1 Redis**, `CPM_REDIS_URL`, `ProofStore` or `wallet_control_proof_id`. Redis / proof handles are **V2 optional** hardening only (see `CP_PERSIST.md` §13.3).
 
-**OpenAPI (CP-PERSIST PR2):** [`openapi/cpm-v1.yaml`](./openapi/cpm-v1.yaml) — merge via [PR #51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51). **PR3 (CP-PERSIST-T3):** `internal/walletauth` canonical message builder + EIP-191 verifier; stateless `POST /api/cpm/v1/wallet-challenges` handler (stores nothing). **PR4 (CP-PERSIST-T4):** normative `POST /api/cpm/v1/drafts/{draft_id}/persist`, EOA blocking on legacy `POST /api/cpm/v1/policies`, transactional persist-once. **PR5 (CP-PERSIST-T5):** Web UI V1 flow in `cafe-frontend` ([#84](https://github.com/create2-labs/cafe-frontend/pull/84)) — `wallet-challenges` → injected-wallet `personal_sign` → `drafts/{draft_id}/persist` in API mode. **PR6 (CP-PERSIST-T6):** CLI V1 flow in `cafe-frontend` `scripts/cafe.sh` — `cpm wallet-challenge create` → external EIP-191 sign → `cpm draft persist`; smokes in `cafe-deploy`. **PR7 (CP-PERSIST-T7):** cross-repo E2E docs and troubleshooting — [cafe-documentation `docs/security/cp-persist-v1.md`](https://github.com/create2-labs/cafe-documentation/blob/main/docs/security/cp-persist-v1.md). **Remaining runtime gap:** **Smart Account / non-EOA CP persist** (backend returns `UNSUPPORTED_WALLET_TYPE` on V1 persist routes; proof model in [`docs/CP_PERSIST.md` Part V](./docs/CP_PERSIST.md#part-v--todo-list-for-future-wallet-types)). Session auth (JWT) and wallet signature are orthogonal. See [Expected implementation gaps (after PR4)](./docs/CP_PERSIST.md#expected-implementation-gaps-after-pr4).
+**OpenAPI (CP-PERSIST PR2):** [`openapi/cpm-v1.yaml`](./openapi/cpm-v1.yaml) — merge via [PR #51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51). **PR3 (CP-PERSIST-T3):** `internal/walletauth` canonical message builder + EIP-191 verifier; stateless `POST /api/cpm/v1/wallet-challenges` handler (stores nothing). **PR4 (CP-PERSIST-T4):** normative `POST /api/cpm/v1/drafts/{draft_id}/persist`, EOA blocking on legacy `POST /api/cpm/v1/policies`, transactional persist-once. **PR5 (CP-PERSIST-T5):** Web UI V1 flow in `cafe-frontend` ([#84](https://github.com/create2-labs/cafe-frontend/pull/84)) — `wallet-challenges` → injected-wallet `personal_sign` → `drafts/{draft_id}/persist` in API mode. **PR6 (CP-PERSIST-T6):** CLI V1 flow in `cafe-frontend` `scripts/cafe.sh` — `cpm wallet-challenge create` → external EIP-191 sign → `cpm draft persist`; smokes in `cafe-deploy`. **PR7 (CP-PERSIST-T7):** cross-repo E2E docs and troubleshooting — [cafe-documentation `docs/security/cp-persist-v1.md`](https://github.com/create2-labs/cafe-documentation/blob/main/docs/security/cp-persist-v1.md). **Provider persist gate (CPM-P6):** normative draft body `cafe.crypto_policy.v0.2` + `accepted_provider_snapshot` (pinned refs, soft findings listed) — see [Capability Providers](#capability-providers-adr-2026-08-03). **Remaining runtime gap:** **Smart Account / non-EOA CP persist** (backend returns `UNSUPPORTED_WALLET_TYPE` on V1 persist routes; proof model in [`docs/CP_PERSIST.md` Part V](./docs/CP_PERSIST.md#part-v--todo-list-for-future-wallet-types)). Session auth (JWT) and wallet signature are orthogonal. See [Expected implementation gaps (after PR4)](./docs/CP_PERSIST.md#expected-implementation-gaps-after-pr4).
+
+## Capability Providers (ADR 2026-08-03)
+
+CPM’s catalogue and explore/persist paths follow the **posture + solution profile** model (no business policy graph: no normative `nodes`, `node_path`, `graphEdges`, `compatibility_rules`, or `allowed` / `selected_node_ids` / `selected_edge_ids`).
+
+| Concept | Where | Role |
+| --- | --- | --- |
+| **Template** | `tpl_pq_account_validation_v1` | CAFE intention: `required_posture` (e.g. `hybrid`) — not a concrete technique |
+| **Instance / candidate** | `cpx_pq_account_validation_v1` | Points at a provider via `solution_profile_ref` (`provider_id` + `solution_profile_id` + `manifest_version`) |
+| **ProviderManifest** | `cafe.provider_manifest.v0.1` | Declares solution profiles (`resulting_posture`, signature, constraints, chain support, references, `maturity`, `claim_status`) |
+| **Selection wire** | `PolicySelectionRequest` | Explore/assessment input; see OpenAPI `PolicySelectionRequest` |
+| **Persisted CP** | `cafe.crypto_policy.v0.2` | Normative draft `payload` at `POST …/drafts/{draft_id}/persist` |
+
+**Posture naming**
+
+- Domain / catalogue / persist body: **`required_posture`** (template, instance globals, CP payload).
+- Explore / NATS wire `selection_request`: **`target_posture`** is the **stable v0.1 alias** of that required posture — **not** renamed in this plan (see OpenAPI description on `PolicySelectionRequest`).
+- Provider solution: **`resulting_posture`**. Hard compatibility requires selection/template posture to align with the profile’s resulting posture (ADR §7).
+
+**`key_rotation_model`:** `none` \| `per_userop` on `selection_request` (replaces the former `key_rotation_required` bool). Compatibility matches the solution profile’s signature rotation model exactly.
+
+**Hard vs soft (Nicetry pilot, ADR §7)**
+
+- **Hard** failures reject the candidate (`incompatible.provider.*` — posture, chain, rotation, continuity, new wallet, wallet type, unresolved ref, etc.).
+- **Soft** findings on ranked candidates: `requires_bundler`, `requires_local_signer_state` (`severity: warning`; do not block ranking). Persist must list them in `accepted_provider_snapshot.accepted_findings` when the snapshot flags require them.
+- `requires_wallet_control_proof` is **persist-only** (CP-PERSIST EOA signature), not an explore soft finding.
+
+**`claim_status` / `maturity`:** ranked and rejected explore candidates expose `maturity` and `claim_status` from the resolved profile. **`claim_status=declared` is a declaration only** — never present it as CAFE-audited or execution-observed proof (`cafe_reviewed` / `externally_audited` / `executed_observed` are distinct levels).
+
+**Persist gate (ADR §9 / CPM-P6)** — before cafe-persistence write:
+
+- `schema_version` = `cafe.crypto_policy.v0.2`
+- `required_posture`, `template_id`, `solution_profile_ref`, `accepted_provider_snapshot` required
+- snapshot `references` must be **pinned** (commit/version must not be empty or `unpinned_pending_fixture` — the shipped Nicetry fixture is intentionally unpinned until **CPM-P7**)
+- soft finding codes listed when account/constraint flags require them; `chain_support_used.status` must not be `planned`
+- stable error codes: `CRYPTO_POLICY_PAYLOAD_INVALID`, `PROVIDER_REFS_UNPINNED`, `PROVIDER_SOFT_FINDINGS_REQUIRED`, `PROVIDER_CHAIN_PLANNED` (OpenAPI `WalletAuthorizationErrorCode`)
+
+Schemas: OpenAPI `CryptoPolicyPersistPayload`, `AcceptedProviderSnapshot`, `SolutionProfileRef`. Package overview: `internal/domain/provider`.
 
 ## Repository layout
 
@@ -55,9 +98,10 @@ Wallet control proof for CP persistence (EOA) is specified in [`docs/CP_PERSIST.
 | `internal/app`, `internal/config` | Bootstrap and configuration |
 | `internal/domain/walletobserved` | Thin re-export of shared `cafe.discovery.wallet.observed` v0.1 wire types |
 | `internal/domain/vocabulary` | Exported strings for account kind, algorithms, PQ posture, subject type |
-| `internal/domain/policy` | Policy domain contracts (`PolicySelectionRequest`, `CryptoPolicyTemplate`, `CryptoPolicyInstance`, `CryptoPolicyValidationResult`, `CryptoPolicyAssessmentResult`, `PolicyCompatibilityResult` + `PolicyCompatibilityEvaluator`, and PR13 `PolicyDecision` models/evaluator) |
+| `internal/domain/provider` | `ProviderManifest` v0.1 loader/registry + ADR §7 hard/soft helpers; Nicetry fixture under `testdata/provider_manifest_nicetry_v0_1.json` |
+| `internal/domain/policy` | Policy domain contracts (`PolicySelectionRequest`, templates/instances with `required_posture` + `solution_profile_ref`, explorers, `CryptoPolicyPersistPayload` / persist gate) — **no** business policy graph |
 | `internal/api` | PR17 read-only HTTP APIs for policy inspection and decision exploration |
-| `internal/persistence` | Durable CP via **cafe-persistence** (`cphttp.Client`); see [Durable CP storage](#durable-cp-storage-cpm_store). `OwnerScopedStore` is compiled **only for tests** (`-tags dev`) — not used at runtime in deployed images. |
+| `internal/persistence` | Durable CP via **cafe-persistence** (`cphttp.Client`); see [Durable CP storage](#durable-cp-storage-cpm_store). `OwnerScopedStore` is compiled **only for tests** (`-tags dev`) — not used at runtime in deployed images. Opaque JSON only — no provider/Nicetry evaluation here. |
 | `internal/walletauth` | CP-PERSIST V1 canonical wallet authorization message builder and EIP-191 / `personal_sign` verifier (PR3); used at persist time by PR4 handlers |
 | `docs/` | Integration narratives — [`docs/CPM_OPTION_A_INTEGRATED.md`](./docs/CPM_OPTION_A_INTEGRATED.md) (Option A v1 flow); [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md) (EOA wallet control proof for CP persistence) |
 | `scripts/` | Operational helpers — [`scripts/test-imm-ops-1.sh`](./scripts/test-imm-ops-1.sh) (IMM-OPS-1 explore observability smoke); Option A v1 smoke lives in [`cafe-deploy`](https://github.com/create2-labs/cafe-deploy/scripts/test-discovery-v1-wallet-scans-to-cpm.sh) |
@@ -126,9 +170,9 @@ Golden JSON: [`internal/domain/walletobserved/testdata/discovery_wallet_observed
 
 ## Compatibility evaluation 
 
-`internal/domain/policy/compatibility_result.go` defines `PolicyCompatibilityEvaluator`, which classifies a single validated `CryptoPolicyInstance` against a `walletobserved.Payload` and `PolicySelectionRequest`. It returns `PolicyCompatibilityResult` with one of: `compatible_and_deployable`, `compatible_but_not_deployable` (e.g. empty instance scope `chain_ids`), or `incompatible`, with structured `AssessmentFinding` entries. Template-backed candidates use `required_posture` + `solution_profile_ref`.
+`internal/domain/policy/compatibility_result.go` defines `PolicyCompatibilityEvaluator`, which classifies a single validated `CryptoPolicyInstance` against a `walletobserved.Payload` and `PolicySelectionRequest`. It returns `PolicyCompatibilityResult` with one of: `compatible_and_deployable`, `compatible_but_not_deployable` (e.g. empty instance scope `chain_ids`), or `incompatible`, with structured `AssessmentFinding` entries. Template-backed candidates use `required_posture` + `solution_profile_ref` (no graph topology).
 
-When `CPM_PROVIDER_MANIFEST_PATHS` is set (default: Nicetry fixture), explore resolves each instance `solution_profile_ref` and applies ADR §7 **hard** provider checks (including `required_posture` vs `solution_profile.resulting_posture`). Hard fail → `rejected_candidate` with stable codes such as `incompatible.provider.posture`, `incompatible.provider.chain`, `incompatible.provider.rotation`, `incompatible.provider.continuity`, `incompatible.provider.new_wallet`, `incompatible.provider.wallet_type`. Ranked candidates keep ADR §7 **soft** findings `requires_bundler` and `requires_local_signer_state` (`severity: warning`; they do not block ranking). `requires_wallet_control_proof` is persist-only (CP-PERSIST stamp). `claim_status=declared` remains a declaration, not audited/executed proof. Ranked/rejected explore candidates expose structured fields (`candidate_id`, `required_posture`, `resulting_posture`, `solution_profile_ref`, `maturity`, `claim_status`) without graph topology arrays.
+When `CPM_PROVIDER_MANIFEST_PATHS` is set (default: Nicetry fixture), explore resolves each instance `solution_profile_ref` and applies ADR §7 **hard** provider checks (`required_posture` / wire `target_posture` vs `solution_profile.resulting_posture`, rotation model, chain support, continuity, wallet type, etc.). Hard fail → `rejected_candidate` with stable codes such as `incompatible.provider.posture`, `incompatible.provider.chain`, `incompatible.provider.rotation`, `incompatible.provider.continuity`, `incompatible.provider.new_wallet`, `incompatible.provider.wallet_type`. Ranked candidates keep ADR §7 **soft** findings `requires_bundler` and `requires_local_signer_state` (`severity: warning`; they do not block ranking). `requires_wallet_control_proof` is persist-only (CP-PERSIST stamp). **`claim_status=declared` remains a declaration, not audited/executed proof.** Ranked/rejected explore candidates expose structured fields (`candidate_id`, `required_posture`, `resulting_posture`, `solution_profile_ref`, `maturity`, `claim_status`) without graph topology arrays. See [Capability Providers](#capability-providers-adr-2026-08-03).
 
 Normative draft persist (`POST /drafts/{draft_id}/persist`) requires a `cafe.crypto_policy.v0.2` payload with `accepted_provider_snapshot`: soft findings listed in `accepted_findings`, and provider `references` pinned (not `unpinned_pending_fixture`). Persistence stores the JSON opaquely — no Nicetry logic in `cafe-persistence`.
 
@@ -136,13 +180,14 @@ Normative draft persist (`POST /drafts/{draft_id}/persist`) requires a `cafe.cry
 
 `internal/domain/policy/policy_decision.go` defines `PolicyDecisionEvaluator`, `PolicyDecision`, `RankedPolicy`, and `RejectedPolicy`. It applies deterministic first-version ranking over compatible candidates:
 1) exclude incompatible routes,
-2) better target-posture alignment,
+2) better alignment of selection `target_posture` with candidate `required_posture` / profile `resulting_posture`,
 3) higher maturity,
 4) better chain coverage,
 5) better address-continuity matching,
 6) avoid new wallet creation when allowed,
 7) final lexical tie-break on normalized stable `policy_id` (derived from instance id while no dedicated policy id exists).
 
+Soft findings and `claim_status` ride along on ranked rows; they do not change the ranking key order above.
 ## Inbound explicit assessment request
 
 `internal/integration/nats` now contains a consumer for `policy.assessment.requested.v0.1` (`cafenatsv01.NATSSubjectPolicyAssessmentRequestedV01`).
@@ -228,9 +273,11 @@ CPM now exposes read-only APIs backed by local policy files loaded at startup. T
 
 Environment variables:
 
-- `CPM_POLICY_TEMPLATE_PATHS` (comma-separated, default: `/app/policy/crypto_policy_template_pq_account_validation_v1.json`)
-- `CPM_POLICY_INSTANCE_PATHS` (comma-separated, default: `/app/policy/crypto_policy_instance_pq_account_validation_v1.json`)
-- `CPM_PROVIDER_MANIFEST_PATHS` (comma-separated, default: `/app/policy/provider_manifest_nicetry_v0_1.json`): Capability Provider manifests (`ProviderManifest` v0.1). Loaded into the explore registry for ADR §7 hard compatibility and ranked soft findings (bundler / local signer). Fixture source: `internal/domain/provider/testdata/provider_manifest_nicetry_v0_1.json`. Catalogue instance `cpx_pq_account_validation_v1` carries `solution_profile_ref` → `nicetry.fors_c.erc4337.v0_1`. Persist requires `accepted_provider_snapshot` with pinned refs (CPM-P6); production pin of Nicetry fixture refs is CPM-P7.
+- `CPM_POLICY_TEMPLATE_PATHS` (comma-separated, default: `/app/policy/crypto_policy_template_pq_account_validation_v1.json`) — ships template `tpl_pq_account_validation_v1` (`required_posture`, no concrete technique)
+- `CPM_POLICY_INSTANCE_PATHS` (comma-separated, default: `/app/policy/crypto_policy_instance_pq_account_validation_v1.json`) — ships instance `cpx_pq_account_validation_v1` with `solution_profile_ref` → `nicetry` / `nicetry.fors_c.erc4337.v0_1`
+- `CPM_PROVIDER_MANIFEST_PATHS` (comma-separated, default: `/app/policy/provider_manifest_nicetry_v0_1.json`): Capability Provider manifests (`ProviderManifest` v0.1). Loaded into the explore registry for ADR §7 hard compatibility and ranked soft findings (bundler / local signer). Fixture source: `internal/domain/provider/testdata/provider_manifest_nicetry_v0_1.json` (refs currently `unpinned_pending_fixture` — explore/draft OK; normative persist blocked until pin — **CPM-P7**).
+
+Catalogue and explore responses are posture + `solution_profile_ref` oriented; they do **not** return a business policy graph.
 
 Endpoints:
 
@@ -242,7 +289,7 @@ Endpoints:
 `POST /api/cpm/v1/policies/decisions/explore` accepts:
 
 - `policy_context` (wallet scan context: `scan_id`, `wallet_address`, `wallet_type`, `chain_ids`, `current_algorithm`, `current_pq_posture`, `scanned_at`, `status` — converted server-side into the evaluator’s normalized payload)
-- `selection_request` (`PolicySelectionRequest`) — includes `key_rotation_model` (`none` | `per_userop`; replaces the former `key_rotation_required` bool; see ADR §7.1)
+- `selection_request` (`PolicySelectionRequest`) — wire fields include **`target_posture`** (v0.1 alias of CAFE `required_posture`) and **`key_rotation_model`** (`none` \| `per_userop`; replaces the former `key_rotation_required` bool; see ADR §7.1 and OpenAPI)
 - optional top-level `scan_id` (`string`): when present and non-empty, AUTH-02 delegates to Discovery (`can-read`); if `policy_context.scan_id` is also set, it must match. Evaluation uses the mapped observation derived from `policy_context` plus `selection_request`. Discovery’s `scan_id` is the id of **one persisted scan result row** (a new scan run creates a new row with a new id; stable for that row’s lifetime — see `WORKPLAN_API.md` §2.2 and Discovery `wallet_policy_context` docs).
 
 and returns `PolicyDecision` output that keeps the distinction between:
@@ -251,8 +298,9 @@ and returns `PolicyDecision` output that keeps the distinction between:
 - `compatible_but_not_deployable`
 - `compatible_and_deployable`
 
-**Chain scope (explore):** `selection_request.target_chain_ids` is evaluated **all-or-nothing** against each candidate instance `scope.chain_ids` — every requested chain must appear in the instance scope (see `WORKPLAN_API.md` §5.1.1). Wallet `chain_ids` and `target_chain_ids` may match each other while explore still returns no deployable candidate when the catalog scope does not cover the full target set (rejection code `incompatible.chain_scope`).
+Ranked/rejected candidates carry provider-facing fields (`required_posture`, `resulting_posture`, `solution_profile_ref`, `maturity`, `claim_status`, soft findings). Full schema: OpenAPI explore response components.
 
+**Chain scope (explore):** `selection_request.target_chain_ids` is evaluated **all-or-nothing** against each candidate instance `scope.chain_ids` — every requested chain must appear in the instance scope (see `WORKPLAN_API.md` §5.1.1). Wallet `chain_ids` and `target_chain_ids` may match each other while explore still returns no deployable candidate when the catalog scope does not cover the full target set (rejection code `incompatible.chain_scope`).
 ## Explore no-deployable-candidate observability (IMM-OPS-1)
 
 When `POST …/decisions/explore` returns HTTP **200** with **no** ranked deployable candidate and **non-empty** `rejected_candidates`, CPM emits platform observability (REQ9). This is **not** an HTTP error — it signals that Discovery context is usable but no catalog route is deployable on the requested chain set.
@@ -311,10 +359,11 @@ Environment variables:
 
 CP-PERSIST V1 does **not** add new mandatory runtime environment variables. Wallet authorization is verified at persist time from the request body (`signed_message`, `signature`) on `POST /api/cpm/v1/drafts/{draft_id}/persist` (PR4). Optional `CPM_WALLET_AUTH_DOMAIN` (or request host fallback) is embedded in canonical messages from `POST /api/cpm/v1/wallet-challenges`. See [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md).
 
+**Provider snapshot gate (CPM-P6 / ADR §9):** the draft `payload` must be a normative `cafe.crypto_policy.v0.2` document with `required_posture`, `solution_profile_ref`, and `accepted_provider_snapshot` (pinned `references`, soft findings in `accepted_findings`, no `planned` chain). Gate runs in CPM **before** the opaque write to cafe-persistence. Fixture refs `unpinned_pending_fixture` are **not** persistable until CPM-P7. Details: [Capability Providers](#capability-providers-adr-2026-08-03) and OpenAPI `CryptoPolicyPersistPayload`.
+
 **V2 optional (not V1):** `CPM_REDIS_URL` and ephemeral proof stores may be introduced later for advanced workflows — not required for CP-PERSIST V1.
 
 Remaining client-side gaps are documented in [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md#expected-implementation-gaps-after-pr4). Smokes: backend [`test-cpm-cp-persist-t4-draft-persist.sh`](https://github.com/create2-labs/cafe-deploy/blob/main/scripts/test-cpm-cp-persist-t4-draft-persist.sh); Web UI [`test-cpm-cp-persist-t5-web-ui-flow.sh`](https://github.com/create2-labs/cafe-deploy/blob/main/scripts/test-cpm-cp-persist-t5-web-ui-flow.sh); CLI [`test-cpm-cp-persist-t6-cli-flow.sh`](https://github.com/create2-labs/cafe-deploy/blob/main/scripts/test-cpm-cp-persist-t6-cli-flow.sh). E2E product doc: [cafe-documentation `docs/security/cp-persist-v1.md`](https://github.com/create2-labs/cafe-documentation/blob/main/docs/security/cp-persist-v1.md).
-
 Important:
 - **`CPM_AUTH_REQUIRED=false`** disables the entire auth middleware: user JWT routes and **`POST /internal/policies/references/scan`** are unauthenticated at CPM — use only in controlled local dev. **Staging/production** should keep **`CPM_AUTH_REQUIRED=true`** and set **`CAFE_POLICY_REFERENCE_INTERNAL_SERVICE_TOKEN`** (see `cafe-deploy` env templates and **WORKPLAN_API_PR** PR9).
 - CPM validates **Discovery-issued session JWTs**.
