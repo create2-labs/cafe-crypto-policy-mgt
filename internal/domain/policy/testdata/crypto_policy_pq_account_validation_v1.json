@@ -1,0 +1,8 @@
+{
+  "id": "cpm_pq_account_validation_v1",
+  "name": "PQ account validation",
+  "version": "v0.1",
+  "description": "CAFE intention: reach post-quantum account validation for an EVM wallet.",
+  "required_posture": "hybrid",
+  "allowed_providers": ["nicetry"]
+}

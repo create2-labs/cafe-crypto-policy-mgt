@@ -14,8 +14,7 @@ const (
 	defaultDiscoveryHTTPTimeoutSec     = 5
 	defaultSessionValidationTimeoutSec = 3
 	defaultScanAuthorizationTimeoutSec = 3
-	defaultPolicyTemplatePaths         = "/app/policy/crypto_policy_template_pq_account_validation_v1.json"
-	defaultPolicyInstancePaths         = "/app/policy/crypto_policy_instance_pq_account_validation_v1.json"
+	defaultCryptoPolicyPaths           = "/app/policy/crypto_policy_pq_account_validation_v1.json"
 	defaultProviderManifestPaths       = "/app/policy/provider_manifest_nicetry_v0_1.json"
 	defaultCPMStore                    = "persistence"
 	defaultPersistenceTimeoutSec       = 15
@@ -37,11 +36,11 @@ type Config struct {
 	DiscoveryHTTPBaseURL    string
 	DiscoveryHTTPTimeoutSec int
 	// NATSURL enables publishing policy.assessment.requested from POST …/policies/assessment/request (PR13g).
-	NATSURL             string
-	PolicyTemplatePaths []string
-	PolicyInstancePaths []string
+	NATSURL string
+	// CryptoPolicyPaths lists catalogued Crypto Policy JSON files (CPM_CRYPTO_POLICY_PATHS).
+	CryptoPolicyPaths []string
 	// ProviderManifestPaths lists ProviderManifest JSON files (CPM_PROVIDER_MANIFEST_PATHS).
-	// Loaded into the explore registry for ADR §7 hard compatibility (CPM-P4).
+	// Loaded for catalogue /providers and explore hard/soft checks.
 	ProviderManifestPaths []string
 	// WalletAuthDomain is embedded in CP-PERSIST canonical messages (§12); falls back to request Host.
 	WalletAuthDomain string
@@ -72,8 +71,7 @@ func LoadFromEnv() Config {
 		DiscoveryHTTPBaseURL:          getEnv("CAFE_DISCOVERY_HTTP_BASE", ""),
 		DiscoveryHTTPTimeoutSec:       getEnvInt("CAFE_DISCOVERY_HTTP_TIMEOUT_SEC", defaultDiscoveryHTTPTimeoutSec),
 		NATSURL:                       getEnv("CPM_NATS_URL", ""),
-		PolicyTemplatePaths:           parseCommaList(getEnv("CPM_POLICY_TEMPLATE_PATHS", defaultPolicyTemplatePaths)),
-		PolicyInstancePaths:           parseCommaList(getEnv("CPM_POLICY_INSTANCE_PATHS", defaultPolicyInstancePaths)),
+		CryptoPolicyPaths:             parseCommaList(getEnv("CPM_CRYPTO_POLICY_PATHS", defaultCryptoPolicyPaths)),
 		ProviderManifestPaths:         parseCommaList(getEnv("CPM_PROVIDER_MANIFEST_PATHS", defaultProviderManifestPaths)),
 		WalletAuthDomain:              getEnv("CPM_WALLET_AUTH_DOMAIN", ""),
 		Store:                         getEnv("CPM_STORE", defaultCPMStore),

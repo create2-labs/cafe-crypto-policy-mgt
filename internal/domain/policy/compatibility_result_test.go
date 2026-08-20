@@ -15,17 +15,17 @@ func testdataPath(t *testing.T, name string) string {
 	return filepath.Join("testdata", name)
 }
 
-func mustLoadFixtures(t *testing.T) (*CryptoPolicyTemplate, *CryptoPolicyInstance) {
+func mustLoadFixtures(t *testing.T) (*CryptoPolicy, *CryptoPolicyInstance) {
 	t.Helper()
-	tpl, err := LoadCryptoPolicyTemplateFromFile(testdataPath(t, "crypto_policy_template_pq_account_validation_v1.json"))
+	cp, err := LoadCryptoPolicyFromFile(testdataPath(t, "crypto_policy_pq_account_validation_v1.json"))
 	if err != nil {
-		t.Fatalf("template: %v", err)
+		t.Fatalf("crypto policy: %v", err)
 	}
 	inst, err := LoadCryptoPolicyInstanceFromFile(testdataPath(t, "crypto_policy_instance_pq_account_validation_v1.json"))
 	if err != nil {
 		t.Fatalf("instance: %v", err)
 	}
-	return tpl, inst
+	return cp, inst
 }
 
 func mustLoadProviderRegistry(t *testing.T) *provider.Registry {
@@ -86,8 +86,6 @@ func TestPolicyCompatibilityEvaluator_happyPath(t *testing.T) {
 func TestPolicyCompatibilityEvaluator_requiredPostureMustEqualResultingPosture(t *testing.T) {
 	tpl, inst := mustLoadFixtures(t)
 	tpl.RequiredPosture = vocabulary.PQPostureFullPQ
-	tpl.Defaults.TargetPosture = vocabulary.PQPostureFullPQ
-	tpl.Metadata.RequiredPosture = vocabulary.PQPostureFullPQ
 	obs := baseObservation()
 	req := baseSelection()
 	req.TargetPosture = vocabulary.PQPostureFullPQ

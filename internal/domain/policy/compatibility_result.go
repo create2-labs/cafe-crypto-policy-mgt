@@ -14,10 +14,10 @@ var (
 	ErrCompatibilityRequestNil = errors.New("compatibility: policy selection request is nil")
 	// ErrCompatibilityInstanceNil indicates a nil policy instance.
 	ErrCompatibilityInstanceNil = errors.New("compatibility: crypto policy instance is nil")
-	// ErrCompatibilityTemplateRequired indicates a candidate without its normative template.
-	ErrCompatibilityTemplateRequired = errors.New("compatibility: matching template is required")
-	// ErrCompatibilityTemplateMismatch indicates a template id mismatch.
-	ErrCompatibilityTemplateMismatch = errors.New("compatibility: instance template_id does not match provided template")
+	// ErrCompatibilityTemplateRequired indicates a candidate without its matching crypto policy.
+	ErrCompatibilityTemplateRequired = errors.New("compatibility: matching crypto policy is required")
+	// ErrCompatibilityTemplateMismatch indicates a crypto policy id mismatch.
+	ErrCompatibilityTemplateMismatch = errors.New("compatibility: instance template_id does not match provided crypto policy")
 )
 
 // PolicyCompatibilityResult is the first-version, explainable output of
@@ -42,7 +42,7 @@ func (e PolicyCompatibilityEvaluator) Evaluate(
 	observation walletobserved.Payload,
 	req *PolicySelectionRequest,
 	inst *CryptoPolicyInstance,
-	tpl *CryptoPolicyTemplate,
+	cp *CryptoPolicy,
 ) (PolicyCompatibilityResult, error) {
 	if req == nil {
 		return PolicyCompatibilityResult{}, ErrCompatibilityRequestNil
@@ -56,16 +56,16 @@ func (e PolicyCompatibilityEvaluator) Evaluate(
 	if err := inst.NormalizeAndValidate(); err != nil {
 		return PolicyCompatibilityResult{}, err
 	}
-	if tpl == nil {
+	if cp == nil {
 		return PolicyCompatibilityResult{}, ErrCompatibilityTemplateRequired
 	}
-	if tpl.ID != inst.TemplateID {
-		return PolicyCompatibilityResult{}, fmt.Errorf("%w: instance template_id %q != template %q", ErrCompatibilityTemplateMismatch, inst.TemplateID, tpl.ID)
+	if cp.ID != inst.TemplateID {
+		return PolicyCompatibilityResult{}, fmt.Errorf("%w: instance template_id %q != crypto policy %q", ErrCompatibilityTemplateMismatch, inst.TemplateID, cp.ID)
 	}
-	if err := tpl.NormalizeAndValidate(); err != nil {
+	if err := cp.NormalizeAndValidate(); err != nil {
 		return PolicyCompatibilityResult{}, err
 	}
-	result := e.evaluateProviderCandidate(observation, req, inst, tpl)
+	result := e.evaluateProviderCandidate(observation, req, inst, cp)
 	if result.Status != AssessmentStatusIncompatible {
 		result.Findings = append(result.Findings, e.providerSoftFindings(inst)...)
 	}
@@ -76,13 +76,13 @@ func (e PolicyCompatibilityEvaluator) evaluateProviderCandidate(
 	observation walletobserved.Payload,
 	req *PolicySelectionRequest,
 	inst *CryptoPolicyInstance,
-	tpl *CryptoPolicyTemplate,
+	cp *CryptoPolicy,
 ) PolicyCompatibilityResult {
 	obsChains := normalizeChainSet(observation.ChainIDs)
 
 	checks := []func() *PolicyCompatibilityResult{
-		func() *PolicyCompatibilityResult { return checkPostureCompatibility(req, tpl) },
-		func() *PolicyCompatibilityResult { return e.checkProviderCompatibility(observation, req, inst, tpl) },
+		func() *PolicyCompatibilityResult { return checkPostureCompatibility(req, cp) },
+		func() *PolicyCompatibilityResult { return e.checkProviderCompatibility(observation, req, inst, cp) },
 		func() *PolicyCompatibilityResult { return checkRequiredCapabilities(req, inst) },
 		func() *PolicyCompatibilityResult { return checkProviderModes(req, inst) },
 		func() *PolicyCompatibilityResult {
@@ -101,13 +101,13 @@ func (e PolicyCompatibilityEvaluator) evaluateProviderCandidate(
 	return PolicyCompatibilityResult{Status: AssessmentStatusCompatibleAndDeployable}
 }
 
-func checkPostureCompatibility(req *PolicySelectionRequest, tpl *CryptoPolicyTemplate) *PolicyCompatibilityResult {
-	if req.TargetPosture == tpl.RequiredPosture {
+func checkPostureCompatibility(req *PolicySelectionRequest, cp *CryptoPolicy) *PolicyCompatibilityResult {
+	if req.TargetPosture == cp.RequiredPosture {
 		return nil
 	}
 	return incompatibleResult(fieldFinding(
 		provider.FindingCodePosture,
-		fmt.Sprintf("selection target_posture %q does not equal template required_posture %q", req.TargetPosture, tpl.RequiredPosture),
+		fmt.Sprintf("selection target_posture %q does not equal crypto policy required_posture %q", req.TargetPosture, cp.RequiredPosture),
 		"required_posture",
 	))
 }
@@ -117,7 +117,7 @@ func (e PolicyCompatibilityEvaluator) checkProviderCompatibility(
 	observation walletobserved.Payload,
 	req *PolicySelectionRequest,
 	inst *CryptoPolicyInstance,
-	tpl *CryptoPolicyTemplate,
+	cp *CryptoPolicy,
 ) *PolicyCompatibilityResult {
 	if e.Providers == nil {
 		return incompatibleResult(fieldFinding(provider.FindingCodeUnresolved, "provider registry is unavailable", "solution_profile_ref"))
@@ -141,7 +141,7 @@ func (e PolicyCompatibilityEvaluator) checkProviderCompatibility(
 	hard := provider.EvaluateHardCompatibility(
 		provider.HardObservation{AccountKind: observation.AccountKind, ChainIDs: observation.ChainIDs},
 		provider.HardSelectionRequest{
-			RequiredPosture:           string(tpl.RequiredPosture),
+			RequiredPosture:           string(cp.RequiredPosture),
 			TargetChainIDs:            req.TargetChainIDs,
 			AllowNewWallet:            req.AllowNewWallet,
 			AddressContinuityRequired: req.AddressContinuityRequired,

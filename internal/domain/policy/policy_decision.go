@@ -16,10 +16,11 @@ var (
 	ErrPolicyDecisionRequestNil = errors.New("policy decision: policy selection request is nil")
 )
 
-// PolicyDecisionCandidate groups one candidate policy instance and its optional template.
+// PolicyDecisionCandidate groups one candidate policy instance and its crypto policy.
+// Instance remains transitional for explore until CPM-P9.
 type PolicyDecisionCandidate struct {
-	Instance *CryptoPolicyInstance
-	Template *CryptoPolicyTemplate
+	Instance     *CryptoPolicyInstance
+	CryptoPolicy *CryptoPolicy
 }
 
 // RankedPolicy stores one compatible candidate after deterministic ranking.
@@ -121,7 +122,7 @@ func (e PolicyDecisionEvaluator) Evaluate(
 			continue
 		}
 
-		compatibility, err := e.CompatibilityEvaluator.Evaluate(observation, req, candidate.Instance, candidate.Template)
+		compatibility, err := e.CompatibilityEvaluator.Evaluate(observation, req, candidate.Instance, candidate.CryptoPolicy)
 		if err != nil {
 			return PolicyDecision{}, fmt.Errorf("candidate[%d] compatibility: %w", idx, err)
 		}
@@ -205,8 +206,8 @@ func resolveProfileView(reg *provider.Registry, candidate PolicyDecisionCandidat
 	view := candidateProfileView{
 		RequiredPosture: candidate.Instance.GlobalParams.RequiredPosture,
 	}
-	if candidate.Template != nil && candidate.Template.RequiredPosture != "" {
-		view.RequiredPosture = candidate.Template.RequiredPosture
+	if candidate.CryptoPolicy != nil && candidate.CryptoPolicy.RequiredPosture != "" {
+		view.RequiredPosture = candidate.CryptoPolicy.RequiredPosture
 	}
 	if reg == nil || candidate.Instance == nil {
 		return view

@@ -14,12 +14,16 @@ import (
 
 func TestHandlerMetricsExposesExploreCounter(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
+		CryptoPolicyPaths: []string{
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
+		ProviderManifestPaths: []string{
+			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
+		},
+
 	})
 	if err != nil {
 		t.Fatalf("LoadReadStore: %v", err)

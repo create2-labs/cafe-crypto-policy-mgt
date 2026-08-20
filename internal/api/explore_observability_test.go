@@ -212,8 +212,8 @@ func TestExploreObservability_skipsWhenRejectedEmpty(t *testing.T) {
 
 func TestDecisionExplore_noDeployableCandidateObservabilityIntegration(t *testing.T) {
 	store, err := LoadReadStore(ReadStoreOptions{
-		TemplatePaths: []string{
-			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
+		CryptoPolicyPaths: []string{
+			fixturePath("crypto_policy_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
 			fixturePath("crypto_policy_instance_pq_account_validation_v1.json"),

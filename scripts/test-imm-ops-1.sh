@@ -42,7 +42,7 @@ base_url_from_addr() {
 }
 
 EXPLORE_PATH="/api/cpm/v1/policies/decisions/explore"
-INSTANCES_PATH="/api/cpm/v1/policies/instances"
+CRYPTO_POLICIES_PATH="/api/cpm/v1/crypto-policies"
 METRIC_NAME="cpm_explore_no_deployable_candidate_total"
 LOG_EVENT="cpm.explore.no_deployable_candidate"
 WALLET_RAW="0x742d35cc6634c0532925a3b844bc454e4438f44e"
@@ -99,8 +99,8 @@ trap cleanup EXIT
 fixture_env() {
   export CPM_AUTH_REQUIRED=false
   export CPM_HTTP_ADDR="$CPM_HTTP_ADDR"
-  export CPM_POLICY_TEMPLATE_PATHS="$REPO_ROOT/internal/domain/policy/testdata/crypto_policy_template_pq_account_validation_v1.json"
-  export CPM_POLICY_INSTANCE_PATHS="$REPO_ROOT/internal/domain/policy/testdata/crypto_policy_instance_pq_account_validation_v1.json"
+  export CPM_CRYPTO_POLICY_PATHS="$REPO_ROOT/internal/domain/policy/testdata/crypto_policy_pq_account_validation_v1.json"
+  export CPM_PROVIDER_MANIFEST_PATHS="$REPO_ROOT/internal/domain/provider/testdata/provider_manifest_nicetry_v0_1.json"
 }
 
 run_unit() {
@@ -248,63 +248,40 @@ post_explore() {
   printf '%s' "$body"
 }
 
-fetch_policy_instances() {
+fetch_crypto_policies() {
   # shellcheck disable=SC2068
-  curl -fsS "${CPM_HEADERS[@]}" "$CPM_BASE_URL$INSTANCES_PATH"
+  curl -fsS "${CPM_HEADERS[@]}" "$CPM_BASE_URL$CRYPTO_POLICIES_PATH"
 }
 
-# Explains why target_chain_ids were rejected: catalog scope.chain_ids must cover the full set (all-or-nothing).
+# Catalogue snapshot after CPM-P8 (intention-only Crypto Policies). Explore candidate
+# scope analysis is deferred to CPM-P9 when explore no longer depends on catalogue instances.
 print_scope_gap_analysis() {
   local explore_body="$1"
-  local instances
+  local policies
 
-  instances="$(fetch_policy_instances)" || {
-    warn "could not GET $INSTANCES_PATH — skipping CP scope details"
+  policies="$(fetch_crypto_policies)" || {
+    warn "could not GET $CRYPTO_POLICIES_PATH — skipping catalogue details"
     return 0
   }
 
+  info "CPM-P8 catalogue: Crypto Policies carry required_posture + allowed_providers (no instance scope)."
   if have jq; then
-  jq -r -n \
-    --argjson explore "$explore_body" \
-    --argjson items "$(printf '%s' "$instances" | jq '.items')" '
-    $explore.decision as $d
-    | ($d.request_summary.target_chain_ids // []) as $targets
-    | ($d.observed_wallet_summary.chain_ids // []) as $observed
-    | [
-        "CPM rule: every selection_request.target_chain_id must appear in the Crypto Policy instance scope.chain_ids (all-or-nothing).",
-        "Observed wallet chains and requested targets may match each other — the blocker is target ⊆ catalog scope.",
-        "",
-        ("requested target_chain_ids: " + ($targets | tostring)),
-        ("observed chain_ids (wallet): " + ($observed | tostring)),
-        ""
-      ]
-    + (
-        if ($d.rejected_candidates | length) == 0 then
-          ["(no rejected_candidates in explore response)"]
-        else
-          $d.rejected_candidates[]
-          | .crypto_policy_instance_id as $iid
-          | .template_id as $rej_tpl
-          | ($items[] | select(.id == $iid)) as $inst
-          | if $inst == null then
-              ["instance \($iid): not found in GET /policies/instances"]
-            else
-              ($inst.scope.chain_ids // []) as $scope
-              | [$targets[] | select(. as $c | ($scope | index($c)) | not)] as $missing
-              | [$targets[] | select(. as $c | ($scope | index($c)))] as $covered
-              | [
-                  "── Crypto Policy instance: \($iid) ──",
-                  "  template_id:         \($rej_tpl // $inst.template_id // "n/a")",
-                  "  scope.chain_ids:     \($scope | tostring)",
-                  "  targets in scope:    \($covered | tostring)",
-                  "  missing from scope:  \($missing | tostring)  → incompatible.chain_scope",
-                  "  rejection codes:     \([.rejection_reasons[]?.code] | unique | join(", "))",
-                  ""
-                ]
-            end
-        end
-      )
-    | .[]
+    jq -r -n --argjson explore "$explore_body" --argjson items "$(printf '%s' "$policies" | jq '.items')" '
+      $explore.decision as $d
+      | [
+          ("requested target_chain_ids: " + (($d.request_summary.target_chain_ids // []) | tostring)),
+          ("observed chain_ids (wallet): " + (($d.observed_wallet_summary.chain_ids // []) | tostring)),
+          ("ranked_candidates: " + (($d.ranked_candidates // []) | length | tostring)),
+          ("rejected_candidates: " + (($d.rejected_candidates // []) | length | tostring)),
+          ""
+        ]
+      + (
+          $items
+          | map(
+              "── Crypto Policy: \(.id) — posture=\(.required_posture) allowed=\(.allowed_providers|tostring)"
+            )
+        )
+      | .[]
     ' | while IFS= read -r line; do
       if [[ -n "$line" ]]; then
         info "$line"
@@ -313,75 +290,38 @@ print_scope_gap_analysis() {
       fi
     done
   elif have python3; then
-    EXPLORE_JSON="$explore_body" INSTANCES_JSON="$instances" python3 <<'PY'
+    EXPLORE_JSON="$explore_body" POLICIES_JSON="$policies" python3 <<'PY'
 import json, os
 explore = json.loads(os.environ["EXPLORE_JSON"])
-items = json.loads(os.environ["INSTANCES_JSON"]).get("items", [])
+items = json.loads(os.environ["POLICIES_JSON"]).get("items", [])
 d = explore.get("decision", {})
-targets = d.get("request_summary", {}).get("target_chain_ids") or []
-observed = d.get("observed_wallet_summary", {}).get("chain_ids") or []
-by_id = {i["id"]: i for i in items}
-print("→ CPM rule: every target_chain_id must be in instance scope.chain_ids (all-or-nothing).")
-print(f"→ requested target_chain_ids: {targets}")
-print(f"→ observed chain_ids (wallet): {observed}")
+print(f"→ requested target_chain_ids: {d.get('request_summary', {}).get('target_chain_ids') or []}")
+print(f"→ observed chain_ids (wallet): {d.get('observed_wallet_summary', {}).get('chain_ids') or []}")
+print(f"→ ranked_candidates: {len(d.get('ranked_candidates') or [])}")
+print(f"→ rejected_candidates: {len(d.get('rejected_candidates') or [])}")
 print()
-for rej in d.get("rejected_candidates") or []:
-    iid = rej.get("crypto_policy_instance_id")
-    inst = by_id.get(iid)
-    print(f"→ ── Crypto Policy instance: {iid} ──")
-    if not inst:
-        print("→   (not found in GET /policies/instances)")
-        continue
-    scope = (inst.get("scope") or {}).get("chain_ids") or []
-    missing = [c for c in targets if c not in scope]
-    covered = [c for c in targets if c in scope]
-    print(f"→   template_id:         {rej.get('template_id') or inst.get('template_id')}")
-    print(f"→   scope.chain_ids:     {scope}")
-    print(f"→   targets in scope:    {covered}")
-    print(f"→   missing from scope:  {missing}  → incompatible.chain_scope")
-    codes = sorted({f.get("code") for f in rej.get("rejection_reasons") or [] if f.get("code")})
-    print(f"→   rejection codes:     {', '.join(codes)}")
-    print()
+for cp in items:
+    print(f"→ ── Crypto Policy: {cp.get('id')} — posture={cp.get('required_posture')} allowed={cp.get('allowed_providers')}")
 PY
-  else
-    warn "install jq or python3 to display CP scope.chain_ids vs target_chain_ids"
-    return 0
   fi
 
   if verbose_enabled && have jq; then
-    verbose_block "GET /policies/instances (catalog snapshot)"
-    printf '%s' "$instances" | jq '[.items[] | {id, template_id, scope: .scope.chain_ids}]'
+    verbose_block "GET /crypto-policies (catalog snapshot)"
+    printf '%s' "$policies" | jq '[.items[] | {id, required_posture, allowed_providers}]'
   fi
 }
 
 print_scope_match_analysis() {
   local explore_body="$1"
   verbose_enabled || return 0
-  local instances
-  instances="$(fetch_policy_instances)" || return 0
+  local policies
+  policies="$(fetch_crypto_policies)" || return 0
   if ! have jq; then
     return 0
   fi
-  verbose_block "CP scope vs target_chain_ids (deployable — all targets covered)"
-  jq -r -n \
-    --argjson explore "$explore_body" \
-    --argjson items "$(printf '%s' "$instances" | jq '.items')" '
-    $explore.decision as $d
-    | ($d.request_summary.target_chain_ids // []) as $targets
-    | ($d.selected_policy_instance_id // $d.ranked_candidates[0].crypto_policy_instance_id // "") as $iid
-    | ($items[] | select(.id == $iid)) as $inst
-    | if $inst == null then
-        "instance \($iid): not found in catalog"
-      else
-        ($inst.scope.chain_ids // []) as $scope
-        | [
-            ("requested target_chain_ids: " + ($targets | tostring)),
-            ("instance scope.chain_ids:   " + ($scope | tostring)),
-            ("all targets in scope:       " + (if ($targets | all(. as $c | ($scope | index($c)))) then "yes ✓" else "no" end))
-          ]
-        | .[]
-      end
-    ' | while IFS= read -r line; do verbose_line "$line"; done
+  verbose_block "Catalogue Crypto Policies (explore candidate rebuild = CPM-P9)"
+  printf '%s' "$policies" | jq '[.items[] | {id, required_posture, allowed_providers}]'
+  verbose_json "explore decision summary" "$(printf '%s' "$explore_body" | jq '{ranked:(.decision.ranked_candidates|length), rejected:(.decision.rejected_candidates|length)}')"
 }
 
 no_candidate_payload() {

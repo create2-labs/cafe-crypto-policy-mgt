@@ -16,39 +16,48 @@ var (
 	ErrStoreNil = errors.New("api read store is nil")
 )
 
+// ReadStoreOptions configures catalogue loading for Crypto Policies and providers.
+// InstancePaths is optional and transitional for explore until CPM-P9 (not a public catalogue).
 type ReadStoreOptions struct {
-	TemplatePaths         []string
-	InstancePaths         []string
+	CryptoPolicyPaths     []string
 	ProviderManifestPaths []string
+	InstancePaths         []string
 }
 
+// ReadStore holds catalogue Crypto Policies, provider manifests, and optional
+// explore-only instances (removed from public catalogue in CPM-P8).
 type ReadStore struct {
-	templates    []*policy.CryptoPolicyTemplate
-	instances    []*policy.CryptoPolicyInstance
-	templateByID map[string]*policy.CryptoPolicyTemplate
-	providers    *provider.Registry
+	cryptoPolicies   []*policy.CryptoPolicy
+	cryptoPolicyByID map[string]*policy.CryptoPolicy
+	instances        []*policy.CryptoPolicyInstance
+	providers        *provider.Registry
 }
 
 func LoadReadStore(opts ReadStoreOptions) (*ReadStore, error) {
-	if len(opts.TemplatePaths) == 0 {
-		return nil, errors.New("at least one template path is required")
+	if len(opts.CryptoPolicyPaths) == 0 {
+		return nil, errors.New("at least one crypto policy path is required")
 	}
-	if len(opts.InstancePaths) == 0 {
-		return nil, errors.New("at least one instance path is required")
+	if len(opts.ProviderManifestPaths) == 0 {
+		return nil, errors.New("at least one provider manifest path is required")
 	}
 
-	templates := make([]*policy.CryptoPolicyTemplate, 0, len(opts.TemplatePaths))
-	templateByID := make(map[string]*policy.CryptoPolicyTemplate, len(opts.TemplatePaths))
-	for _, path := range opts.TemplatePaths {
-		tpl, loadErr := policy.LoadCryptoPolicyTemplateFromFile(path)
+	policies := make([]*policy.CryptoPolicy, 0, len(opts.CryptoPolicyPaths))
+	byID := make(map[string]*policy.CryptoPolicy, len(opts.CryptoPolicyPaths))
+	for _, path := range opts.CryptoPolicyPaths {
+		cp, loadErr := policy.LoadCryptoPolicyFromFile(path)
 		if loadErr != nil {
-			return nil, fmt.Errorf("load template %q: %w", path, loadErr)
+			return nil, fmt.Errorf("load crypto policy %q: %w", path, loadErr)
 		}
-		if _, exists := templateByID[tpl.ID]; exists {
-			return nil, fmt.Errorf("duplicate template id %q", tpl.ID)
+		if _, exists := byID[cp.ID]; exists {
+			return nil, fmt.Errorf("duplicate crypto policy id %q", cp.ID)
 		}
-		templateByID[tpl.ID] = tpl
-		templates = append(templates, tpl)
+		byID[cp.ID] = cp
+		policies = append(policies, cp)
+	}
+
+	providers, err := provider.LoadRegistryFromFiles(opts.ProviderManifestPaths)
+	if err != nil {
+		return nil, fmt.Errorf("load provider manifests: %w", err)
 	}
 
 	instances := make([]*policy.CryptoPolicyInstance, 0, len(opts.InstancePaths))
@@ -65,20 +74,11 @@ func LoadReadStore(opts ReadStoreOptions) (*ReadStore, error) {
 		instances = append(instances, inst)
 	}
 
-	var providers *provider.Registry
-	if len(opts.ProviderManifestPaths) > 0 {
-		var loadErr error
-		providers, loadErr = provider.LoadRegistryFromFiles(opts.ProviderManifestPaths)
-		if loadErr != nil {
-			return nil, fmt.Errorf("load provider manifests: %w", loadErr)
-		}
-	}
-
 	return &ReadStore{
-		templates:    templates,
-		instances:    instances,
-		templateByID: templateByID,
-		providers:    providers,
+		cryptoPolicies:   policies,
+		cryptoPolicyByID: byID,
+		instances:        instances,
+		providers:        providers,
 	}, nil
 }
 
@@ -89,25 +89,42 @@ func RegisterReadRoutes(mux *http.ServeMux, store *ReadStore) error {
 	if store == nil {
 		return ErrStoreNil
 	}
-	registerReadRoutesForPrefix(mux, store, cpmroutes.PoliciesPrefix)
+	registerCatalogRoutes(mux, store)
+	registerExploreRoute(mux, store)
 	return nil
 }
 
-func registerReadRoutesForPrefix(mux *http.ServeMux, store *ReadStore, prefix string) {
-	mux.HandleFunc("GET "+prefix+"/catalog", func(w http.ResponseWriter, _ *http.Request) {
-		respondJSON(w, http.StatusOK, map[string]any{
-			"templates": store.templates,
-			"instances": store.instances,
-		})
+func registerCatalogRoutes(mux *http.ServeMux, store *ReadStore) {
+	mux.HandleFunc("GET "+cpmroutes.CryptoPolicies, func(w http.ResponseWriter, _ *http.Request) {
+		respondJSON(w, http.StatusOK, map[string]any{"items": store.cryptoPolicies})
 	})
-	mux.HandleFunc("GET "+prefix+"/templates", func(w http.ResponseWriter, _ *http.Request) {
-		respondJSON(w, http.StatusOK, map[string]any{"items": store.templates})
+	mux.HandleFunc("GET "+cpmroutes.CryptoPolicyByID, func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("crypto_policy_id")
+		cp, ok := store.cryptoPolicyByID[id]
+		if !ok {
+			respondJSON(w, http.StatusNotFound, map[string]any{"error": "crypto policy not found"})
+			return
+		}
+		respondJSON(w, http.StatusOK, cp)
 	})
-	mux.HandleFunc("GET "+prefix+"/instances", func(w http.ResponseWriter, _ *http.Request) {
-		respondJSON(w, http.StatusOK, map[string]any{"items": store.instances})
+	mux.HandleFunc("GET "+cpmroutes.Providers, func(w http.ResponseWriter, _ *http.Request) {
+		respondJSON(w, http.StatusOK, map[string]any{"items": store.providers.List()})
 	})
+	mux.HandleFunc("GET "+cpmroutes.ProviderByID, func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("provider_id")
+		m, ok := store.providers.Get(id)
+		if !ok {
+			respondJSON(w, http.StatusNotFound, map[string]any{"error": "provider not found"})
+			return
+		}
+		respondJSON(w, http.StatusOK, m)
+	})
+}
+
+func registerExploreRoute(mux *http.ServeMux, store *ReadStore) {
 	// POST …/decisions/explore evaluates candidates in memory only (no persisted policy instances).
-	mux.HandleFunc("POST "+prefix+"/decisions/explore", func(w http.ResponseWriter, r *http.Request) {
+	// Candidate construction from catalogue instances is transitional until CPM-P9.
+	mux.HandleFunc("POST "+cpmroutes.PoliciesDecisionsExplore, func(w http.ResponseWriter, r *http.Request) {
 		req, err := decodeDecisionExploreRequest(r)
 		if err != nil {
 			respondJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
@@ -123,8 +140,8 @@ func registerReadRoutesForPrefix(mux *http.ServeMux, store *ReadStore, prefix st
 		candidates := make([]policy.PolicyDecisionCandidate, 0, len(store.instances))
 		for _, inst := range store.instances {
 			candidates = append(candidates, policy.PolicyDecisionCandidate{
-				Instance: inst,
-				Template: store.templateByID[inst.TemplateID],
+				Instance:     inst,
+				CryptoPolicy: store.cryptoPolicyByID[inst.TemplateID],
 			})
 		}
 

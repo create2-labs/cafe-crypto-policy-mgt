@@ -17,12 +17,16 @@ import (
 
 func TestHandlerHealthz(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
+		CryptoPolicyPaths: []string{
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
+		ProviderManifestPaths: []string{
+			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
+		},
+
 	})
 	if err != nil {
 		t.Fatalf("LoadReadStore: %v", err)
@@ -54,12 +58,16 @@ func TestHandlerHealthz(t *testing.T) {
 
 func TestHandlerHealthPathNotRegistered(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
+		CryptoPolicyPaths: []string{
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
+		ProviderManifestPaths: []string{
+			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
+		},
+
 	})
 	if err != nil {
 		t.Fatalf("LoadReadStore: %v", err)
@@ -88,12 +96,16 @@ func TestHandlerHealthPathNotRegistered(t *testing.T) {
 
 func TestHandlerRequiresAuthForBusinessRoutes(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
+		CryptoPolicyPaths: []string{
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
+		ProviderManifestPaths: []string{
+			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
+		},
+
 	})
 	if err != nil {
 		t.Fatalf("LoadReadStore: %v", err)
@@ -109,7 +121,7 @@ func TestHandlerRequiresAuthForBusinessRoutes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("handler: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodGet, cpmroutes.PoliciesCatalog, nil)
+	req := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies, nil)
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
 	if res.Code != http.StatusUnauthorized {
@@ -126,12 +138,16 @@ func TestHandlerRequiresAuthForBusinessRoutes(t *testing.T) {
 
 func TestHandlerRejectsMalformedBearerHeader(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
+		CryptoPolicyPaths: []string{
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
+		ProviderManifestPaths: []string{
+			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
+		},
+
 	})
 	if err != nil {
 		t.Fatalf("LoadReadStore: %v", err)
@@ -147,7 +163,7 @@ func TestHandlerRejectsMalformedBearerHeader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("handler: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodGet, cpmroutes.PoliciesCatalog, nil)
+	req := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies, nil)
 	req.Header.Set("Authorization", "Token abc")
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
@@ -158,12 +174,16 @@ func TestHandlerRejectsMalformedBearerHeader(t *testing.T) {
 
 func TestHandlerAcceptsValidBearerToken(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
+		CryptoPolicyPaths: []string{
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
+		ProviderManifestPaths: []string{
+			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
+		},
+
 	})
 	if err != nil {
 		t.Fatalf("LoadReadStore: %v", err)
@@ -187,7 +207,7 @@ func TestHandlerAcceptsValidBearerToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("make token: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodGet, cpmroutes.PoliciesCatalog, nil)
+	req := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies, nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
@@ -198,12 +218,16 @@ func TestHandlerAcceptsValidBearerToken(t *testing.T) {
 
 func TestHandlerRejectsExpiredDiscoveryToken(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
+		CryptoPolicyPaths: []string{
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
+		ProviderManifestPaths: []string{
+			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
+		},
+
 	})
 	if err != nil {
 		t.Fatalf("LoadReadStore: %v", err)
@@ -227,7 +251,7 @@ func TestHandlerRejectsExpiredDiscoveryToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("make token: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodGet, cpmroutes.PoliciesCatalog, nil)
+	req := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies, nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
@@ -238,12 +262,16 @@ func TestHandlerRejectsExpiredDiscoveryToken(t *testing.T) {
 
 func TestHandlerRejectsDiscoveryDeniedToken(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
+		CryptoPolicyPaths: []string{
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
+		ProviderManifestPaths: []string{
+			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
+		},
+
 	})
 	if err != nil {
 		t.Fatalf("LoadReadStore: %v", err)
@@ -267,7 +295,7 @@ func TestHandlerRejectsDiscoveryDeniedToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("make token: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodGet, cpmroutes.PoliciesCatalog, nil)
+	req := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies, nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
@@ -286,12 +314,16 @@ func TestHandlerRejectsMissingMLDSASignature(t *testing.T) {
 
 func TestHandlerReturns503OnValidationTimeout(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
+		CryptoPolicyPaths: []string{
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
+		ProviderManifestPaths: []string{
+			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
+		},
+
 	})
 	if err != nil {
 		t.Fatalf("LoadReadStore: %v", err)
@@ -310,7 +342,7 @@ func TestHandlerReturns503OnValidationTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("handler: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodGet, cpmroutes.PoliciesCatalog, nil)
+	req := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies, nil)
 	token, err := makeDiscoveryHybridToken(map[string]any{
 		"user_id": "u1",
 		"email":   "u@example.com",
@@ -329,12 +361,16 @@ func TestHandlerReturns503OnValidationTimeout(t *testing.T) {
 
 func TestHandlerReturns503OnValidation5xx(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
+		CryptoPolicyPaths: []string{
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
+		ProviderManifestPaths: []string{
+			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
+		},
+
 	})
 	if err != nil {
 		t.Fatalf("LoadReadStore: %v", err)
@@ -358,7 +394,7 @@ func TestHandlerReturns503OnValidation5xx(t *testing.T) {
 	if err != nil {
 		t.Fatalf("make token: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodGet, cpmroutes.PoliciesCatalog, nil)
+	req := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies, nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
@@ -369,12 +405,16 @@ func TestHandlerReturns503OnValidation5xx(t *testing.T) {
 
 func TestHandlerRejectsValidationSuccessButMissingUserID(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
+		CryptoPolicyPaths: []string{
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
+		ProviderManifestPaths: []string{
+			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
+		},
+
 	})
 	if err != nil {
 		t.Fatalf("LoadReadStore: %v", err)
@@ -401,7 +441,7 @@ func TestHandlerRejectsValidationSuccessButMissingUserID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("make token: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodGet, cpmroutes.PoliciesCatalog, nil)
+	req := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies, nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
@@ -412,12 +452,16 @@ func TestHandlerRejectsValidationSuccessButMissingUserID(t *testing.T) {
 
 func TestHandlerPropagatesRequestIDToDiscoveryValidation(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
+		CryptoPolicyPaths: []string{
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
+		ProviderManifestPaths: []string{
+			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
+		},
+
 	})
 	if err != nil {
 		t.Fatalf("LoadReadStore: %v", err)
@@ -445,7 +489,7 @@ func TestHandlerPropagatesRequestIDToDiscoveryValidation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("make token: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodGet, cpmroutes.PoliciesCatalog, nil)
+	req := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies, nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("X-Request-Id", "rid-123")
 	res := httptest.NewRecorder()
@@ -461,12 +505,16 @@ func TestHandlerPropagatesRequestIDToDiscoveryValidation(t *testing.T) {
 
 func TestHandlerFailsClosedWhenScanIDPresentButAuthzNotConfigured(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
+		CryptoPolicyPaths: []string{
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
+		ProviderManifestPaths: []string{
+			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
+		},
+
 	})
 	if err != nil {
 		t.Fatalf("LoadReadStore: %v", err)
@@ -506,12 +554,16 @@ func TestHandlerFailsClosedWhenScanIDPresentButAuthzNotConfigured(t *testing.T) 
 
 func TestHandlerContinuesWhenAuthzNotConfiguredAndNoScanID(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
+		CryptoPolicyPaths: []string{
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
+		ProviderManifestPaths: []string{
+			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
+		},
+
 	})
 	if err != nil {
 		t.Fatalf("LoadReadStore: %v", err)
@@ -588,12 +640,16 @@ func newDiscoveryValidationServer(t *testing.T, cfg discoveryValidationTestConfi
 func assertTokenRejected(t *testing.T, algorithms []string, expectedStatus int) {
 	t.Helper()
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
+		CryptoPolicyPaths: []string{
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
+		ProviderManifestPaths: []string{
+			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
+		},
+
 	})
 	if err != nil {
 		t.Fatalf("LoadReadStore: %v", err)
@@ -617,7 +673,7 @@ func assertTokenRejected(t *testing.T, algorithms []string, expectedStatus int) 
 	if err != nil {
 		t.Fatalf("make token envelope: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodGet, cpmroutes.PoliciesCatalog, nil)
+	req := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies, nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)

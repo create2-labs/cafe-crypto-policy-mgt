@@ -58,17 +58,16 @@ CPM’s catalogue and explore/persist paths follow the **posture + solution prof
 
 | Concept | Where | Role |
 | --- | --- | --- |
-| **Template** | `tpl_pq_account_validation_v1` | CAFE intention: `required_posture` (e.g. `hybrid`) — not a concrete technique |
-| **Instance / candidate** | `cpx_pq_account_validation_v1` | Points at a provider via `solution_profile_ref` (`provider_id` + `solution_profile_id` + `manifest_version`) |
+| **Crypto Policy** | `cpm_pq_account_validation_v1` | CAFE intention: `required_posture` + `allowed_providers` (e.g. `["nicetry"]`) — not a concrete technique |
 | **ProviderManifest** | `cafe.provider_manifest.v0.1` | Declares solution profiles (`resulting_posture`, signature, constraints, chain support, references, `maturity`, `claim_status`) |
-| **Selection wire** | `PolicySelectionRequest` | Explore/assessment input; see OpenAPI `PolicySelectionRequest` |
+| **Selection wire** | `PolicySelectionRequest` | Explore/assessment input (transitional until CPM-P9); see OpenAPI `PolicySelectionRequest` |
 | **Persisted CP** | `cafe.crypto_policy.v0.2` | Normative draft `payload` at `POST …/drafts/{draft_id}/persist` |
 
 **Posture naming**
 
-- Domain / catalogue / persist body: **`required_posture`** (template, instance globals, CP payload).
-- Explore / NATS wire `selection_request`: **`target_posture`** is the **stable v0.1 alias** of that required posture — **not** renamed in this plan (see OpenAPI description on `PolicySelectionRequest`).
-- Provider solution: **`resulting_posture`**. Hard compatibility requires selection/template posture to align with the profile’s resulting posture (ADR §7).
+- Domain / catalogue / persist body: **`required_posture`** (Crypto Policy, CP payload).
+- Explore / NATS wire `selection_request`: **`target_posture`** is the **stable v0.1 alias** of that required posture — **not** renamed in this plan (see OpenAPI description on `PolicySelectionRequest`). Removed from explore input in **CPM-P9**.
+- Provider solution: **`resulting_posture`**. Hard compatibility requires selection/Crypto Policy posture to align with the profile’s resulting posture (ADR §7).
 
 **`key_rotation_model`:** `none` \| `per_userop` on `selection_request` (replaces the former `key_rotation_required` bool). Compatibility matches the solution profile’s signature rotation model exactly.
 
@@ -99,7 +98,7 @@ Schemas: OpenAPI `CryptoPolicyPersistPayload`, `AcceptedProviderSnapshot`, `Solu
 | `internal/domain/walletobserved` | Thin re-export of shared `cafe.discovery.wallet.observed` v0.1 wire types |
 | `internal/domain/vocabulary` | Exported strings for account kind, algorithms, PQ posture, subject type |
 | `internal/domain/provider` | `ProviderManifest` v0.1 loader/registry + ADR §7 hard/soft helpers; Nicetry fixture under `testdata/provider_manifest_nicetry_v0_1.json` |
-| `internal/domain/policy` | Policy domain contracts (`PolicySelectionRequest`, templates/instances with `required_posture` + `solution_profile_ref`, explorers, `CryptoPolicyPersistPayload` / persist gate) — **no** business policy graph |
+| `internal/domain/policy` | Policy domain contracts (`PolicySelectionRequest`, catalogue `CryptoPolicy` with `required_posture` + `allowed_providers`, explorers, `CryptoPolicyPersistPayload` / persist gate) — **no** business policy graph |
 | `internal/api` | PR17 read-only HTTP APIs for policy inspection and decision exploration |
 | `internal/persistence` | Durable CP via **cafe-persistence** (`cphttp.Client`); see [Durable CP storage](#durable-cp-storage-cpm_store). `OwnerScopedStore` is compiled **only for tests** (`-tags dev`) — not used at runtime in deployed images. Opaque JSON only — no provider/Nicetry evaluation here. |
 | `internal/walletauth` | CP-PERSIST V1 canonical wallet authorization message builder and EIP-191 / `personal_sign` verifier (PR3); used at persist time by PR4 handlers |
@@ -269,22 +268,22 @@ Producer behavior is replay-safe and deterministic:
 
 ## Read APIs
 
-CPM now exposes read-only APIs backed by local policy files loaded at startup. These endpoints are for inspection and exploration only.
+CPM exposes read-only catalogue APIs backed by local Crypto Policy and provider manifest files loaded at startup.
 
 Environment variables:
 
-- `CPM_POLICY_TEMPLATE_PATHS` (comma-separated, default: `/app/policy/crypto_policy_template_pq_account_validation_v1.json`) — ships template `tpl_pq_account_validation_v1` (`required_posture`, no concrete technique)
-- `CPM_POLICY_INSTANCE_PATHS` (comma-separated, default: `/app/policy/crypto_policy_instance_pq_account_validation_v1.json`) — ships instance `cpx_pq_account_validation_v1` with `solution_profile_ref` → `nicetry` / `nicetry.fors_c.erc4337.v0_1`
-- `CPM_PROVIDER_MANIFEST_PATHS` (comma-separated, default: `/app/policy/provider_manifest_nicetry_v0_1.json`): Capability Provider manifests (`ProviderManifest` v0.1). Loaded into the explore registry for ADR §7 hard compatibility and ranked soft findings (bundler / local signer). Fixture source: `internal/domain/provider/testdata/provider_manifest_nicetry_v0_1.json` (refs currently `unpinned_pending_fixture` — explore/draft OK; normative persist blocked until pin — **CPM-P7**).
+- `CPM_CRYPTO_POLICY_PATHS` (comma-separated, default: `/app/policy/crypto_policy_pq_account_validation_v1.json`) — ships Crypto Policy `cpm_pq_account_validation_v1` (`required_posture` + `allowed_providers: ["nicetry"]`)
+- `CPM_PROVIDER_MANIFEST_PATHS` (comma-separated, default: `/app/policy/provider_manifest_nicetry_v0_1.json`): Capability Provider manifests (`ProviderManifest` v0.1). Loaded for `GET /providers` and explore hard/soft checks. Fixture source: `internal/domain/provider/testdata/provider_manifest_nicetry_v0_1.json` (refs currently `unpinned_pending_fixture` — explore/draft OK; normative persist blocked until pin — **CPM-P7**).
 
-Catalogue and explore responses are posture + `solution_profile_ref` oriented; they do **not** return a business policy graph.
+Catalogue responses are posture + `allowed_providers` / provider-manifest oriented; they do **not** return templates, instances, or a business policy graph.
 
 Endpoints:
 
-- `GET /api/cpm/v1/policies/catalog`
-- `GET /api/cpm/v1/policies/templates`
-- `GET /api/cpm/v1/policies/instances`
-- `POST /api/cpm/v1/policies/decisions/explore`
+- `GET /api/cpm/v1/crypto-policies`
+- `GET /api/cpm/v1/crypto-policies/{crypto_policy_id}`
+- `GET /api/cpm/v1/providers`
+- `GET /api/cpm/v1/providers/{provider_id}`
+- `POST /api/cpm/v1/policies/decisions/explore` (transitional wire until CPM-P9; production catalogue no longer loads explore instances — empty candidates until P9 rebuild)
 
 `POST /api/cpm/v1/policies/decisions/explore` accepts:
 
@@ -300,7 +299,7 @@ and returns `PolicyDecision` output that keeps the distinction between:
 
 Ranked/rejected candidates carry provider-facing fields (`required_posture`, `resulting_posture`, `solution_profile_ref`, `maturity`, `claim_status`, soft findings). Full schema: OpenAPI explore response components.
 
-**Chain scope (explore):** `selection_request.target_chain_ids` is evaluated **all-or-nothing** against each candidate instance `scope.chain_ids` — every requested chain must appear in the instance scope (see `WORKPLAN_API.md` §5.1.1). Wallet `chain_ids` and `target_chain_ids` may match each other while explore still returns no deployable candidate when the catalog scope does not cover the full target set (rejection code `incompatible.chain_scope`).
+**Chain scope (explore):** transitional until CPM-P9 — when explore-only instances are present in tests, `selection_request.target_chain_ids` is evaluated **all-or-nothing** against each candidate instance `scope.chain_ids` (see `WORKPLAN_API.md` §5.1.1).
 ## Explore no-deployable-candidate observability (IMM-OPS-1)
 
 When `POST …/decisions/explore` returns HTTP **200** with **no** ranked deployable candidate and **non-empty** `rejected_candidates`, CPM emits platform observability (REQ9). This is **not** an HTTP error — it signals that Discovery context is usable but no catalog route is deployable on the requested chain set.
@@ -386,9 +385,10 @@ Public routes:
 
 Authenticated business routes:
 
-- `GET /api/cpm/v1/policies/catalog`
-- `GET /api/cpm/v1/policies/templates`
-- `GET /api/cpm/v1/policies/instances`
+- `GET /api/cpm/v1/crypto-policies`
+- `GET /api/cpm/v1/crypto-policies/{crypto_policy_id}`
+- `GET /api/cpm/v1/providers`
+- `GET /api/cpm/v1/providers/{provider_id}`
 - `POST /api/cpm/v1/policies/decisions/explore`
 
 Additional authenticated routes (owner-scoped draft / policy payloads):
@@ -574,8 +574,7 @@ With repo test fixtures and auth disabled:
 
 ```bash
 export CPM_AUTH_REQUIRED=false
-export CPM_POLICY_TEMPLATE_PATHS=internal/domain/policy/testdata/crypto_policy_template_pq_account_validation_v1.json
-export CPM_POLICY_INSTANCE_PATHS=internal/domain/policy/testdata/crypto_policy_instance_pq_account_validation_v1.json
+export CPM_CRYPTO_POLICY_PATHS=internal/domain/policy/testdata/crypto_policy_pq_account_validation_v1.json
 export CPM_PROVIDER_MANIFEST_PATHS=internal/domain/provider/testdata/provider_manifest_nicetry_v0_1.json
 go run ./cmd/cafe-cpm
 ```
@@ -596,10 +595,10 @@ Validates explore no-deployable-candidate observability (unit tests, HTTP smoke,
 **What the smoke test does**
 
 1. `GET /healthz`, `GET /metrics`, and `GET /version`
-2. **No-candidate case** — `POST …/decisions/explore` with `target_chain_ids: [1, 2, 5]` while fixture instance `cpx_pq_account_validation_v1` has `scope.chain_ids: [1, 8453]` → HTTP 200, empty `ranked_candidates`, `incompatible.chain_scope` in `rejected_candidates`
-3. Prints **CP scope vs request** (via `GET /policies/instances`): requested targets, instance `scope.chain_ids`, chains missing from scope — explains why observed and requested wallet chains can match while explore still rejects
-4. Asserts log `cpm.explore.no_deployable_candidate` and increment of `cpm_explore_no_deployable_candidate_total`
-5. **Negative case** — explore with `target_chain_ids: [1, 8453]` → deployable candidate; metric must **not** increment again
+2. **No-candidate case** — `POST …/decisions/explore` (transitional until CPM-P9; production catalogue no longer ships explore instances after CPM-P8 — smoke may see empty candidates until P9)
+3. Prints **catalogue snapshot** via `GET /crypto-policies` (intention: `required_posture` + `allowed_providers`)
+4. Asserts log `cpm.explore.no_deployable_candidate` and increment of `cpm_explore_no_deployable_candidate_total` when rejected candidates are present
+5. **Negative case** — explore with deployable targets when candidates exist → metric must **not** increment again
 
 **Environment variables**
 
