@@ -8,10 +8,17 @@ const (
 	// V1Base is the public API prefix registered on the CPM mux (edge: /api/cpm/v1).
 	V1Base = "/api/cpm/v1"
 
-	PoliciesPrefix           = V1Base + "/policies"
-	PoliciesCatalog          = PoliciesPrefix + "/catalog"
-	PoliciesTemplates        = PoliciesPrefix + "/templates"
-	PoliciesInstances        = PoliciesPrefix + "/instances"
+	// CryptoPolicies lists catalogued Crypto Policies (ADR §5.2 / CPM-P8).
+	CryptoPolicies = V1Base + "/crypto-policies"
+	// CryptoPolicyByID returns one Crypto Policy by stable crypto_policy_id.
+	CryptoPolicyByID = CryptoPolicies + "/{crypto_policy_id}"
+	// Providers lists Capability Provider manifests (ADR §5.1 / CPM-P8).
+	Providers = V1Base + "/providers"
+	// ProviderByID returns one provider manifest by provider_id.
+	ProviderByID = Providers + "/{provider_id}"
+
+	PoliciesPrefix = V1Base + "/policies"
+	// PoliciesDecisionsExplore evaluates candidates in memory only (transitional until CPM-P9).
 	PoliciesDecisionsExplore = PoliciesPrefix + "/decisions/explore"
 	// PoliciesAssessmentRequest is the async wallet-scan-only policy assessment trigger (WORKPLAN_API_PR PR13g).
 	PoliciesAssessmentRequest = PoliciesPrefix + "/assessment/request"
@@ -24,8 +31,8 @@ const (
 	// WalletTargetContext is the owner-scoped IMM-9b lookup for proactive wallet scan UI (FE-IMM-2).
 	WalletTargetContext = V1Base + "/wallet-target-context"
 
-	Healthz  = "/healthz"
-	Metrics  = "/metrics"
+	Healthz = "/healthz"
+	Metrics = "/metrics"
 	// Version is the public ops endpoint for deployed service version (CPM-OPS-3).
 	Version = "/version"
 )
@@ -42,9 +49,10 @@ type AuthenticatedRoute struct {
 // AuthenticatedRoutes returns every authenticated CPM v1 route (excludes /healthz, /metrics, /version, and internal).
 func AuthenticatedRoutes() []AuthenticatedRoute {
 	return []AuthenticatedRoute{
-		{Method: http.MethodGet, Path: PoliciesCatalog},
-		{Method: http.MethodGet, Path: PoliciesTemplates},
-		{Method: http.MethodGet, Path: PoliciesInstances},
+		{Method: http.MethodGet, Path: CryptoPolicies},
+		{Method: http.MethodGet, Path: CryptoPolicyByID},
+		{Method: http.MethodGet, Path: Providers},
+		{Method: http.MethodGet, Path: ProviderByID},
 		{Method: http.MethodPost, Path: PoliciesDecisionsExplore},
 		{Method: http.MethodPost, Path: PoliciesAssessmentRequest},
 		{Method: http.MethodPost, Path: Drafts},

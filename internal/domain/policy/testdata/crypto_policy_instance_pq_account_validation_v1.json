@@ -2,7 +2,7 @@
   "id": "cpx_pq_account_validation_v1",
   "name": "PQ account validation (NiceTry FORS+C)",
   "catalog_version": "v0.1",
-  "template_id": "tpl_pq_account_validation_v1",
+  "template_id": "cpm_pq_account_validation_v1",
   "solution_profile_ref": {
     "provider_id": "nicetry",
     "solution_profile_id": "nicetry.fors_c.erc4337.v0_1",

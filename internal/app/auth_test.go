@@ -28,7 +28,7 @@ func TestClassifyRoute(t *testing.T) {
 	if got := classifyRoute(http.MethodGet, cpmroutes.Version); got != authz.RouteClassPublicHealth {
 		t.Fatalf("expected version class %q, got %q", authz.RouteClassPublicHealth, got)
 	}
-	if got := classifyRoute(http.MethodGet, cpmroutes.PoliciesCatalog); got != authz.RouteClassAuthenticated {
+	if got := classifyRoute(http.MethodGet, cpmroutes.CryptoPolicies); got != authz.RouteClassAuthenticated {
 		t.Fatalf("expected catalog class %q, got %q", authz.RouteClassAuthenticated, got)
 	}
 	if got := classifyRoute(http.MethodGet, "/does-not-exist"); got != authz.RouteClassDeprecatedDisabled {
@@ -77,7 +77,7 @@ func TestPrincipalInjectionOnlyOnSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("make token: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodGet, cpmroutes.PoliciesCatalog, nil)
+	req := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies, nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
@@ -90,7 +90,7 @@ func TestPrincipalInjectionOnlyOnSuccess(t *testing.T) {
 
 	// Failure path: malformed token should not inject principal and should not call next.
 	called = false
-	req2 := httptest.NewRequest(http.MethodGet, cpmroutes.PoliciesCatalog, nil)
+	req2 := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies, nil)
 	req2.Header.Set("Authorization", "Bearer malformed")
 	rr2 := httptest.NewRecorder()
 	handler.ServeHTTP(rr2, req2)

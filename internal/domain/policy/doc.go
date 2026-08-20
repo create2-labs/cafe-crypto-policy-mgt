@@ -1,9 +1,9 @@
 // Package policy contains CPM policy domain models and services.
 //
 // PolicySelectionRequest is the stable input contract for policy selection.
-// CryptoPolicyTemplate defines reusable CAFE intentions (required posture + defaults).
-// CryptoPolicyInstance defines the concrete scope-bound policy document bound to a
-// Capability Provider solution profile.
+// CryptoPolicy is the catalogue intention (required_posture + allowed_providers).
+// CryptoPolicyInstance remains an internal explore/persist transitional type until
+// CPM-P9/P10; it is not part of the public catalogue.
 // AssessmentStatus and AssessmentFinding model compatibility/deployability signals.
 // PolicyCompatibilityEvaluator and PolicyCompatibilityResult implement
 // observation+request+instance compatibility classification (PR12) before

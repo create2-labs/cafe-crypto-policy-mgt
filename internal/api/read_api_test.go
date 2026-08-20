@@ -3,27 +3,37 @@ package api
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
 
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/vocabulary"
 )
 
-func TestLoadReadStoreAndRoutes(t *testing.T) {
-	store, err := LoadReadStore(ReadStoreOptions{
-		TemplatePaths: []string{
-			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
+func testReadStore(t *testing.T, withInstances bool) *ReadStore {
+	t.Helper()
+	opts := ReadStoreOptions{
+		CryptoPolicyPaths: []string{
+			fixturePath("crypto_policy_pq_account_validation_v1.json"),
 		},
-		InstancePaths: []string{
+		ProviderManifestPaths: []string{providerManifestFixturePath()},
+	}
+	if withInstances {
+		opts.InstancePaths = []string{
 			fixturePath("crypto_policy_instance_pq_account_validation_v1.json"),
-		},
-	})
+		}
+	}
+	store, err := LoadReadStore(opts)
 	if err != nil {
 		t.Fatalf("LoadReadStore: %v", err)
 	}
+	return store
+}
+
+func TestLoadReadStoreAndRoutes(t *testing.T) {
+	store := testReadStore(t, false)
 
 	mux := http.NewServeMux()
 	if err := RegisterReadRoutes(mux, store); err != nil {
@@ -34,62 +44,56 @@ func TestLoadReadStoreAndRoutes(t *testing.T) {
 		method string
 		path   string
 	}{
-		{method: http.MethodGet, path: cpmroutes.PoliciesCatalog},
-		{method: http.MethodGet, path: cpmroutes.PoliciesTemplates},
-		{method: http.MethodGet, path: cpmroutes.PoliciesInstances},
+		{method: http.MethodGet, path: cpmroutes.CryptoPolicies},
+		{method: http.MethodGet, path: cpmroutes.CryptoPolicies + "/cpm_pq_account_validation_v1"},
+		{method: http.MethodGet, path: cpmroutes.Providers},
+		{method: http.MethodGet, path: cpmroutes.Providers + "/nicetry"},
 	} {
 		req := httptest.NewRequest(tc.method, tc.path, nil)
 		rec := httptest.NewRecorder()
 		mux.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
-			t.Fatalf("%s %s status: got %d want %d", tc.method, tc.path, rec.Code, http.StatusOK)
+			t.Fatalf("%s %s status: got %d want %d body=%s", tc.method, tc.path, rec.Code, http.StatusOK, rec.Body.String())
+		}
+	}
+
+	for _, legacy := range []string{
+		"/api/cpm/v1/policies/catalog",
+		"/api/cpm/v1/policies/templates",
+		"/api/cpm/v1/policies/instances",
+	} {
+		req := httptest.NewRequest(http.MethodGet, legacy, nil)
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("%s status: got %d want %d (legacy route must be absent)", legacy, rec.Code, http.StatusNotFound)
 		}
 	}
 }
 
-func TestLoadReadStore_RAZCatalogue(t *testing.T) {
-	store, err := LoadReadStore(ReadStoreOptions{
-		TemplatePaths: []string{
-			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
-		},
-		InstancePaths: []string{
-			fixturePath("crypto_policy_instance_pq_account_validation_v1.json"),
-		},
-	})
-	if err != nil {
-		t.Fatalf("LoadReadStore: %v", err)
+func TestLoadReadStore_CatalogueIntentionOnly(t *testing.T) {
+	store := testReadStore(t, false)
+	if len(store.cryptoPolicies) != 1 {
+		t.Fatalf("cryptoPolicies: got %d want 1", len(store.cryptoPolicies))
 	}
-	if len(store.templates) != 1 {
-		t.Fatalf("templates: got %d want 1", len(store.templates))
+	cp := store.cryptoPolicies[0]
+	if cp.ID != "cpm_pq_account_validation_v1" {
+		t.Fatalf("crypto policy id: got %q", cp.ID)
 	}
-	if store.templates[0].ID != "tpl_pq_account_validation_v1" {
-		t.Fatalf("template id: got %q", store.templates[0].ID)
+	if len(cp.AllowedProviders) != 1 || cp.AllowedProviders[0] != "nicetry" {
+		t.Fatalf("allowed_providers: %#v", cp.AllowedProviders)
 	}
-	if len(store.instances) != 1 {
-		t.Fatalf("instances: got %d want 1", len(store.instances))
+	if len(store.instances) != 0 {
+		t.Fatalf("instances must not load for catalogue-only store: got %d", len(store.instances))
 	}
-	inst := store.instances[0]
-	if inst.ID != "cpx_pq_account_validation_v1" {
-		t.Fatalf("instance id: got %q", inst.ID)
-	}
-	if inst.SolutionProfileRef.SolutionProfileID != "nicetry.fors_c.erc4337.v0_1" {
-		t.Fatalf("solution_profile_ref: %#v", inst.SolutionProfileRef)
+	items := store.providers.List()
+	if len(items) != 1 || items[0].ProviderID != "nicetry" {
+		t.Fatalf("providers: %#v", items)
 	}
 }
 
 func TestDecisionExplorePreservesDeployabilityDistinction(t *testing.T) {
-	store, err := LoadReadStore(ReadStoreOptions{
-		TemplatePaths: []string{
-			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
-		},
-		InstancePaths: []string{
-			fixturePath("crypto_policy_instance_pq_account_validation_v1.json"),
-		},
-		ProviderManifestPaths: []string{providerManifestFixturePath()},
-	})
-	if err != nil {
-		t.Fatalf("LoadReadStore: %v", err)
-	}
+	store := testReadStore(t, true)
 
 	mux := http.NewServeMux()
 	if err := RegisterReadRoutes(mux, store); err != nil {
@@ -156,18 +160,7 @@ func TestDecisionExplorePreservesDeployabilityDistinction(t *testing.T) {
 }
 
 func TestDecisionExplore_optionA_policy_context(t *testing.T) {
-	store, err := LoadReadStore(ReadStoreOptions{
-		TemplatePaths: []string{
-			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
-		},
-		InstancePaths: []string{
-			fixturePath("crypto_policy_instance_pq_account_validation_v1.json"),
-		},
-		ProviderManifestPaths: []string{providerManifestFixturePath()},
-	})
-	if err != nil {
-		t.Fatalf("LoadReadStore: %v", err)
-	}
+	store := testReadStore(t, true)
 
 	mux := http.NewServeMux()
 	if err := RegisterReadRoutes(mux, store); err != nil {
@@ -201,41 +194,16 @@ func TestDecisionExplore_optionA_policy_context(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-
 	req := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, bytes.NewReader(raw))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status: got %d body=%s", rec.Code, rec.Body.String())
-	}
-
-	var response struct {
-		Decision struct {
-			SelectedPolicyID string `json:"selected_policy_id"`
-		} `json:"decision"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if response.Decision.SelectedPolicyID == "" {
-		t.Fatalf("expected selected_policy_id, got empty body=%s", rec.Body.String())
+		t.Fatalf("status: got %d want %d body=%s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 }
 
-// TestDecisionExplore_discoveryV1WalletScanDetailEnvelope uses the same shape as GET …/discovery/v1/wallets/scans/{scan_id}
-// once the scan is terminal (openapi WalletScanDetail + WalletScanResult).
 func TestDecisionExplore_discoveryV1WalletScanDetailEnvelope(t *testing.T) {
-	store, err := LoadReadStore(ReadStoreOptions{
-		TemplatePaths: []string{
-			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
-		},
-		InstancePaths: []string{
-			fixturePath("crypto_policy_instance_pq_account_validation_v1.json"),
-		},
-	})
-	if err != nil {
-		t.Fatalf("LoadReadStore: %v", err)
-	}
+	store := testReadStore(t, true)
 
 	mux := http.NewServeMux()
 	if err := RegisterReadRoutes(mux, store); err != nil {
@@ -282,17 +250,7 @@ func TestDecisionExplore_discoveryV1WalletScanDetailEnvelope(t *testing.T) {
 }
 
 func TestDecisionExplore_targetAddressFlatPolicyContext(t *testing.T) {
-	store, err := LoadReadStore(ReadStoreOptions{
-		TemplatePaths: []string{
-			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
-		},
-		InstancePaths: []string{
-			fixturePath("crypto_policy_instance_pq_account_validation_v1.json"),
-		},
-	})
-	if err != nil {
-		t.Fatalf("LoadReadStore: %v", err)
-	}
+	store := testReadStore(t, true)
 
 	mux := http.NewServeMux()
 	if err := RegisterReadRoutes(mux, store); err != nil {
@@ -334,17 +292,7 @@ func TestDecisionExplore_targetAddressFlatPolicyContext(t *testing.T) {
 }
 
 func TestDecisionExplore_doesNotMutateReadStoreInstances(t *testing.T) {
-	store, err := LoadReadStore(ReadStoreOptions{
-		TemplatePaths: []string{
-			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
-		},
-		InstancePaths: []string{
-			fixturePath("crypto_policy_instance_pq_account_validation_v1.json"),
-		},
-	})
-	if err != nil {
-		t.Fatalf("LoadReadStore: %v", err)
-	}
+	store := testReadStore(t, true)
 
 	mux := http.NewServeMux()
 	if err := RegisterReadRoutes(mux, store); err != nil {

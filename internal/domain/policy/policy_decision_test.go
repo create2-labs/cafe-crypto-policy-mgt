@@ -41,9 +41,9 @@ func TestPolicyDecisionEvaluator_RanksCompatibleByCandidateIDAndKeepsRejected(t 
 		obs,
 		&req,
 		[]PolicyDecisionCandidate{
-			{Instance: second, Template: tpl},
-			{Instance: rejected, Template: tpl},
-			{Instance: best, Template: tpl},
+			{Instance: second, CryptoPolicy: tpl},
+			{Instance: rejected, CryptoPolicy: tpl},
+			{Instance: best, CryptoPolicy: tpl},
 		},
 	)
 	if err != nil {
@@ -95,8 +95,8 @@ func TestPolicyDecisionEvaluator_DeterministicNormalizedPolicyIDTieBreak(t *test
 		obs,
 		&req,
 		[]PolicyDecisionCandidate{
-			{Instance: first, Template: tpl},
-			{Instance: second, Template: tpl},
+			{Instance: first, CryptoPolicy: tpl},
+			{Instance: second, CryptoPolicy: tpl},
 		},
 	)
 	if err != nil {
@@ -141,8 +141,8 @@ func TestPolicyDecisionEvaluator_RankingIgnoresLegacyMaturityAndPostureCopies(t 
 		obs,
 		&req,
 		[]PolicyDecisionCandidate{
-			{Instance: over, Template: tpl},
-			{Instance: exact, Template: tpl},
+			{Instance: over, CryptoPolicy: tpl},
+			{Instance: exact, CryptoPolicy: tpl},
 		},
 	)
 	if err != nil {

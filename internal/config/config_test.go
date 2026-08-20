@@ -42,17 +42,11 @@ func TestLoadFromEnvDefaults(t *testing.T) {
 	if cfg.ScanAuthorizationServiceToken != "" {
 		t.Fatalf("expected empty scan authorization service token default, got %q", cfg.ScanAuthorizationServiceToken)
 	}
-	if len(cfg.PolicyTemplatePaths) != 1 {
-		t.Fatalf("expected 1 default policy template path, got %#v", cfg.PolicyTemplatePaths)
+	if len(cfg.CryptoPolicyPaths) != 1 {
+		t.Fatalf("expected 1 default crypto policy path, got %#v", cfg.CryptoPolicyPaths)
 	}
-	if cfg.PolicyTemplatePaths[0] != "/app/policy/crypto_policy_template_pq_account_validation_v1.json" {
-		t.Fatalf("unexpected default policy template paths: %#v", cfg.PolicyTemplatePaths)
-	}
-	if len(cfg.PolicyInstancePaths) != 1 {
-		t.Fatalf("expected 1 default policy instance path, got %#v", cfg.PolicyInstancePaths)
-	}
-	if cfg.PolicyInstancePaths[0] != "/app/policy/crypto_policy_instance_pq_account_validation_v1.json" {
-		t.Fatalf("unexpected default policy instance paths: %#v", cfg.PolicyInstancePaths)
+	if cfg.CryptoPolicyPaths[0] != "/app/policy/crypto_policy_pq_account_validation_v1.json" {
+		t.Fatalf("unexpected default crypto policy paths: %#v", cfg.CryptoPolicyPaths)
 	}
 	if len(cfg.ProviderManifestPaths) != 1 || cfg.ProviderManifestPaths[0] != "/app/policy/provider_manifest_nicetry_v0_1.json" {
 		t.Fatalf("unexpected default provider manifest paths: %#v", cfg.ProviderManifestPaths)
@@ -92,8 +86,7 @@ func TestLoadFromEnvOverrides(t *testing.T) {
 	t.Setenv("CAFE_SCAN_AUTHORIZATION_TIMEOUT_SEC", "9")
 	t.Setenv("CAFE_SCAN_AUTHORIZATION_SERVICE_TOKEN", "scan-authz-service-token")
 	t.Setenv("CPM_AUTH_CLOCK_SKEW_SEC", "45")
-	t.Setenv("CPM_POLICY_TEMPLATE_PATHS", "tpl-a.json, tpl-b.json")
-	t.Setenv("CPM_POLICY_INSTANCE_PATHS", "inst-a.json,inst-b.json")
+	t.Setenv("CPM_CRYPTO_POLICY_PATHS", "cp-a.json, cp-b.json")
 	t.Setenv("CPM_PROVIDER_MANIFEST_PATHS", "provider-a.json, provider-b.json")
 	t.Setenv("CAFE_DISCOVERY_HTTP_BASE", "http://discovery:8080")
 	t.Setenv("CAFE_DISCOVERY_HTTP_TIMEOUT_SEC", "11")
@@ -138,11 +131,8 @@ func TestLoadFromEnvOverrides(t *testing.T) {
 	if cfg.AuthClockSkewSec != 45 {
 		t.Fatalf("expected auth clock skew override, got %d", cfg.AuthClockSkewSec)
 	}
-	if len(cfg.PolicyTemplatePaths) != 2 || cfg.PolicyTemplatePaths[0] != "tpl-a.json" || cfg.PolicyTemplatePaths[1] != "tpl-b.json" {
-		t.Fatalf("expected policy template paths override, got %#v", cfg.PolicyTemplatePaths)
-	}
-	if len(cfg.PolicyInstancePaths) != 2 || cfg.PolicyInstancePaths[0] != "inst-a.json" || cfg.PolicyInstancePaths[1] != "inst-b.json" {
-		t.Fatalf("expected policy instance paths override, got %#v", cfg.PolicyInstancePaths)
+	if len(cfg.CryptoPolicyPaths) != 2 || cfg.CryptoPolicyPaths[0] != "cp-a.json" || cfg.CryptoPolicyPaths[1] != "cp-b.json" {
+		t.Fatalf("expected crypto policy paths override, got %#v", cfg.CryptoPolicyPaths)
 	}
 	if len(cfg.ProviderManifestPaths) != 2 || cfg.ProviderManifestPaths[0] != "provider-a.json" || cfg.ProviderManifestPaths[1] != "provider-b.json" {
 		t.Fatalf("expected provider manifest paths override, got %#v", cfg.ProviderManifestPaths)

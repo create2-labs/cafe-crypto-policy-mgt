@@ -47,7 +47,7 @@ func TestAuthErrorPayloadContract(t *testing.T) {
 		{
 			name:       "missing token",
 			method:     http.MethodGet,
-			target:     cpmroutes.PoliciesCatalog,
+			target:     cpmroutes.CryptoPolicies,
 			cfg:        authConfig{Required: true, SessionValidationURL: introspectUnavailable.URL},
 			wantStatus: http.StatusUnauthorized,
 			wantCode:   authCodeUnauthenticated,
@@ -55,7 +55,7 @@ func TestAuthErrorPayloadContract(t *testing.T) {
 		{
 			name:       "malformed token",
 			method:     http.MethodGet,
-			target:     cpmroutes.PoliciesCatalog,
+			target:     cpmroutes.CryptoPolicies,
 			authHeader: "Bearer malformed",
 			cfg:        authConfig{Required: true, SessionValidationURL: introspectUnavailable.URL},
 			wantStatus: http.StatusUnauthorized,
@@ -64,7 +64,7 @@ func TestAuthErrorPayloadContract(t *testing.T) {
 		{
 			name:       "validation unavailable",
 			method:     http.MethodGet,
-			target:     cpmroutes.PoliciesCatalog,
+			target:     cpmroutes.CryptoPolicies,
 			authHeader: "Bearer " + mustTokenEnvelope(t, "user-1"),
 			cfg:        authConfig{Required: true, SessionValidationURL: introspectUnavailable.URL},
 			wantStatus: http.StatusServiceUnavailable,
@@ -130,7 +130,7 @@ func TestAuthRequestIDHeaderAndPayload(t *testing.T) {
 	h := mustAuthHandler(t, authConfig{Required: true, SessionValidationURL: introspect.URL})
 
 	t.Run("propagates incoming request id", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, cpmroutes.PoliciesCatalog, nil)
+		req := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies, nil)
 		req.Header.Set("Authorization", "Bearer "+mustTokenEnvelope(t, "user-1"))
 		req.Header.Set("X-Request-Id", "rid-from-client")
 		rec := httptest.NewRecorder()
@@ -142,7 +142,7 @@ func TestAuthRequestIDHeaderAndPayload(t *testing.T) {
 	})
 
 	t.Run("generates missing request id", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, cpmroutes.PoliciesCatalog, nil)
+		req := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies, nil)
 		req.Header.Set("Authorization", "Bearer "+mustTokenEnvelope(t, "user-1"))
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, req)
@@ -158,7 +158,7 @@ func TestAuthRequestIDHeaderAndPayload(t *testing.T) {
 	})
 
 	t.Run("sanitizes invalid incoming request id", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, cpmroutes.PoliciesCatalog, nil)
+		req := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies, nil)
 		req.Header.Set("Authorization", "Bearer "+mustTokenEnvelope(t, "user-1"))
 		req.Header.Set("X-Request-Id", "bad\nid")
 		rec := httptest.NewRecorder()
@@ -191,7 +191,7 @@ func TestAuthLogsDoNotLeakSensitiveData(t *testing.T) {
 	})
 
 	rawToken := mustTokenEnvelope(t, "user@example.com")
-	req := httptest.NewRequest(http.MethodGet, cpmroutes.PoliciesCatalog, nil)
+	req := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies, nil)
 	req.Header.Set("Authorization", "Bearer "+rawToken+"raw-fragment")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -230,11 +230,11 @@ func TestAuthMetricsCounters(t *testing.T) {
 		Observability:        obs,
 	})
 
-	successReq := httptest.NewRequest(http.MethodGet, cpmroutes.PoliciesCatalog, nil)
+	successReq := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies, nil)
 	successReq.Header.Set("Authorization", "Bearer "+mustTokenEnvelope(t, "user-1"))
 	h.ServeHTTP(httptest.NewRecorder(), successReq)
 
-	missingTokenReq := httptest.NewRequest(http.MethodGet, cpmroutes.PoliciesCatalog, nil)
+	missingTokenReq := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies, nil)
 	h.ServeHTTP(httptest.NewRecorder(), missingTokenReq)
 
 	denyReq := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, strings.NewReader(`{"scan_id":"deny"}`))
@@ -262,12 +262,16 @@ func TestAuthMetricsCounters(t *testing.T) {
 func mustAuthHandler(t *testing.T, cfg authConfig) http.Handler {
 	t.Helper()
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
-		TemplatePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_template_pq_account_validation_v1.json"),
+		CryptoPolicyPaths: []string{
+			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
+		ProviderManifestPaths: []string{
+			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
+		},
+
 	})
 	if err != nil {
 		t.Fatalf("LoadReadStore: %v", err)

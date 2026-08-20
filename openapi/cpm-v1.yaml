@@ -44,7 +44,7 @@ tags:
   - name: drafts
     description: Policy drafts (§0.2).
   - name: catalog
-    description: Static catalogue reads (templates and reference instances).
+    description: Static catalogue reads (Crypto Policies and Capability Providers).
   - name: decisions
     description: Non-persisted decision exploration (`explore`).
   - name: wallet-authorization
@@ -57,14 +57,14 @@ security:
   - bearerAuth: []
 
 paths:
-  /policies/catalog:
+  /crypto-policies:
     get:
       tags: [catalog]
-      summary: Get policy catalogue (static)
-      operationId: getPoliciesCatalog
+      summary: List catalogued Crypto Policies
+      operationId: listCryptoPolicies
       responses:
         "200":
-          description: Catalogue templates and reference instances; no policy graph topology.
+          description: Catalogue Crypto Policies (intention only — required_posture + allowed_providers).
           content:
             application/json:
               schema:
@@ -73,14 +73,38 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
-  /policies/templates:
+  /crypto-policies/{crypto_policy_id}:
     get:
       tags: [catalog]
-      summary: List policy templates (static)
-      operationId: getPoliciesTemplates
+      summary: Get one catalogued Crypto Policy
+      operationId: getCryptoPolicy
+      parameters:
+        - name: crypto_policy_id
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         "200":
-          description: Policy templates payload (static catalogue read).
+          description: Crypto Policy document.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Unknown crypto_policy_id
+
+  /providers:
+    get:
+      tags: [catalog]
+      summary: List Capability Provider manifests
+      operationId: listProviders
+      responses:
+        "200":
+          description: Loaded provider manifests (solution profiles included).
           content:
             application/json:
               schema:
@@ -89,14 +113,20 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
-  /policies/instances:
+  /providers/{provider_id}:
     get:
       tags: [catalog]
-      summary: List reference / example instances from catalogue (static)
-      operationId: getPoliciesInstancesCatalog
+      summary: Get one Capability Provider manifest
+      operationId: getProvider
+      parameters:
+        - name: provider_id
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         "200":
-          description: Reference / example instances payload (static catalogue read).
+          description: Provider manifest document.
           content:
             application/json:
               schema:
@@ -104,6 +134,8 @@ paths:
                 additionalProperties: true
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Unknown provider_id
 
   /policies/decisions/explore:
     post:

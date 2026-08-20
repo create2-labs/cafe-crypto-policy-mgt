@@ -14,8 +14,8 @@ import (
 
 func TestDecisionExplore_providerHard_sepoliaRankedMainnetRejected(t *testing.T) {
 	store, err := LoadReadStore(ReadStoreOptions{
-		TemplatePaths: []string{
-			fixturePath("crypto_policy_template_pq_account_validation_v1.json"),
+		CryptoPolicyPaths: []string{
+			fixturePath("crypto_policy_pq_account_validation_v1.json"),
 		},
 		InstancePaths: []string{
 			fixturePath("crypto_policy_instance_pq_account_validation_v1.json"),
@@ -150,7 +150,7 @@ func TestDecisionExplore_providerHard_sepoliaRankedMainnetRejected(t *testing.T)
 	if c["candidate_id"] != "cpx_pq_account_validation_v1" {
 		t.Fatalf("candidate_id: %#v", c["candidate_id"])
 	}
-	if c["template_id"] != "tpl_pq_account_validation_v1" {
+	if c["template_id"] != "cpm_pq_account_validation_v1" {
 		t.Fatalf("template_id: %#v", c["template_id"])
 	}
 	if c["required_posture"] != "hybrid" || c["resulting_posture"] != "hybrid" {
