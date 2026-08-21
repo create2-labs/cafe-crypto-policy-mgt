@@ -69,18 +69,27 @@ type ProviderManifest struct {
 }
 
 type SolutionProfile struct {
-	SolutionProfileID string             `json:"solution_profile_id"`
-	DisplayName       string             `json:"display_name"`
-	Maturity          Maturity           `json:"maturity"`
-	ClaimStatus       ClaimStatus        `json:"claim_status"`
-	ResultingPosture  string             `json:"resulting_posture"` // CAFE: classical_only|hybrid|full_pq
-	InputRequirements InputRequirements  `json:"input_requirements"`
-	Signature         SignatureProfile   `json:"signature"`
-	AccountModel      AccountModel       `json:"account_model"`
-	Constraints       ProfileConstraints `json:"constraints"`
-	ChainSupport      []ChainSupport     `json:"chain_support"`
-	References        []Reference        `json:"references,omitempty"`
-	RiskNotes         []string           `json:"risk_notes,omitempty"`
+	SolutionProfileID        string                    `json:"solution_profile_id"`
+	DisplayName              string                    `json:"display_name"`
+	Maturity                 Maturity                  `json:"maturity"`
+	ClaimStatus              ClaimStatus               `json:"claim_status"`
+	ResultingPosture         string                    `json:"resulting_posture"` // CAFE: classical_only|hybrid|full_pq
+	InputRequirements        InputRequirements         `json:"input_requirements"`
+	Signature                SignatureProfile          `json:"signature"`
+	AccountModel             AccountModel              `json:"account_model"`
+	Constraints              ProfileConstraints        `json:"constraints"`
+	SuggestedUserConstraints *SuggestedUserConstraints `json:"suggested_user_constraints,omitempty"`
+	ChainSupport             []ChainSupport            `json:"chain_support"`
+	References               []Reference               `json:"references,omitempty"`
+	RiskNotes                []string                  `json:"risk_notes,omitempty"`
+}
+
+// SuggestedUserConstraints are indicative couche-B defaults for the UI (ADR §6.2 rule 9).
+// They are not authoritative for explore scan-compatible membership.
+type SuggestedUserConstraints struct {
+	AllowNewWallet            bool             `json:"allow_new_wallet"`
+	AddressContinuityRequired bool             `json:"address_continuity_required"`
+	KeyRotationModel          KeyRotationModel `json:"key_rotation_model"`
 }
 
 type InputRequirements struct {
@@ -165,6 +174,11 @@ func normalizeSolutionProfile(p *SolutionProfile) {
 	p.AccountModel.Standard = strings.TrimSpace(p.AccountModel.Standard)
 	p.AccountModel.ExecutionModel = strings.TrimSpace(p.AccountModel.ExecutionModel)
 	p.AccountModel.EntrypointVersions = dedupeStrings(p.AccountModel.EntrypointVersions)
+	if p.SuggestedUserConstraints != nil {
+		p.SuggestedUserConstraints.KeyRotationModel = KeyRotationModel(
+			strings.TrimSpace(string(p.SuggestedUserConstraints.KeyRotationModel)),
+		)
+	}
 	for j := range p.ChainSupport {
 		p.ChainSupport[j].Network = strings.TrimSpace(p.ChainSupport[j].Network)
 		p.ChainSupport[j].Status = ChainSupportStatus(strings.TrimSpace(string(p.ChainSupport[j].Status)))
@@ -276,6 +290,39 @@ func validateSolutionProfile(p *SolutionProfile) error {
 		if !oneOf(string(r.Kind), "source_repo", "protocol_spec") || r.URL == "" {
 			return fmt.Errorf("%w: references[%d]", ErrInvalidManifest, i)
 		}
+	}
+	if p.SuggestedUserConstraints != nil {
+		if !oneOf(string(p.SuggestedUserConstraints.KeyRotationModel), "none", "per_userop") {
+			return fmt.Errorf("%w: suggested_user_constraints.key_rotation_model %q", ErrInvalidManifest, p.SuggestedUserConstraints.KeyRotationModel)
+		}
+	}
+	return nil
+}
+
+// ErrSuggestedConstraintsContradict is returned when suggested_user_constraints
+// contradict profile constraints / signature (ADR §6.2 rule 9).
+var ErrSuggestedConstraintsContradict = errors.New("suggested_user_constraints contradict profile constraints")
+
+// ValidateSuggestedUserConstraints reports contradictions vs constraints / signature.
+// A nil suggestion is valid (UI shows no pre-checks). Load remains permissive;
+// explore marks the profile erroneous when this returns an error (P9b); startup
+// catalogue signals are P11a.
+func ValidateSuggestedUserConstraints(p *SolutionProfile) error {
+	if p == nil || p.SuggestedUserConstraints == nil {
+		return nil
+	}
+	s := p.SuggestedUserConstraints
+	if !s.AllowNewWallet && p.Constraints.RequiresNewAccount {
+		return fmt.Errorf("%w: allow_new_wallet=false but constraints.requires_new_account=true", ErrSuggestedConstraintsContradict)
+	}
+	if s.AddressContinuityRequired && !p.Constraints.AddressContinuitySupported {
+		return fmt.Errorf("%w: address_continuity_required=true but constraints.address_continuity_supported=false", ErrSuggestedConstraintsContradict)
+	}
+	if s.KeyRotationModel != "" && s.KeyRotationModel != p.Signature.KeyRotationModel {
+		return fmt.Errorf(
+			"%w: key_rotation_model %q does not match signature.key_rotation_model %q",
+			ErrSuggestedConstraintsContradict, s.KeyRotationModel, p.Signature.KeyRotationModel,
+		)
 	}
 	return nil
 }

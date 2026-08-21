@@ -25,24 +25,25 @@ type PolicyDecisionCandidate struct {
 
 // RankedPolicy stores one compatible candidate after deterministic ranking.
 type RankedPolicy struct {
-	CandidateID            string                      `json:"candidate_id"`
-	PolicyID               string                      `json:"policy_id"`
-	CryptoPolicyInstanceID string                      `json:"crypto_policy_instance_id"`
-	TemplateID             string                      `json:"template_id,omitempty"`
-	RequiredPosture        vocabulary.CurrentPQPosture `json:"required_posture,omitempty"`
-	ResultingPosture       vocabulary.CurrentPQPosture `json:"resulting_posture,omitempty"`
-	SolutionProfileRef     SolutionProfileRef          `json:"solution_profile_ref,omitempty"`
-	Maturity               string                      `json:"maturity,omitempty"`
-	ClaimStatus            string                      `json:"claim_status,omitempty"`
-	CompatibilityStatus    AssessmentStatus            `json:"compatibility_status"`
-	CompatibilityFindings  []AssessmentFinding         `json:"compatibility_findings"`
+	CandidateID              string                             `json:"candidate_id"`
+	PolicyID                 string                             `json:"policy_id"`
+	CryptoPolicyInstanceID   string                             `json:"crypto_policy_instance_id,omitempty"`
+	TemplateID               string                             `json:"template_id,omitempty"`
+	RequiredPosture          vocabulary.CurrentPQPosture        `json:"required_posture,omitempty"`
+	ResultingPosture         vocabulary.CurrentPQPosture        `json:"resulting_posture,omitempty"`
+	SolutionProfileRef       SolutionProfileRef                 `json:"solution_profile_ref,omitempty"`
+	Maturity                 string                             `json:"maturity,omitempty"`
+	ClaimStatus              string                             `json:"claim_status,omitempty"`
+	CompatibilityStatus      AssessmentStatus                   `json:"compatibility_status"`
+	CompatibilityFindings    []AssessmentFinding                `json:"compatibility_findings"`
+	SuggestedUserConstraints *provider.SuggestedUserConstraints `json:"suggested_user_constraints,omitempty"`
 }
 
 // RejectedPolicy stores one incompatible candidate and explainable reasons.
 type RejectedPolicy struct {
 	CandidateID            string                      `json:"candidate_id"`
 	PolicyID               string                      `json:"policy_id"`
-	CryptoPolicyInstanceID string                      `json:"crypto_policy_instance_id"`
+	CryptoPolicyInstanceID string                      `json:"crypto_policy_instance_id,omitempty"`
 	TemplateID             string                      `json:"template_id,omitempty"`
 	RequiredPosture        vocabulary.CurrentPQPosture `json:"required_posture,omitempty"`
 	ResultingPosture       vocabulary.CurrentPQPosture `json:"resulting_posture,omitempty"`
@@ -59,9 +60,9 @@ type ObservedWalletSummary struct {
 	ChainIDs []int64 `json:"chain_ids,omitempty"`
 }
 
-// RequestSummary is a compact projection of explore/assessment input used for ranking.
-// Explore HTTP v0.2 carries crypto_policy_id; Target* fields remain for the transitional
-// Evaluate path until CPM-P9b replaces couche-A matching.
+// RequestSummary is a compact projection of explore/assessment input.
+// Explore HTTP v0.2 carries crypto_policy_id; Target* / couche-B fields remain for the
+// transitional PolicyDecisionEvaluator path (persist couche B → CPM-P10).
 type RequestSummary struct {
 	CryptoPolicyID            string                      `json:"crypto_policy_id,omitempty"`
 	TargetPosture             vocabulary.CurrentPQPosture `json:"target_posture,omitempty"`
@@ -74,7 +75,7 @@ type RequestSummary struct {
 
 // PolicyDecision is the explainable first-version output from ranking.
 // JSON public key for compatible candidates is scan_compatible_providers (ADR amendement / P9a).
-// Go type RankedPolicy may remain internal (ADR §14 Q9) until P9b enriches entries.
+// Go type RankedPolicy may remain internal (ADR §14 Q9).
 type PolicyDecision struct {
 	ObservedWalletSummary    ObservedWalletSummary `json:"observed_wallet_summary"`
 	RequestSummary           RequestSummary        `json:"request_summary"`
@@ -85,12 +86,8 @@ type PolicyDecision struct {
 	Warnings                 []string              `json:"warnings,omitempty"`
 }
 
-// ExploreDegradedWarning documents that scan_compatible_providers content is non-final until P9b.
-const ExploreDegradedWarning = "scan_compatible_providers is degraded until CPM-P9b (couche A match not yet applied)"
-
 // PolicyDecisionEvaluator evaluates compatibility and applies deterministic PR13 ranking.
-// Explore HTTP v0.2 (P9a) returns a degraded empty scan_compatible_providers list and does
-// not call Evaluate; CPM-P9b reconnects couche A matching to this path (or a successor).
+// Explore HTTP v0.2 uses ExploreCoucheAEvaluator instead (CPM-P9b).
 type PolicyDecisionEvaluator struct {
 	CompatibilityEvaluator PolicyCompatibilityEvaluator
 }

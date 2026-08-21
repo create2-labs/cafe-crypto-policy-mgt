@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
@@ -92,7 +93,7 @@ func TestLoadReadStore_CatalogueIntentionOnly(t *testing.T) {
 	}
 }
 
-func TestDecisionExplore_v02_degradedScanCompatibleProviders(t *testing.T) {
+func TestDecisionExplore_v02_sepoliaScanCompatibleProviders(t *testing.T) {
 	store := testReadStore(t, false)
 
 	mux := http.NewServeMux()
@@ -128,9 +129,17 @@ func TestDecisionExplore_v02_degradedScanCompatibleProviders(t *testing.T) {
 			RequestSummary struct {
 				CryptoPolicyID string `json:"crypto_policy_id"`
 			} `json:"request_summary"`
-			ScanCompatibleProviders []any    `json:"scan_compatible_providers"`
-			RejectedCandidates      []any    `json:"rejected_candidates"`
-			Warnings                []string `json:"warnings"`
+			ScanCompatibleProviders []struct {
+				CandidateID              string `json:"candidate_id"`
+				SuggestedUserConstraints *struct {
+					AllowNewWallet bool `json:"allow_new_wallet"`
+				} `json:"suggested_user_constraints"`
+				SolutionProfileRef struct {
+					ProviderID string `json:"provider_id"`
+				} `json:"solution_profile_ref"`
+			} `json:"scan_compatible_providers"`
+			RejectedCandidates []any    `json:"rejected_candidates"`
+			Warnings           []string `json:"warnings"`
 		} `json:"decision"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
@@ -139,14 +148,20 @@ func TestDecisionExplore_v02_degradedScanCompatibleProviders(t *testing.T) {
 	if response.Decision.RequestSummary.CryptoPolicyID != "cpm_pq_account_validation_v1" {
 		t.Fatalf("crypto_policy_id: got %q", response.Decision.RequestSummary.CryptoPolicyID)
 	}
-	if response.Decision.ScanCompatibleProviders == nil {
-		t.Fatal("scan_compatible_providers key must be present (may be empty)")
+	if len(response.Decision.ScanCompatibleProviders) != 1 {
+		t.Fatalf("P9b: want 1 scan_compatible_providers, got %d body=%s", len(response.Decision.ScanCompatibleProviders), rec.Body.String())
 	}
-	if len(response.Decision.ScanCompatibleProviders) != 0 {
-		t.Fatalf("P9a degraded: want empty scan_compatible_providers, got %d", len(response.Decision.ScanCompatibleProviders))
+	got := response.Decision.ScanCompatibleProviders[0]
+	if got.SolutionProfileRef.ProviderID != "nicetry" {
+		t.Fatalf("provider: %+v", got.SolutionProfileRef)
 	}
-	if len(response.Decision.Warnings) == 0 {
-		t.Fatal("expected degraded warning")
+	if got.SuggestedUserConstraints == nil || !got.SuggestedUserConstraints.AllowNewWallet {
+		t.Fatalf("suggested_user_constraints: %+v", got.SuggestedUserConstraints)
+	}
+	for _, w := range response.Decision.Warnings {
+		if strings.Contains(w, "degraded") {
+			t.Fatalf("degraded warning must be gone after P9b: %q", w)
+		}
 	}
 }
 
