@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/policy"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/provider"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/metrics"
 )
 
 var (
@@ -75,12 +77,28 @@ func LoadReadStore(opts ReadStoreOptions) (*ReadStore, error) {
 		instances = append(instances, inst)
 	}
 
-	return &ReadStore{
+	store := &ReadStore{
 		cryptoPolicies:   policies,
 		cryptoPolicyByID: byID,
 		instances:        instances,
 		providers:        providers,
-	}, nil
+	}
+	emitCatalogueLoadSignals(store, log.Default())
+	return store, nil
+}
+
+// emitCatalogueLoadSignals runs ADR §7.2.1 family-1 checks after a successful
+// catalogue load (CPM-P11a). Failures are logged + metered; they do not abort load.
+func emitCatalogueLoadSignals(store *ReadStore, logger interface {
+	Printf(format string, v ...any)
+}) {
+	if store == nil {
+		return
+	}
+	malformed := store.providers.ApplyManifestLoadSignals(logger)
+	metrics.AddCatalogueMalformedManifests(malformed)
+	orphans := policy.CheckPostureOrphanage(store.cryptoPolicies, store.providers, logger)
+	metrics.AddCataloguePostureOrphans(orphans)
 }
 
 func RegisterReadRoutes(mux *http.ServeMux, store *ReadStore) error {

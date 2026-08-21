@@ -304,9 +304,9 @@ func validateSolutionProfile(p *SolutionProfile) error {
 var ErrSuggestedConstraintsContradict = errors.New("suggested_user_constraints contradict profile constraints")
 
 // ValidateSuggestedUserConstraints reports contradictions vs constraints / signature.
-// A nil suggestion is valid (UI shows no pre-checks). Load remains permissive;
-// explore marks the profile erroneous when this returns an error (P9b); startup
-// catalogue signals are P11a.
+// A nil suggestion is valid (UI shows no pre-checks). Load remains permissive:
+// CPM-P11a logs ERROR + marks Registry profiles Erroneous at catalogue load;
+// CPM-P9b still marks explore responses erroneous when this returns an error.
 func ValidateSuggestedUserConstraints(p *SolutionProfile) error {
 	if p == nil || p.SuggestedUserConstraints == nil {
 		return nil

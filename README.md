@@ -279,6 +279,13 @@ Environment variables:
 
 Catalogue responses are posture + `allowed_providers` / provider-manifest oriented; they do **not** return templates, instances, or a business policy graph.
 
+**Catalogue startup signals (ADR §7.2.1 family 1 / CPM-P11a):** after loading Crypto Policies and provider manifests, CPM emits structured logs (no `/admin` endpoint):
+
+- `WARN catalogue: posture orphanage …` when a CP has empty `allowed_providers` or no allowed profile with `resulting_posture == required_posture` (chain `planned` / wallet type are **not** part of this static check — no false alert for posture-OK + planned-only).
+- `ERROR catalogue: malformed suggested_user_constraints …` when a profile’s `suggested_user_constraints` contradict `constraints` / signature; the registry marks that profile `Erroneous` (explore still returns `compatibility_status=erroneous` per CPM-P9b).
+
+Optional Prometheus counters: `cpm_catalogue_posture_orphan_total`, `cpm_catalogue_malformed_manifest_total`.
+
 Endpoints:
 
 - `GET /api/cpm/v1/crypto-policies`

@@ -47,4 +47,10 @@ func TestHandlerMetricsExposesExploreCounter(t *testing.T) {
 	if !strings.Contains(body, "cpm_explore_no_deployable_candidate_total") {
 		t.Fatalf("metrics body missing explore counter: %s", body)
 	}
+	if !strings.Contains(body, "cpm_catalogue_posture_orphan_total") {
+		t.Fatalf("metrics body missing catalogue orphan counter: %s", body)
+	}
+	if !strings.Contains(body, "cpm_catalogue_malformed_manifest_total") {
+		t.Fatalf("metrics body missing catalogue malformed counter: %s", body)
+	}
 }
