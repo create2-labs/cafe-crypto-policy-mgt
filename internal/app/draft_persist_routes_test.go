@@ -116,13 +116,18 @@ func createDraftPersistBoundDraftWithPayload(t *testing.T, h http.Handler, token
 	}
 }
 
-// draftPersistValidPayloadJSON is a cafe.crypto_policy.v0.2 draft body with pinned refs (CPM-P6).
+// draftPersistValidPayloadJSON is a cafe.crypto_policy.v0.2 draft body with pinned refs (CPM-P10).
 func draftPersistValidPayloadJSON() string {
 	return `{
 		"schema_version":"cafe.crypto_policy.v0.2",
 		"policy_kind":"wallet_migration_policy",
-		"template_id":"tpl_pq_account_validation_v1",
+		"crypto_policy_id":"cpm_pq_account_validation_v1",
 		"required_posture":"hybrid",
+		"user_constraints":{
+			"allow_new_wallet":true,
+			"address_continuity_required":false,
+			"key_rotation_model":"per_userop"
+		},
 		"solution_profile_ref":{
 			"provider_id":"nicetry",
 			"solution_profile_id":"nicetry.fors_c.erc4337.v0_1",
@@ -145,15 +150,20 @@ func draftPersistValidPayloadJSON() string {
 			"accepted_findings":["requires_bundler","requires_local_signer_state"],
 			"accepted_risk_notes":["test note"]
 		},
-		"policy_context":{"wallet_address":"` + draftPersistTestWallet + `","wallet_type":"eoa"}
+		"policy_context":{"wallet_address":"` + draftPersistTestWallet + `","wallet_type":"eoa","chain_ids":[11155111]}
 	}`
 }
 
 func draftPersistUnpinnedPayloadJSON() string {
 	return `{
 		"schema_version":"cafe.crypto_policy.v0.2",
-		"template_id":"tpl_pq_account_validation_v1",
+		"crypto_policy_id":"cpm_pq_account_validation_v1",
 		"required_posture":"hybrid",
+		"user_constraints":{
+			"allow_new_wallet":true,
+			"address_continuity_required":false,
+			"key_rotation_model":"per_userop"
+		},
 		"solution_profile_ref":{
 			"provider_id":"nicetry",
 			"solution_profile_id":"nicetry.fors_c.erc4337.v0_1",
@@ -167,9 +177,75 @@ func draftPersistUnpinnedPayloadJSON() string {
 			"signature":{"scheme":"FORS+C","family":"hash_based","key_rotation_model":"per_userop"},
 			"account_model":{"standard":"ERC-4337","execution_model":"erc4337_bundler","requires_bundler":true,"requires_entrypoint":true},
 			"constraints":{"requires_new_account":true,"address_continuity_supported":false,"requires_local_signer_state":true},
-			"chain_support_used":{"chain_id":11155111,"status":"testnet_supported"},
+			"chain_support_used":{"chain_id":11155111,"status":"testnet_supported","capabilities":["deploy","sign_userop","rotate_signer"]},
 			"references":[
 				{"kind":"source_repo","url":"https://github.com/RivaLabs-Core/NiceTry","commit":"unpinned_pending_fixture"}
+			],
+			"accepted_findings":["requires_bundler","requires_local_signer_state"]
+		},
+		"policy_context":{"wallet_address":"` + draftPersistTestWallet + `","wallet_type":"eoa","chain_ids":[11155111]}
+	}`
+}
+
+func draftPersistCoucheBKOPayloadJSON() string {
+	return `{
+		"schema_version":"cafe.crypto_policy.v0.2",
+		"crypto_policy_id":"cpm_pq_account_validation_v1",
+		"required_posture":"hybrid",
+		"user_constraints":{
+			"allow_new_wallet":true,
+			"address_continuity_required":true,
+			"key_rotation_model":"per_userop"
+		},
+		"solution_profile_ref":{
+			"provider_id":"nicetry",
+			"solution_profile_id":"nicetry.fors_c.erc4337.v0_1",
+			"manifest_version":"2026-08"
+		},
+		"accepted_provider_snapshot":{
+			"maturity":"research",
+			"claim_status":"declared",
+			"resulting_posture":"hybrid",
+			"input_requirements":{"wallet_types":["EOA"],"requires_wallet_control_proof":true},
+			"signature":{"scheme":"FORS+C","family":"hash_based","key_rotation_model":"per_userop"},
+			"account_model":{"standard":"ERC-4337","execution_model":"erc4337_bundler","requires_bundler":true,"requires_entrypoint":true},
+			"constraints":{"requires_new_account":true,"address_continuity_supported":false,"requires_local_signer_state":true},
+			"chain_support_used":{"chain_id":11155111,"status":"testnet_supported","capabilities":["deploy","sign_userop","rotate_signer"]},
+			"references":[
+				{"kind":"source_repo","url":"https://github.com/RivaLabs-Core/NiceTry","commit":"abc123deadbeef"}
+			],
+			"accepted_findings":["requires_bundler","requires_local_signer_state"]
+		},
+		"policy_context":{"wallet_address":"` + draftPersistTestWallet + `","wallet_type":"eoa","chain_ids":[11155111]}
+	}`
+}
+
+func draftPersistLegacyTemplatePayloadJSON() string {
+	return `{
+		"schema_version":"cafe.crypto_policy.v0.2",
+		"template_id":"tpl_pq_account_validation_v1",
+		"required_posture":"hybrid",
+		"user_constraints":{
+			"allow_new_wallet":true,
+			"address_continuity_required":false,
+			"key_rotation_model":"per_userop"
+		},
+		"solution_profile_ref":{
+			"provider_id":"nicetry",
+			"solution_profile_id":"nicetry.fors_c.erc4337.v0_1",
+			"manifest_version":"2026-08"
+		},
+		"accepted_provider_snapshot":{
+			"maturity":"research",
+			"claim_status":"declared",
+			"resulting_posture":"hybrid",
+			"input_requirements":{"wallet_types":["EOA"]},
+			"signature":{"scheme":"FORS+C","family":"hash_based","key_rotation_model":"per_userop"},
+			"account_model":{"requires_bundler":true},
+			"constraints":{"requires_new_account":true,"requires_local_signer_state":true},
+			"chain_support_used":{"chain_id":11155111,"status":"testnet_supported","capabilities":["deploy","sign_userop","rotate_signer"]},
+			"references":[
+				{"kind":"source_repo","url":"https://example.com/a","commit":"abc123"}
 			],
 			"accepted_findings":["requires_bundler","requires_local_signer_state"]
 		},
@@ -277,6 +353,50 @@ func TestDraftPersist_rejectsUnpinnedProviderRefs(t *testing.T) {
 		t.Fatalf("status = %d want 400 body=%s", rec.Code, rec.Body.String())
 	}
 	assertAuthErrorPayload(t, rec, persistCodeProviderRefsUnpinned)
+}
+
+func TestDraftPersist_rejectsLegacyTemplateID(t *testing.T) {
+	h := newDraftPersistTestHandler(t)
+	token := mustToken(t, "draft-persist-legacy-tpl")
+	draftID := "draft-persist-legacy-tpl"
+	createDraftPersistBoundDraftWithPayload(t, h, token, draftID, draftPersistLegacyTemplatePayloadJSON())
+
+	issued := time.Now().UTC().Truncate(time.Second)
+	expires := issued.Add(10 * time.Minute)
+	message, signature := buildDraftPersistSignedRequest(t, draftID, issued, expires)
+	body := `{"wallet_address":"` + draftPersistTestWallet + `","chain_id":1,"scan_id":"` + draftPersistTestScanID + `","signed_message":` + jsonString(message) + `,"signature":"` + signature + `"}`
+
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.DraftPersistPath(draftID), strings.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d want 400 body=%s", rec.Code, rec.Body.String())
+	}
+	assertAuthErrorPayload(t, rec, persistCodeCryptoPolicyPayloadInvalid)
+}
+
+func TestDraftPersist_rejectsCoucheBKO(t *testing.T) {
+	h := newDraftPersistTestHandler(t)
+	token := mustToken(t, "draft-persist-couche-b")
+	draftID := "draft-persist-couche-b"
+	createDraftPersistBoundDraftWithPayload(t, h, token, draftID, draftPersistCoucheBKOPayloadJSON())
+
+	issued := time.Now().UTC().Truncate(time.Second)
+	expires := issued.Add(10 * time.Minute)
+	message, signature := buildDraftPersistSignedRequest(t, draftID, issued, expires)
+	body := `{"wallet_address":"` + draftPersistTestWallet + `","chain_id":1,"scan_id":"` + draftPersistTestScanID + `","signed_message":` + jsonString(message) + `,"signature":"` + signature + `"}`
+
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.DraftPersistPath(draftID), strings.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d want 400 body=%s", rec.Code, rec.Body.String())
+	}
+	assertAuthErrorPayload(t, rec, persistCodeProviderUserConstraintsIncompatible)
 }
 
 func TestDraftPersist_rejectsMissingSnapshot(t *testing.T) {

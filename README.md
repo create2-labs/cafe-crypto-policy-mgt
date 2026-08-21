@@ -60,8 +60,8 @@ CPM’s catalogue and explore/persist paths follow the **posture + solution prof
 | --- | --- | --- |
 | **Crypto Policy** | `cpm_pq_account_validation_v1` | CAFE intention: `required_posture` + `allowed_providers` (e.g. `["nicetry"]`) — not a concrete technique |
 | **ProviderManifest** | `cafe.provider_manifest.v0.1` | Declares solution profiles (`resulting_posture`, signature, constraints, chain support, references, `maturity`, `claim_status`) |
-| **Selection wire** | `PolicySelectionRequest` | Internal / persist transitional; **removed from explore & assessment input** in CPM-P9a (couche B → `user_constraints` at persist in P10) |
-| **Persisted CP** | `cafe.crypto_policy.v0.2` | Normative draft `payload` at `POST …/drafts/{draft_id}/persist` |
+| **Selection wire** | `PolicySelectionRequest` | Internal transitional only; **removed from explore & assessment input** in CPM-P9a; couche B lives in persist `user_constraints` (CPM-P10) |
+| **Persisted CP** | `cafe.crypto_policy.v0.2` | Normative draft `payload` at `POST …/drafts/{draft_id}/persist` (`crypto_policy_id` + `user_constraints` + snapshot) |
 
 **Posture naming**
 
@@ -79,15 +79,17 @@ CPM’s catalogue and explore/persist paths follow the **posture + solution prof
 
 **`claim_status` / `maturity`:** ranked and rejected explore candidates expose `maturity` and `claim_status` from the resolved profile. **`claim_status=declared` is a declaration only** — never present it as CAFE-audited or execution-observed proof (`cafe_reviewed` / `externally_audited` / `executed_observed` are distinct levels).
 
-**Persist gate (ADR §9 / CPM-P6)** — before cafe-persistence write:
+**Persist gate (ADR §9 / CPM-P10)** — before cafe-persistence write:
 
 - `schema_version` = `cafe.crypto_policy.v0.2`
-- `required_posture`, `template_id`, `solution_profile_ref`, `accepted_provider_snapshot` required
+- `crypto_policy_id`, `required_posture`, `user_constraints`, `solution_profile_ref`, `accepted_provider_snapshot` required
+- legacy `template_id` / `selection_request` / top-level couche B fields → **400** `CRYPTO_POLICY_PAYLOAD_INVALID`
+- CPM **rejoue couche A puis couche B** against the snapshot (+ `policy_context` wallet/chains); couche B KO → `PROVIDER_USER_CONSTRAINTS_INCOMPATIBLE`
 - snapshot `references` must be **pinned** (commit/version must not be empty or `unpinned_pending_fixture` — the shipped Nicetry fixture is intentionally unpinned until **CPM-P7**)
 - soft finding codes listed when account/constraint flags require them; `chain_support_used.status` must not be `planned`
-- stable error codes: `CRYPTO_POLICY_PAYLOAD_INVALID`, `PROVIDER_REFS_UNPINNED`, `PROVIDER_SOFT_FINDINGS_REQUIRED`, `PROVIDER_CHAIN_PLANNED` (OpenAPI `WalletAuthorizationErrorCode`)
+- stable error codes: `CRYPTO_POLICY_PAYLOAD_INVALID`, `PROVIDER_REFS_UNPINNED`, `PROVIDER_SOFT_FINDINGS_REQUIRED`, `PROVIDER_CHAIN_PLANNED`, `PROVIDER_SCAN_COMPAT_FAILED`, `PROVIDER_USER_CONSTRAINTS_INCOMPATIBLE` (OpenAPI `WalletAuthorizationErrorCode`)
 
-Schemas: OpenAPI `CryptoPolicyPersistPayload`, `AcceptedProviderSnapshot`, `SolutionProfileRef`. Package overview: `internal/domain/provider`.
+Schemas: OpenAPI `CryptoPolicyPersistPayload`, `UserConstraints`, `AcceptedProviderSnapshot`, `SolutionProfileRef`. Package overview: `internal/domain/provider`.
 
 ## Repository layout
 
@@ -173,7 +175,7 @@ Golden JSON: [`internal/domain/walletobserved/testdata/discovery_wallet_observed
 
 When `CPM_PROVIDER_MANIFEST_PATHS` is set (default: Nicetry fixture), explore resolves each instance `solution_profile_ref` and applies ADR §7 **hard** provider checks (`required_posture` / wire `target_posture` vs `solution_profile.resulting_posture`, rotation model, chain support, continuity, wallet type, etc.). Hard fail → `rejected_candidate` with stable codes such as `incompatible.provider.posture`, `incompatible.provider.chain`, `incompatible.provider.rotation`, `incompatible.provider.continuity`, `incompatible.provider.new_wallet`, `incompatible.provider.wallet_type`. Ranked candidates keep ADR §7 **soft** findings `requires_bundler` and `requires_local_signer_state` (`severity: warning`; they do not block ranking). `requires_wallet_control_proof` is persist-only (CP-PERSIST stamp). **`claim_status=declared` remains a declaration, not audited/executed proof.** Ranked/rejected explore candidates expose structured fields (`candidate_id`, `required_posture`, `resulting_posture`, `solution_profile_ref`, `maturity`, `claim_status`) without graph topology arrays. See [Capability Providers](#capability-providers-adr-2026-08-03).
 
-Normative draft persist (`POST /drafts/{draft_id}/persist`) requires a `cafe.crypto_policy.v0.2` payload with `accepted_provider_snapshot`: soft findings listed in `accepted_findings`, and provider `references` pinned (not `unpinned_pending_fixture`). Persistence stores the JSON opaquely — no Nicetry logic in `cafe-persistence`.
+Normative draft persist (`POST /drafts/{draft_id}/persist`) requires a `cafe.crypto_policy.v0.2` payload with `crypto_policy_id`, `user_constraints`, and `accepted_provider_snapshot`: soft findings listed in `accepted_findings`, provider `references` pinned (not `unpinned_pending_fixture`), and CPM rejeu couche A+B against the snapshot. Persistence stores the JSON opaquely — no Nicetry logic in `cafe-persistence`.
 
 ## Ranking and policy decision output 
 
@@ -354,7 +356,7 @@ Environment variables:
 
 CP-PERSIST V1 does **not** add new mandatory runtime environment variables. Wallet authorization is verified at persist time from the request body (`signed_message`, `signature`) on `POST /api/cpm/v1/drafts/{draft_id}/persist` (PR4). Optional `CPM_WALLET_AUTH_DOMAIN` (or request host fallback) is embedded in canonical messages from `POST /api/cpm/v1/wallet-challenges`. See [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md).
 
-**Provider snapshot gate (CPM-P6 / ADR §9):** the draft `payload` must be a normative `cafe.crypto_policy.v0.2` document with `required_posture`, `solution_profile_ref`, and `accepted_provider_snapshot` (pinned `references`, soft findings in `accepted_findings`, no `planned` chain). Gate runs in CPM **before** the opaque write to cafe-persistence. Fixture refs `unpinned_pending_fixture` are **not** persistable until CPM-P7. Details: [Capability Providers](#capability-providers-adr-2026-08-03) and OpenAPI `CryptoPolicyPersistPayload`.
+**Provider snapshot gate (CPM-P10 / ADR §9):** the draft `payload` must be a normative `cafe.crypto_policy.v0.2` document with `crypto_policy_id`, `user_constraints`, `required_posture`, `solution_profile_ref`, and `accepted_provider_snapshot` (pinned `references`, soft findings in `accepted_findings`, no `planned` chain). CPM rejoue couche A+B against the snapshot before the opaque write to cafe-persistence. Fixture refs `unpinned_pending_fixture` are **not** persistable until CPM-P7. Details: [Capability Providers](#capability-providers-adr-2026-08-03) and OpenAPI `CryptoPolicyPersistPayload`.
 
 **V2 optional (not V1):** `CPM_REDIS_URL` and ephemeral proof stores may be introduced later for advanced workflows — not required for CP-PERSIST V1.
 

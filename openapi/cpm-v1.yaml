@@ -494,9 +494,11 @@ paths:
           `action = persist_crypto_policy` and validity window (`issued_at`, `expires_at`)
         - EIP-191 / `personal_sign` signature recovers the expected EOA address
         - max validity window **10 minutes**; `issued_at` not more than **30 seconds** in the future (clock skew)
-        - draft payload is a **cafe.crypto_policy.v0.2** document with `accepted_provider_snapshot`, soft findings
-          listed in `accepted_findings`, and provider `references` that are **pinned** (not
-          `unpinned_pending_fixture`)
+        - draft payload is a **cafe.crypto_policy.v0.2** document with `crypto_policy_id`,
+          `user_constraints`, `accepted_provider_snapshot`, soft findings listed in
+          `accepted_findings`, provider `references` that are **pinned** (not
+          `unpinned_pending_fixture`), and CPM rejeu couche A+B against the snapshot
+          (legacy `template_id` / `selection_request` → 400)
 
         Transactional **persist-once** semantics: replay after success → `DRAFT_ALREADY_PERSISTED`.
         If CP creation fails before the draft is marked persisted, the client may retry with the **same
@@ -613,8 +615,11 @@ components:
       description: |
         Missing or invalid persist authorization (`WALLET_CONTROL_PROOF_REQUIRED`,
         `WALLET_AUTHORIZATION_NOT_YET_VALID`, `WALLET_AUTHORIZATION_VALIDITY_TOO_LONG`),
-        or CPM-P6 provider snapshot gate failures (`CRYPTO_POLICY_PAYLOAD_INVALID`,
-        `PROVIDER_REFS_UNPINNED`, `PROVIDER_SOFT_FINDINGS_REQUIRED`, `PROVIDER_CHAIN_PLANNED`).
+        or CPM-P10 provider snapshot gate failures (`CRYPTO_POLICY_PAYLOAD_INVALID`,
+        `PROVIDER_REFS_UNPINNED`, `PROVIDER_SOFT_FINDINGS_REQUIRED`, `PROVIDER_CHAIN_PLANNED`,
+        `PROVIDER_SCAN_COMPAT_FAILED`, `PROVIDER_USER_CONSTRAINTS_INCOMPATIBLE`).
+        Legacy `template_id` / missing `crypto_policy_id` / missing `user_constraints` →
+        `CRYPTO_POLICY_PAYLOAD_INVALID`.
       content:
         application/json:
           schema:
@@ -1139,24 +1144,54 @@ components:
         - PROVIDER_REFS_UNPINNED
         - PROVIDER_SOFT_FINDINGS_REQUIRED
         - PROVIDER_CHAIN_PLANNED
+        - PROVIDER_SCAN_COMPAT_FAILED
+        - PROVIDER_USER_CONSTRAINTS_INCOMPATIBLE
+
+    UserConstraints:
+      type: object
+      required: [allow_new_wallet, address_continuity_required, key_rotation_model]
+      description: |
+        User-validated couche B choices snapshotted at persist (ADR §7 / §9).
+        Distinct from indicative `suggested_user_constraints` on explore.
+      additionalProperties: false
+      properties:
+        allow_new_wallet:
+          type: boolean
+        address_continuity_required:
+          type: boolean
+        key_rotation_model:
+          type: string
+          enum: [none, per_userop]
 
     CryptoPolicyPersistPayload:
       type: object
-      required: [schema_version, template_id, required_posture, solution_profile_ref, accepted_provider_snapshot]
+      required:
+        - schema_version
+        - crypto_policy_id
+        - required_posture
+        - user_constraints
+        - solution_profile_ref
+        - accepted_provider_snapshot
       description: |
-        Normative draft `payload` body for `POST /drafts/{draft_id}/persist` (ADR §9 / CPM-P6).
-        `policy_context` may coexist; CP-PERSIST stamp fields are applied at persist.
+        Normative draft `payload` body for `POST /drafts/{draft_id}/persist` (ADR §9 / CPM-P10).
+        Requires `crypto_policy_id` + `user_constraints`; CPM rejoue couche A then couche B
+        against `accepted_provider_snapshot` before write. `template_id`, `selection_request`,
+        and top-level couche B fields are **rejected** (400). `policy_context` may coexist;
+        CP-PERSIST stamp fields are applied at persist.
       properties:
         schema_version:
           type: string
           enum: [cafe.crypto_policy.v0.2]
         policy_kind:
           type: string
-        template_id:
+        crypto_policy_id:
           type: string
+          description: Catalogue Crypto Policy id (replaces legacy template_id).
         required_posture:
           type: string
           enum: [classical_only, hybrid, full_pq]
+        user_constraints:
+          $ref: "#/components/schemas/UserConstraints"
         solution_profile_ref:
           $ref: "#/components/schemas/SolutionProfileRef"
         accepted_provider_snapshot:

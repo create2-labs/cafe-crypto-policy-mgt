@@ -6,7 +6,7 @@ Items deferred; not blocking current IMM work unless noted.
 
 ## Capability Providers (ADR 2026-08-03)
 
-See [ADR](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction.md) / [PR plan](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction_PR_PLAN.md). **CPM-P1–P6** delivered: `ProviderManifest`, catalogue without business graph, `key_rotation_model`, hard/soft Nicetry compat, persist gate on `cafe.crypto_policy.v0.2` + `accepted_provider_snapshot` (pinned refs). **CPM-P6b:** maintainer README Capability Providers section (docs-only) — see [README § Capability Providers](./README.md#capability-providers-adr-2026-08-03). Next: FE train (FE-P1b+); production pin of Nicetry fixture refs = **CPM-P7**.
+See [ADR](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction.md) / [PR plan](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction_PR_PLAN.md). **CPM-P1–P9b** delivered through explore couche A (`scan_compatible_providers`, `suggested_user_constraints`, `rotate_signer`). **CPM-P10** (this train): persist `crypto_policy_id` + `user_constraints` with couche A+B replay. Next on CPM: **P11a/P11b** then **CPM-P7** (pin Nicetry refs); then FE amendement train (FE-P6+).
 
 ---
 ## Open — Retirer entièrement le mode CPM mock (frontend)
