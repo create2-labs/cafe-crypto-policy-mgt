@@ -115,6 +115,10 @@ func handleDraftPersist(w http.ResponseWriter, r *http.Request, store persistenc
 
 	// CPM-P10: ADR §9 persist gate (crypto_policy_id + user_constraints + A+B replay + pinned refs).
 	if gateErr := policy.ValidateDraftPayloadForPersist(draft.Payload); gateErr != nil {
+		if errors.Is(gateErr, policy.ErrProviderUserConstraintsIncompatible) {
+			cpID := cryptoPolicyIDFromDraftPayload(draft.Payload)
+			recordPersistUserConstraintsIncompatible(r, draftID, cpID, policy.UserConstraintsIncompatibleFindingCode(gateErr))
+		}
 		status, code, message := mapPersistProviderGateError(gateErr)
 		writeWalletAuthorizationError(w, r, obs, status, code, message)
 		return
@@ -259,4 +263,14 @@ func mapPersistProviderGateError(err error) (status int, code string, message st
 	default:
 		return http.StatusBadRequest, persistCodeCryptoPolicyPayloadInvalid, message
 	}
+}
+
+func cryptoPolicyIDFromDraftPayload(payload map[string]any) string {
+	if payload == nil {
+		return ""
+	}
+	if v, ok := payload["crypto_policy_id"].(string); ok {
+		return strings.TrimSpace(v)
+	}
+	return ""
 }

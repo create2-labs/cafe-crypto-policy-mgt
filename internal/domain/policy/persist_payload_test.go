@@ -83,8 +83,12 @@ func TestValidateForPersist_rejectsSoftFindingsPlannedSchema(t *testing.T) {
 func TestValidateForPersist_rejectsCoucheBKO(t *testing.T) {
 	p := validPersistPayload()
 	p.UserConstraints.AddressContinuityRequired = true
-	if err := p.ValidateForPersist(persistObsEOA()); !errors.Is(err, ErrProviderUserConstraintsIncompatible) {
+	err := p.ValidateForPersist(persistObsEOA())
+	if !errors.Is(err, ErrProviderUserConstraintsIncompatible) {
 		t.Fatalf("couche B: got %v", err)
+	}
+	if got := UserConstraintsIncompatibleFindingCode(err); got != provider.FindingCodeContinuity {
+		t.Fatalf("finding code: got %q want %q", got, provider.FindingCodeContinuity)
 	}
 }
 

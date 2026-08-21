@@ -16,11 +16,12 @@ import (
 )
 
 const (
-	exploreNoDeployableEventName = "cpm.explore.no_deployable_candidate"
-	rejectionCodeChainScope      = "incompatible.chain_scope"
-	exploreBindingDiscovery      = "discovery"
-	exploreBindingUnknown        = "unknown"
-	exploreLabelUnknown          = "unknown"
+	exploreNoDeployableEventName       = "cpm.explore.no_deployable_candidate"
+	adrSignalNoScanCompatibleProviders = "runtime.no_scan_compatible"
+	rejectionCodeChainScope            = "incompatible.chain_scope"
+	exploreBindingDiscovery            = "discovery"
+	exploreBindingUnknown              = "unknown"
+	exploreLabelUnknown                = "unknown"
 )
 
 type exploreMetricsRecorder interface {
@@ -314,6 +315,7 @@ func (o exploreObservability) logNoDeployableCandidate(
 
 	fields := []string{
 		"event=" + strconv.Quote(exploreNoDeployableEventName),
+		"adr_signal=" + strconv.Quote(adrSignalNoScanCompatibleProviders),
 		"dominant_rejection_code=" + strconv.Quote(dominantCode),
 		"wallet_type=" + strconv.Quote(walletType),
 		"binding=" + strconv.Quote(binding),

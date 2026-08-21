@@ -153,6 +153,12 @@ func TestExploreObservability_emitsMetricAndLogForNoCandidate(t *testing.T) {
 	if !strings.Contains(line, "event="+strconvQuote(exploreNoDeployableEventName)) {
 		t.Fatalf("log missing event name: %s", line)
 	}
+	if !strings.Contains(line, "adr_signal="+strconvQuote(adrSignalNoScanCompatibleProviders)) {
+		t.Fatalf("log missing adr_signal: %s", line)
+	}
+	if strings.Contains(line, "runtime.no_provider_after_user_constraints") {
+		t.Fatalf("explore signal must be distinct from persist couche B: %s", line)
+	}
 	rawAddr := "0x742d35cc6634c0532925a3b844bc454e4438f44e"
 	if strings.Contains(line, rawAddr) {
 		t.Fatalf("log must not contain raw wallet address: %s", line)

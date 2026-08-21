@@ -53,4 +53,11 @@ func TestHandlerMetricsExposesExploreCounter(t *testing.T) {
 	if !strings.Contains(body, "cpm_catalogue_malformed_manifest_total") {
 		t.Fatalf("metrics body missing catalogue malformed counter: %s", body)
 	}
+	metrics.IncPersistUserConstraintsIncompatible()
+	req2 := httptest.NewRequest(http.MethodGet, cpmroutes.Metrics, nil)
+	res2 := httptest.NewRecorder()
+	h.ServeHTTP(res2, req2)
+	if !strings.Contains(res2.Body.String(), "cpm_persist_user_constraints_incompatible_total") {
+		t.Fatalf("metrics body missing persist couche B counter: %s", res2.Body.String())
+	}
 }

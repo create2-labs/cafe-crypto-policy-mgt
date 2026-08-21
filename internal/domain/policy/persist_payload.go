@@ -152,9 +152,25 @@ func (p *CryptoPolicyPersistPayload) ValidateForPersist(obs provider.HardObserva
 		return fmt.Errorf("%w: %s", ErrProviderScanCompatFailed, findings[0].Message)
 	}
 	if findings := provider.EvaluateUserConstraints(p.UserConstraints, profile); len(findings) > 0 {
-		return fmt.Errorf("%w: %s", ErrProviderUserConstraintsIncompatible, findings[0].Message)
+		return fmt.Errorf("%w: [%s] %s", ErrProviderUserConstraintsIncompatible, findings[0].Code, findings[0].Message)
 	}
 	return nil
+}
+
+// UserConstraintsIncompatibleFindingCode extracts the hard finding code from a
+// couche B persist error (ADR §7.2.1 / CPM-P11b). Returns "" if err is not a
+// user_constraints incompatible error.
+func UserConstraintsIncompatibleFindingCode(err error) string {
+	if err == nil || !errors.Is(err, ErrProviderUserConstraintsIncompatible) {
+		return ""
+	}
+	msg := err.Error()
+	start := strings.Index(msg, "[")
+	end := strings.Index(msg, "]")
+	if start < 0 || end <= start+1 {
+		return ""
+	}
+	return strings.TrimSpace(msg[start+1 : end])
 }
 
 func rejectLegacyPersistShape(raw map[string]any) error {

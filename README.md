@@ -286,6 +286,15 @@ Catalogue responses are posture + `allowed_providers` / provider-manifest orient
 
 Optional Prometheus counters: `cpm_catalogue_posture_orphan_total`, `cpm_catalogue_malformed_manifest_total`.
 
+**Runtime signals (ADR §7.2.1 family 2 / CPM-P11b):** contextual to a scan + CP (+ user constraints). Distinct from catalogue startup signals:
+
+| Signal | When | Log / metric |
+| --- | --- | --- |
+| Aucun scan-compatible | Explore HTTP 200 with empty `scan_compatible_providers` and non-empty `rejected_candidates` | `event=cpm.explore.no_deployable_candidate` + `adr_signal=runtime.no_scan_compatible` ; counter `cpm_explore_no_deployable_candidate_total` (IMM-OPS-1) |
+| Couche B KO | Persist gate fails with `PROVIDER_USER_CONSTRAINTS_INCOMPATIBLE` (scan-compatible snapshot rejected by `user_constraints`) | `event=cpm.persist.user_constraints_incompatible` + `adr_signal=runtime.no_provider_after_user_constraints` ; counter `cpm_persist_user_constraints_incompatible_total` |
+
+These are **not** catalogue/admin alerts and **not** fired at startup/load.
+
 Endpoints:
 
 - `GET /api/cpm/v1/crypto-policies`
@@ -307,7 +316,7 @@ and returns `PolicyDecision` with public key **`scan_compatible_providers`** (co
 **Couche A match:** for each provider in `allowed_providers`, resolve solution profiles and apply ADR §5.3 / §7 couche A. Contradictory `suggested_user_constraints` → `compatibility_status=erroneous` (not scan-compatible).
 ## Explore no-deployable-candidate observability (IMM-OPS-1)
 
-When `POST …/decisions/explore` returns HTTP **200** with **no** scan-compatible provider and **non-empty** `rejected_candidates`, CPM emits platform observability (REQ9). This is **not** an HTTP error — it signals that Discovery context is usable but no catalog route is deployable on the requested chain set.
+When `POST …/decisions/explore` returns HTTP **200** with **no** scan-compatible provider and **non-empty** `rejected_candidates`, CPM emits platform observability (REQ9). This is **not** an HTTP error — it is the ADR §7.2.1 family-2 signal **aucun scan-compatible** (`adr_signal=runtime.no_scan_compatible`). Discovery context is usable but no catalog route is deployable on the requested chain set. Distinct from persist couche B KO (`adr_signal=runtime.no_provider_after_user_constraints`).
 
 **Hook:** `internal/api/read_api.go` — after building the explore decision, before `respondJSON(200)`. The explore JSON response uses `scan_compatible_providers`.
 
