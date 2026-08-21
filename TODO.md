@@ -6,7 +6,7 @@ Items deferred; not blocking current IMM work unless noted.
 
 ## Capability Providers (ADR 2026-08-03)
 
-See [ADR](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction.md) / [PR plan](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction_PR_PLAN.md). **CPM-P1–P9b** delivered through explore couche A (`scan_compatible_providers`, `suggested_user_constraints`, `rotate_signer`). **CPM-P10** (this train): persist `crypto_policy_id` + `user_constraints` with couche A+B replay. Next on CPM: **P11a/P11b** then **CPM-P7** (pin Nicetry refs); then FE amendement train (FE-P6+).
+See [ADR](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction.md) / [PR plan](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction_PR_PLAN.md). **CPM-P1–P10** delivered through persist `user_constraints` + couche A+B replay. **CPM-P11a** (this train): catalogue startup/load signals (posture orphanage + malformed `suggested_user_constraints`). Next on CPM: **P11b** then **CPM-P7** (pin Nicetry refs); then FE amendement train (FE-P6+).
 
 ---
 ## Open — Retirer entièrement le mode CPM mock (frontend)

@@ -18,6 +18,9 @@ type ResolvedProfile struct {
 	ProviderID      string
 	ProviderVersion string
 	Profile         SolutionProfile
+	// Erroneous is set at catalogue load when suggested_user_constraints
+	// contradict profile constraints (ADR §7.2.1 / CPM-P11a). Load stays up.
+	Erroneous bool
 }
 
 // Registry indexes ProviderManifest files by (provider_id, solution_profile_id)
@@ -126,18 +129,19 @@ func (r *Registry) Get(providerID string) (*ProviderManifest, bool) {
 
 // ProfilesForProvider returns all resolved profiles for a provider_id,
 // sorted by solution_profile_id for deterministic explore output.
+// Entries are pointers into the registry index (including Erroneous flags).
 func (r *Registry) ProfilesForProvider(providerID string) []*ResolvedProfile {
 	m, ok := r.Get(providerID)
-	if !ok || m == nil {
+	if !ok || m == nil || r.byKey == nil {
 		return nil
 	}
 	out := make([]*ResolvedProfile, 0, len(m.SolutionProfiles))
 	for i := range m.SolutionProfiles {
-		out = append(out, &ResolvedProfile{
-			ProviderID:      m.ProviderID,
-			ProviderVersion: m.ProviderVersion,
-			Profile:         m.SolutionProfiles[i],
-		})
+		got, ok := r.byKey[profileKey(m.ProviderID, m.SolutionProfiles[i].SolutionProfileID)]
+		if !ok || got == nil {
+			continue
+		}
+		out = append(out, got)
 	}
 	sort.Slice(out, func(i, j int) bool {
 		return out[i].Profile.SolutionProfileID < out[j].Profile.SolutionProfileID
