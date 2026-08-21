@@ -6,7 +6,7 @@ Items deferred; not blocking current IMM work unless noted.
 
 ## Capability Providers (ADR 2026-08-03)
 
-See [ADR](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction.md) / [PR plan](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction_PR_PLAN.md). **CPM-P1–P11a** delivered through catalogue startup signals. **CPM-P11b** (this train): runtime signals — empty `scan_compatible_providers` (explore) vs couche B KO at persist. Next on CPM: **CPM-P7** (pin Nicetry refs); then FE amendement train (FE-P6+).
+See [ADR](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction.md) / [PR plan](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction_PR_PLAN.md). **CPM-P1–P11b** delivered through runtime signals. **CPM-P7** (this train): pin Nicetry manifest refs for normative persist. Next: FE amendement train (FE-P6+).
 
 ---
 ## Open — Retirer entièrement le mode CPM mock (frontend)

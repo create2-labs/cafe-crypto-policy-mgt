@@ -40,8 +40,8 @@
         { "chain_id": 1, "network": "ethereum-mainnet", "status": "planned", "capabilities": [] }
       ],
       "references": [
-        { "kind": "source_repo", "url": "https://github.com/RivaLabs-Core/NiceTry", "commit": "unpinned_pending_fixture" },
-        { "kind": "protocol_spec", "url": "https://github.com/RivaLabs-Core/Ephemeral-Keys-Protocol", "version": "unpinned_pending_fixture" }
+        { "kind": "source_repo", "url": "https://github.com/RivaLabs-Core/NiceTry", "commit": "40a1286d18dee2a92631da82a52e484fa9a3628c" },
+        { "kind": "protocol_spec", "url": "https://github.com/RivaLabs-Core/Ephemeral-Keys-Protocol", "version": "ac140c71d400449adec18884c4fd3373592292f3" }
       ],
       "risk_notes": [
         "FORS+C parameters are still presented as tunable by upstream documentation.",
