@@ -151,8 +151,10 @@ paths:
         `wallet_type` **`smart_account`** maps like Option A `AA`.
 
         Legacy **`selection_request`** / couche-B fields → **400**. Public output key is
-        **`scan_compatible_providers`** (degraded / empty until CPM-P9b couche A match).
-        Soft findings enrichment and `suggested_user_constraints` → P9b.
+        **`scan_compatible_providers`** with ADR couche A match (CPM-P9b): posture, wallet type,
+        deployable chain + capabilities (`deploy`, `sign_userop`, + `rotate_signer` if `per_userop`),
+        soft findings, and indicative **`suggested_user_constraints`**. Couche B does not filter
+        explore membership. Contradictory suggestions → candidate `compatibility_status=erroneous`.
       operationId: postPoliciesDecisionsExplore
       requestBody:
         required: true
@@ -824,8 +826,7 @@ components:
       description: |
         Explore output without normative policy graph topology
         (no nodeInstances / graphEdges / edgeIds). Public compatible list key is
-        `scan_compatible_providers` (ADR amendement). Until CPM-P9b the array may be empty
-        (degraded stub) while the key remains present.
+        `scan_compatible_providers` (ADR amendement / CPM-P9b couche A).
       properties:
         observed_wallet_summary:
           type: object
@@ -854,8 +855,6 @@ components:
       type: object
       required:
         - candidate_id
-        - crypto_policy_instance_id
-        - template_id
         - required_posture
         - solution_profile_ref
         - resulting_posture
@@ -868,8 +867,10 @@ components:
           type: string
         crypto_policy_instance_id:
           type: string
+          description: Transitional; omitted on catalogue-driven explore v0.2 (no instance binding).
         template_id:
           type: string
+          description: Legacy field; omitted on explore v0.2.
         required_posture:
           type: string
           enum: [classical_only, hybrid, full_pq]
@@ -891,20 +892,34 @@ components:
         compatibility_findings:
           type: array
           description: |
-            Explainable compatibility signals. Ranked Nicetry candidates include
+            Explainable compatibility signals. Scan-compatible Nicetry candidates include
             ADR §7 soft findings `requires_bundler` and `requires_local_signer_state`
-            (severity `warning`; they do not block ranking). Hard provider codes use
+            (severity `warning`; they do not block couche A). Hard provider codes use
             `incompatible.provider.*` (severity `blocking`) on rejected candidates.
             `requires_wallet_control_proof` is persist-only (CPM-P6), not explore.
           items:
             $ref: "#/components/schemas/CompatibilityFinding"
+        suggested_user_constraints:
+          $ref: "#/components/schemas/SuggestedUserConstraints"
+
+    SuggestedUserConstraints:
+      type: object
+      description: |
+        Indicative couche-B defaults from the provider manifest (ADR §6.2 rule 9).
+        Not authoritative for explore scan-compatible membership; UI pre-checks only.
+      properties:
+        allow_new_wallet:
+          type: boolean
+        address_continuity_required:
+          type: boolean
+        key_rotation_model:
+          type: string
+          enum: [none, per_userop]
 
     RejectedPolicyCandidate:
       type: object
       required:
         - candidate_id
-        - crypto_policy_instance_id
-        - template_id
         - required_posture
         - solution_profile_ref
         - compatibility_status
@@ -934,6 +949,9 @@ components:
           enum: [declared, cafe_reviewed, externally_audited, executed_observed]
         compatibility_status:
           type: string
+          description: |
+            `incompatible` for couche A hard reject; `erroneous` when
+            `suggested_user_constraints` contradict profile constraints.
         compatibility_findings:
           type: array
           description: Blocking hard-compatibility findings (severity `blocking`).

@@ -283,7 +283,7 @@ Endpoints:
 - `GET /api/cpm/v1/crypto-policies/{crypto_policy_id}`
 - `GET /api/cpm/v1/providers`
 - `GET /api/cpm/v1/providers/{provider_id}`
-- `POST /api/cpm/v1/policies/decisions/explore` (wire v0.2: `crypto_policy_id` + `policy_context`; output `scan_compatible_providers` degraded until P9b)
+- `POST /api/cpm/v1/policies/decisions/explore` (wire v0.2: `crypto_policy_id` + `policy_context`; output `scan_compatible_providers` via couche A match)
 
 `POST /api/cpm/v1/policies/decisions/explore` accepts:
 
@@ -293,12 +293,12 @@ Endpoints:
 
 Legacy `selection_request` / couche-B fields are **rejected with HTTP 400**.
 
-and returns `PolicyDecision` with public key **`scan_compatible_providers`** (may be empty / degraded until CPM-P9b couche A match) plus optional `rejected_candidates` and `warnings`.
+and returns `PolicyDecision` with public key **`scan_compatible_providers`** (couche A: posture, wallet type, deployable chain + capabilities including `rotate_signer` when `per_userop`, soft findings, indicative `suggested_user_constraints`) plus optional `rejected_candidates` and `warnings`. Couche B does not influence explore membership.
 
-**Chain scope / couche A match:** CPM-P9b.
+**Couche A match:** for each provider in `allowed_providers`, resolve solution profiles and apply ADR §5.3 / §7 couche A. Contradictory `suggested_user_constraints` → `compatibility_status=erroneous` (not scan-compatible).
 ## Explore no-deployable-candidate observability (IMM-OPS-1)
 
-When `POST …/decisions/explore` returns HTTP **200** with **no** scan-compatible provider and **non-empty** `rejected_candidates`, CPM emits platform observability (REQ9). This is **not** an HTTP error — it signals that Discovery context is usable but no catalog route is deployable on the requested chain set. Until P9b the degraded empty response typically does **not** emit this signal.
+When `POST …/decisions/explore` returns HTTP **200** with **no** scan-compatible provider and **non-empty** `rejected_candidates`, CPM emits platform observability (REQ9). This is **not** an HTTP error — it signals that Discovery context is usable but no catalog route is deployable on the requested chain set.
 
 **Hook:** `internal/api/read_api.go` — after building the explore decision, before `respondJSON(200)`. The explore JSON response uses `scan_compatible_providers`.
 

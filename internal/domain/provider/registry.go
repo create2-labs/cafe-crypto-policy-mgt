@@ -123,3 +123,24 @@ func (r *Registry) Get(providerID string) (*ProviderManifest, bool) {
 	m, ok := r.manifests[strings.ToLower(strings.TrimSpace(providerID))]
 	return m, ok
 }
+
+// ProfilesForProvider returns all resolved profiles for a provider_id,
+// sorted by solution_profile_id for deterministic explore output.
+func (r *Registry) ProfilesForProvider(providerID string) []*ResolvedProfile {
+	m, ok := r.Get(providerID)
+	if !ok || m == nil {
+		return nil
+	}
+	out := make([]*ResolvedProfile, 0, len(m.SolutionProfiles))
+	for i := range m.SolutionProfiles {
+		out = append(out, &ResolvedProfile{
+			ProviderID:      m.ProviderID,
+			ProviderVersion: m.ProviderVersion,
+			Profile:         m.SolutionProfiles[i],
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].Profile.SolutionProfileID < out[j].Profile.SolutionProfileID
+	})
+	return out
+}

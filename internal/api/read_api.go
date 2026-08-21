@@ -123,15 +123,16 @@ func registerCatalogRoutes(mux *http.ServeMux, store *ReadStore) {
 }
 
 func registerExploreRoute(mux *http.ServeMux, store *ReadStore) {
-	// POST …/decisions/explore — HTTP explore wire v0.2 (CPM-P9a-cpm).
-	// Input: crypto_policy_id + policy_context only. Output: scan_compatible_providers (degraded until P9b).
+	// POST …/decisions/explore — HTTP explore wire v0.2 + couche A match (CPM-P9b).
+	// Input: crypto_policy_id + policy_context only. Output: scan_compatible_providers.
 	mux.HandleFunc("POST "+cpmroutes.PoliciesDecisionsExplore, func(w http.ResponseWriter, r *http.Request) {
 		req, err := decodeDecisionExploreRequest(r)
 		if err != nil {
 			respondJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 			return
 		}
-		if _, ok := store.cryptoPolicyByID[req.CryptoPolicyID]; !ok {
+		cp, ok := store.cryptoPolicyByID[req.CryptoPolicyID]
+		if !ok {
 			respondJSON(w, http.StatusBadRequest, map[string]any{"error": "unknown crypto_policy_id"})
 			return
 		}
@@ -142,17 +143,11 @@ func registerExploreRoute(mux *http.ServeMux, store *ReadStore) {
 			return
 		}
 
-		// P9a: normative output key with degraded/empty content until P9b couche A match.
-		decision := policy.PolicyDecision{
-			ObservedWalletSummary: policy.ObservedWalletSummary{
-				ChainIDs: append([]int64(nil), observation.ChainIDs...),
-			},
-			RequestSummary: policy.RequestSummary{
-				CryptoPolicyID: req.CryptoPolicyID,
-			},
-			RankedCandidates:   []policy.RankedPolicy{},
-			RejectedCandidates: []policy.RejectedPolicy{},
-			Warnings:           []string{policy.ExploreDegradedWarning},
+		evaluator := policy.ExploreCoucheAEvaluator{Providers: store.providers}
+		decision, err := evaluator.EvaluateExploreCoucheA(observation, cp)
+		if err != nil {
+			respondJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			return
 		}
 
 		recordExploreNoDeployableCandidate(r, req, decision, instanceScopeByID(store.instances))

@@ -210,8 +210,7 @@ func TestExploreObservability_skipsWhenRejectedEmpty(t *testing.T) {
 }
 
 func TestDecisionExplore_noDeployableCandidateObservabilityIntegration(t *testing.T) {
-	// Until CPM-P9b, explore returns degraded empty scan_compatible_providers and does not
-	// emit no-deployable observability from the HTTP path (no rejected_candidates yet).
+	// Mainnet-only scan → Nicetry planned → empty scan_compatible + rejected → observability fires.
 	store, err := LoadReadStore(ReadStoreOptions{
 		CryptoPolicyPaths: []string{
 			fixturePath("crypto_policy_pq_account_validation_v1.json"),
@@ -237,7 +236,7 @@ func TestDecisionExplore_noDeployableCandidateObservabilityIntegration(t *testin
 		"policy_context": map[string]any{
 			"wallet_address":     "0x742d35cc6634c0532925a3b844bc454e4438f44e",
 			"wallet_type":        "eoa",
-			"chain_ids":          []int64{11155111},
+			"chain_ids":          []int64{1},
 			"current_algorithm":  "secp256k1_ecrecover",
 			"current_pq_posture": "classical_only",
 			"scanned_at":         "2026-04-17T09:59:58Z",
@@ -265,10 +264,13 @@ func TestDecisionExplore_noDeployableCandidateObservabilityIntegration(t *testin
 		t.Fatalf("decode: %v", err)
 	}
 	if len(response.Decision.ScanCompatibleProviders) != 0 {
-		t.Fatalf("expected empty scan_compatible_providers until P9b")
+		t.Fatalf("expected empty scan_compatible_providers for mainnet planned")
 	}
-	if len(metrics.increments) != 0 {
-		t.Fatalf("P9a degraded path must not emit no-deployable metrics, got %d", len(metrics.increments))
+	if len(response.Decision.RejectedCandidates) == 0 {
+		t.Fatal("expected rejected_candidates for mainnet planned")
+	}
+	if len(metrics.increments) != 1 {
+		t.Fatalf("want 1 no-deployable metric, got %d", len(metrics.increments))
 	}
 }
 
