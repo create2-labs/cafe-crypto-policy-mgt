@@ -12,8 +12,8 @@ github.com/consensys/gnark-crypto v0.18.1 h1:RyLV6UhPRoYYzaFnPQA4qK3DyuDgkTgskDd
 github.com/consensys/gnark-crypto v0.18.1/go.mod h1:L3mXGFTe1ZN+RSJ+CLjUt9x7PNdx8ubaYfDROyp2Z8c=
 github.com/crate-crypto/go-eth-kzg v1.5.0 h1:FYRiJMJG2iv+2Dy3fi14SVGjcPteZ5HAAUe4YWlJygc=
 github.com/crate-crypto/go-eth-kzg v1.5.0/go.mod h1:J9/u5sWfznSObptgfa92Jq8rTswn6ahQWEuiLHOjCUI=
-github.com/create2-labs/cafe-contracts v0.0.2-0.20260805161432-01fea0174749 h1:zyBXrVPy1pcuQgQYr4iO4oI4LPF6+H+DpTTHQk3SJnM=
-github.com/create2-labs/cafe-contracts v0.0.2-0.20260805161432-01fea0174749/go.mod h1:YKq1T3SMsfXm7XNOadnJv11Zk/7pt6SCV/46rsH1Gno=
+github.com/create2-labs/cafe-contracts v0.0.2-0.20260820143337-15bfb255b4ed h1:AEBZhpfDagu7XA0qYLaUKgqkNncRYnA49N6c1xcTSpA=
+github.com/create2-labs/cafe-contracts v0.0.2-0.20260820143337-15bfb255b4ed/go.mod h1:YKq1T3SMsfXm7XNOadnJv11Zk/7pt6SCV/46rsH1Gno=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/decred/dcrd/crypto/blake256 v1.0.0 h1:/8DMNYp9SGi5f0w7uCm6d6M4OU2rGFK09Y2A4Xv7EE0=

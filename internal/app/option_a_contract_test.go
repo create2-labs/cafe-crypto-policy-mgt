@@ -97,7 +97,7 @@ func TestOptionAContract_assessmentPolicyContextForbiddenReturns400(t *testing.T
 	body := map[string]any{
 		"scan_id":           optionAContractScanID,
 		"policy_context":    map[string]any{"wallet_address": "0x1"},
-		"selection_request": validAssessmentSelectionRequest(),
+		"crypto_policy_id": "cpm_pq_account_validation_v1",
 	}
 	raw, err := json.Marshal(body)
 	if err != nil {

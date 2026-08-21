@@ -34,7 +34,7 @@ func TestOptionA_GoldenExplorePolicyContextReturns200(t *testing.T) {
 	body := map[string]any{
 		"scan_id":           optionAScanID,
 		"policy_context":    policyContext,
-		"selection_request": validOptionASelectionRequest(),
+		"crypto_policy_id": validOptionACryptoPolicyID(),
 	}
 	raw, err := json.Marshal(body)
 	if err != nil {

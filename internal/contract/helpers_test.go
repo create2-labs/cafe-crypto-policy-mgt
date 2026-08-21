@@ -55,18 +55,8 @@ func mustLoadReadStore(t *testing.T) *api.ReadStore {
 	return store
 }
 
-func validOptionASelectionRequest() map[string]any {
-	return map[string]any{
-		"target_posture":              "hybrid",
-		"target_chain_ids":            []int64{1},
-		"require_multichain":          false,
-		"allow_new_wallet":            false,
-		"address_continuity_required": true,
-		"key_rotation_model":          "per_userop",
-		"recovery_required":           true,
-		"minimum_maturity":            1,
-		"approval_mode":               "manual",
-	}
+func validOptionACryptoPolicyID() string {
+	return "cpm_pq_account_validation_v1"
 }
 
 // policyContextFromDiscoveryV1Detail builds the explore policy_context envelope per A2 §3.1

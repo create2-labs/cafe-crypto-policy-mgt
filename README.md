@@ -60,16 +60,16 @@ CPM’s catalogue and explore/persist paths follow the **posture + solution prof
 | --- | --- | --- |
 | **Crypto Policy** | `cpm_pq_account_validation_v1` | CAFE intention: `required_posture` + `allowed_providers` (e.g. `["nicetry"]`) — not a concrete technique |
 | **ProviderManifest** | `cafe.provider_manifest.v0.1` | Declares solution profiles (`resulting_posture`, signature, constraints, chain support, references, `maturity`, `claim_status`) |
-| **Selection wire** | `PolicySelectionRequest` | Explore/assessment input (transitional until CPM-P9); see OpenAPI `PolicySelectionRequest` |
+| **Selection wire** | `PolicySelectionRequest` | Internal / persist transitional; **removed from explore & assessment input** in CPM-P9a (couche B → `user_constraints` at persist in P10) |
 | **Persisted CP** | `cafe.crypto_policy.v0.2` | Normative draft `payload` at `POST …/drafts/{draft_id}/persist` |
 
 **Posture naming**
 
 - Domain / catalogue / persist body: **`required_posture`** (Crypto Policy, CP payload).
-- Explore / NATS wire `selection_request`: **`target_posture`** is the **stable v0.1 alias** of that required posture — **not** renamed in this plan (see OpenAPI description on `PolicySelectionRequest`). Removed from explore input in **CPM-P9**.
-- Provider solution: **`resulting_posture`**. Hard compatibility requires selection/Crypto Policy posture to align with the profile’s resulting posture (ADR §7).
+- Explore / NATS assessment input **v0.2**: **`crypto_policy_id`** + scan context (`policy_context` HTTP / `observation` NATS). Required posture lives on the catalogue CP. Legacy `selection_request` / `target_posture` → HTTP **400** / NATS validation error.
+- Provider solution: **`resulting_posture`**. Hard compatibility (CPM-P9b+) requires Crypto Policy posture to align with the profile’s resulting posture (ADR §7).
 
-**`key_rotation_model`:** `none` \| `per_userop` on `selection_request` (replaces the former `key_rotation_required` bool). Compatibility matches the solution profile’s signature rotation model exactly.
+**`key_rotation_model`:** on solution profiles / persist `user_constraints` (P10); **not** on explore/assessment input after P9a.
 
 **Hard vs soft (Nicetry pilot, ADR §7)**
 
@@ -283,28 +283,24 @@ Endpoints:
 - `GET /api/cpm/v1/crypto-policies/{crypto_policy_id}`
 - `GET /api/cpm/v1/providers`
 - `GET /api/cpm/v1/providers/{provider_id}`
-- `POST /api/cpm/v1/policies/decisions/explore` (transitional wire until CPM-P9; production catalogue no longer loads explore instances — empty candidates until P9 rebuild)
+- `POST /api/cpm/v1/policies/decisions/explore` (wire v0.2: `crypto_policy_id` + `policy_context`; output `scan_compatible_providers` degraded until P9b)
 
 `POST /api/cpm/v1/policies/decisions/explore` accepts:
 
-- `policy_context` (wallet scan context: `scan_id`, `wallet_address`, `wallet_type`, `chain_ids`, `current_algorithm`, `current_pq_posture`, `scanned_at`, `status` — converted server-side into the evaluator’s normalized payload)
-- `selection_request` (`PolicySelectionRequest`) — wire fields include **`target_posture`** (v0.1 alias of CAFE `required_posture`) and **`key_rotation_model`** (`none` \| `per_userop`; replaces the former `key_rotation_required` bool; see ADR §7.1 and OpenAPI)
-- optional top-level `scan_id` (`string`): when present and non-empty, AUTH-02 delegates to Discovery (`can-read`); if `policy_context.scan_id` is also set, it must match. Evaluation uses the mapped observation derived from `policy_context` plus `selection_request`. Discovery’s `scan_id` is the id of **one persisted scan result row** (a new scan run creates a new row with a new id; stable for that row’s lifetime — see `WORKPLAN_API.md` §2.2 and Discovery `wallet_policy_context` docs).
+- `crypto_policy_id` (required) — catalogue Crypto Policy id
+- `policy_context` (wallet scan context: `scan_id`, `wallet_address` / `target_address`, `wallet_type`, `chain_ids`, `current_algorithm`, `current_pq_posture`, `scanned_at`, `status` — converted server-side into the evaluator’s normalized payload)
+- optional top-level `scan_id` (`string`): when present and non-empty, AUTH-02 delegates to Discovery (`can-read`); if `policy_context.scan_id` is also set, it must match. Discovery’s `scan_id` is the id of **one persisted scan result row** (a new scan run creates a new row with a new id; stable for that row’s lifetime — see `WORKPLAN_API.md` §2.2 and Discovery `wallet_policy_context` docs).
 
-and returns `PolicyDecision` output that keeps the distinction between:
+Legacy `selection_request` / couche-B fields are **rejected with HTTP 400**.
 
-- `incompatible`
-- `compatible_but_not_deployable`
-- `compatible_and_deployable`
+and returns `PolicyDecision` with public key **`scan_compatible_providers`** (may be empty / degraded until CPM-P9b couche A match) plus optional `rejected_candidates` and `warnings`.
 
-Ranked/rejected candidates carry provider-facing fields (`required_posture`, `resulting_posture`, `solution_profile_ref`, `maturity`, `claim_status`, soft findings). Full schema: OpenAPI explore response components.
-
-**Chain scope (explore):** transitional until CPM-P9 — when explore-only instances are present in tests, `selection_request.target_chain_ids` is evaluated **all-or-nothing** against each candidate instance `scope.chain_ids` (see `WORKPLAN_API.md` §5.1.1).
+**Chain scope / couche A match:** CPM-P9b.
 ## Explore no-deployable-candidate observability (IMM-OPS-1)
 
-When `POST …/decisions/explore` returns HTTP **200** with **no** ranked deployable candidate and **non-empty** `rejected_candidates`, CPM emits platform observability (REQ9). This is **not** an HTTP error — it signals that Discovery context is usable but no catalog route is deployable on the requested chain set.
+When `POST …/decisions/explore` returns HTTP **200** with **no** scan-compatible provider and **non-empty** `rejected_candidates`, CPM emits platform observability (REQ9). This is **not** an HTTP error — it signals that Discovery context is usable but no catalog route is deployable on the requested chain set. Until P9b the degraded empty response typically does **not** emit this signal.
 
-**Hook:** `internal/api/read_api.go` — after `PolicyDecisionEvaluator.Evaluate`, before `respondJSON(200)`. The explore JSON response is unchanged.
+**Hook:** `internal/api/read_api.go` — after building the explore decision, before `respondJSON(200)`. The explore JSON response uses `scan_compatible_providers`.
 
 **Structured log** (`event=cpm.explore.no_deployable_candidate`):
 

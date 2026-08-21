@@ -59,28 +59,38 @@ type ObservedWalletSummary struct {
 	ChainIDs []int64 `json:"chain_ids,omitempty"`
 }
 
-// RequestSummary is a compact projection of the selection request used for ranking.
+// RequestSummary is a compact projection of explore/assessment input used for ranking.
+// Explore HTTP v0.2 carries crypto_policy_id; Target* fields remain for the transitional
+// Evaluate path until CPM-P9b replaces couche-A matching.
 type RequestSummary struct {
-	TargetPosture             vocabulary.CurrentPQPosture `json:"target_posture"`
+	CryptoPolicyID            string                      `json:"crypto_policy_id,omitempty"`
+	TargetPosture             vocabulary.CurrentPQPosture `json:"target_posture,omitempty"`
 	TargetChainIDs            []int64                     `json:"target_chain_ids,omitempty"`
-	RequireMultichain         bool                        `json:"require_multichain"`
-	AllowNewWallet            bool                        `json:"allow_new_wallet"`
-	AddressContinuityRequired bool                        `json:"address_continuity_required"`
-	MinimumMaturity           int                         `json:"minimum_maturity"`
+	RequireMultichain         bool                        `json:"require_multichain,omitempty"`
+	AllowNewWallet            bool                        `json:"allow_new_wallet,omitempty"`
+	AddressContinuityRequired bool                        `json:"address_continuity_required,omitempty"`
+	MinimumMaturity           int                         `json:"minimum_maturity,omitempty"`
 }
 
 // PolicyDecision is the explainable first-version output from ranking.
+// JSON public key for compatible candidates is scan_compatible_providers (ADR amendement / P9a).
+// Go type RankedPolicy may remain internal (ADR §14 Q9) until P9b enriches entries.
 type PolicyDecision struct {
 	ObservedWalletSummary    ObservedWalletSummary `json:"observed_wallet_summary"`
 	RequestSummary           RequestSummary        `json:"request_summary"`
 	SelectedPolicyID         string                `json:"selected_policy_id,omitempty"`
 	SelectedPolicyInstanceID string                `json:"selected_policy_instance_id,omitempty"`
-	RankedCandidates         []RankedPolicy        `json:"ranked_candidates,omitempty"`
+	RankedCandidates         []RankedPolicy        `json:"scan_compatible_providers"`
 	RejectedCandidates       []RejectedPolicy      `json:"rejected_candidates,omitempty"`
 	Warnings                 []string              `json:"warnings,omitempty"`
 }
 
+// ExploreDegradedWarning documents that scan_compatible_providers content is non-final until P9b.
+const ExploreDegradedWarning = "scan_compatible_providers is degraded until CPM-P9b (couche A match not yet applied)"
+
 // PolicyDecisionEvaluator evaluates compatibility and applies deterministic PR13 ranking.
+// Explore HTTP v0.2 (P9a) returns a degraded empty scan_compatible_providers list and does
+// not call Evaluate; CPM-P9b reconnects couche A matching to this path (or a successor).
 type PolicyDecisionEvaluator struct {
 	CompatibilityEvaluator PolicyCompatibilityEvaluator
 }

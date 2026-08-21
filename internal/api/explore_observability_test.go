@@ -12,7 +12,6 @@ import (
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/policy"
-	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/vocabulary"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/persistence"
 )
 
@@ -211,12 +210,11 @@ func TestExploreObservability_skipsWhenRejectedEmpty(t *testing.T) {
 }
 
 func TestDecisionExplore_noDeployableCandidateObservabilityIntegration(t *testing.T) {
+	// Until CPM-P9b, explore returns degraded empty scan_compatible_providers and does not
+	// emit no-deployable observability from the HTTP path (no rejected_candidates yet).
 	store, err := LoadReadStore(ReadStoreOptions{
 		CryptoPolicyPaths: []string{
 			fixturePath("crypto_policy_pq_account_validation_v1.json"),
-		},
-		InstancePaths: []string{
-			fixturePath("crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 		ProviderManifestPaths: []string{providerManifestFixturePath()},
 	})
@@ -228,16 +226,14 @@ func TestDecisionExplore_noDeployableCandidateObservabilityIntegration(t *testin
 	restore := setExploreObservabilityForTest(exploreObservability{metrics: metrics})
 	defer restore()
 
-	store.instances[0].Scope.ChainIDs = []int64{1}
-	store.instances[0].Scope.RequireMultichain = false
-
 	mux := http.NewServeMux()
 	if err := RegisterReadRoutes(mux, store); err != nil {
 		t.Fatalf("RegisterReadRoutes: %v", err)
 	}
 
 	body := map[string]any{
-		"scan_id": "705c9704-9428-45e0-882d-fae4cb9d2a0b",
+		"scan_id":          "705c9704-9428-45e0-882d-fae4cb9d2a0b",
+		"crypto_policy_id": "cpm_pq_account_validation_v1",
 		"policy_context": map[string]any{
 			"wallet_address":     "0x742d35cc6634c0532925a3b844bc454e4438f44e",
 			"wallet_type":        "eoa",
@@ -245,17 +241,6 @@ func TestDecisionExplore_noDeployableCandidateObservabilityIntegration(t *testin
 			"current_algorithm":  "secp256k1_ecrecover",
 			"current_pq_posture": "classical_only",
 			"scanned_at":         "2026-04-17T09:59:58Z",
-		},
-		"selection_request": map[string]any{
-			"target_posture":              string(vocabulary.PQPostureHybrid),
-			"target_chain_ids":            []int64{11155111},
-			"require_multichain":          false,
-			"allow_new_wallet":            true,
-			"address_continuity_required": false,
-			"key_rotation_model":          "per_userop",
-			"recovery_required":           true,
-			"minimum_maturity":            1,
-			"approval_mode":               "manual",
 		},
 	}
 	raw, err := json.Marshal(body)
@@ -272,46 +257,18 @@ func TestDecisionExplore_noDeployableCandidateObservabilityIntegration(t *testin
 
 	var response struct {
 		Decision struct {
-			SelectedPolicyID   string `json:"selected_policy_id"`
-			RankedCandidates   []any  `json:"ranked_candidates"`
-			RejectedCandidates []struct {
-				CompatibilityFindings []struct {
-					Code string `json:"code"`
-				} `json:"compatibility_findings"`
-			} `json:"rejected_candidates"`
+			ScanCompatibleProviders []any `json:"scan_compatible_providers"`
+			RejectedCandidates      []any `json:"rejected_candidates"`
 		} `json:"decision"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if response.Decision.SelectedPolicyID != "" {
-		t.Fatalf("expected empty selected_policy_id, got %q", response.Decision.SelectedPolicyID)
+	if len(response.Decision.ScanCompatibleProviders) != 0 {
+		t.Fatalf("expected empty scan_compatible_providers until P9b")
 	}
-	if len(response.Decision.RankedCandidates) != 0 {
-		t.Fatalf("expected empty ranked_candidates")
-	}
-	if len(response.Decision.RejectedCandidates) == 0 {
-		t.Fatalf("expected rejected_candidates")
-	}
-	foundChainScope := false
-	for _, rejected := range response.Decision.RejectedCandidates {
-		for _, reason := range rejected.CompatibilityFindings {
-			if reason.Code == rejectionCodeChainScope {
-				foundChainScope = true
-			}
-		}
-	}
-	if !foundChainScope {
-		t.Fatalf("expected incompatible.chain_scope rejection in response")
-	}
-	if len(metrics.increments) != 1 {
-		t.Fatalf("metric increments: got %d want 1", len(metrics.increments))
-	}
-	if metrics.increments[0].RejectionCode != rejectionCodeChainScope {
-		t.Fatalf("metric rejection_code: got %q", metrics.increments[0].RejectionCode)
-	}
-	if metrics.increments[0].MissingChainCount != "1" {
-		t.Fatalf("metric missing_chain_count: got %q want 1", metrics.increments[0].MissingChainCount)
+	if len(metrics.increments) != 0 {
+		t.Fatalf("P9a degraded path must not emit no-deployable metrics, got %d", len(metrics.increments))
 	}
 }
 

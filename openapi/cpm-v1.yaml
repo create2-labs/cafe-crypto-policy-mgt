@@ -142,15 +142,17 @@ paths:
       tags: [decisions]
       summary: Explore applicable policies for a context (non-persistent)
       description: |
-        **Does not** persist a final policy instance (WORKPLAN_API.md §5.1, §8.6). Body carries
-        `policy_context` and `selection_request`. **`policy_context`** accepts either the flat Option A
-        shape (`wallet_address` or **`target_address`**, `wallet_type`, `chain_ids`, …) or a Discovery v1
-        wallet scan **detail** envelope (`scan_id`, `status`, **`result`** with `WalletScanResult` fields
-        as in `cafe-discovery` `openapi/discovery-v1.yaml`). Discovery **`current_pq_posture`** labels
-        `pq_ready` / `not_pq_ready` map to evaluator exports; `wallet_type` **`smart_account`** maps like
-        Option A `AA`. Ranked candidates include non-blocking ADR §7 soft findings
-        `requires_bundler` and `requires_local_signer_state` (severity `warning`).
-        `requires_wallet_control_proof` is persist-only and is not an explore finding.
+        **Does not** persist a final policy instance (WORKPLAN_API.md §5.1, §8.6). Explore wire **v0.2**
+        (CPM-P9a-cpm): body carries **`crypto_policy_id`** + **`policy_context`** only.
+        **`policy_context`** accepts either the flat Option A shape (`wallet_address` or **`target_address`**,
+        `wallet_type`, `chain_ids`, …) or a Discovery v1 wallet scan **detail** envelope (`scan_id`, `status`,
+        **`result`** with `WalletScanResult` fields as in `cafe-discovery` `openapi/discovery-v1.yaml`).
+        Discovery **`current_pq_posture`** labels `pq_ready` / `not_pq_ready` map to evaluator exports;
+        `wallet_type` **`smart_account`** maps like Option A `AA`.
+
+        Legacy **`selection_request`** / couche-B fields → **400**. Public output key is
+        **`scan_compatible_providers`** (degraded / empty until CPM-P9b couche A match).
+        Soft findings enrichment and `suggested_user_constraints` → P9b.
       operationId: postPoliciesDecisionsExplore
       requestBody:
         required: true
@@ -179,13 +181,15 @@ paths:
         `POST /discovery/assessments/request`. TLS scans are **not** supported for CPM policy assessment.
 
         CPM fetches authoritative scan detail from Discovery (`GET /discovery/v1/wallets/scans/{scan_id}`)
-        and emits `policy.assessment.requested.v0.1` on NATS. The request body must **not** include
-        `policy_context` (server builds observation from Discovery).
+        and emits `policy.assessment.requested.v0.1` on NATS with assessment payload **v0.2**
+        (`crypto_policy_id` + embedded observation). The request body must **not** include
+        `policy_context` (server builds observation from Discovery) nor `selection_request` / couche-B fields.
 
         | Situation | HTTP |
         |-----------|------|
         | `policy_context` present | **400** |
-        | Invalid `scan_id` / `selection_request` | **400** |
+        | Legacy `selection_request` / couche-B fields | **400** |
+        | Invalid `scan_id` / missing `crypto_policy_id` | **400** |
         | Authz deny / unknown scan / TLS scan / missing `result` | **404** |
         | Discovery authz or detail unavailable | **503** |
         | Accepted for async processing | **202** |
@@ -789,11 +793,16 @@ components:
 
     DecisionExploreRequest:
       type: object
-      required: [policy_context, selection_request]
+      required: [crypto_policy_id, policy_context]
+      description: |
+        Explore HTTP wire v0.2. `selection_request` and couche-B constraint fields are rejected (**400**).
       properties:
         scan_id:
           type: string
           description: Optional scan binding for AUTH-02 (implementation detail).
+        crypto_policy_id:
+          type: string
+          description: Catalogue Crypto Policy id; required posture is on the CP, not on this request.
         policy_context:
           type: object
           description: |
@@ -801,8 +810,7 @@ components:
             Extra keys are ignored when parsing the nested `result` branch; unknown keys at the top level of the
             request body remain rejected by the API (strict JSON on the outer envelope).
           additionalProperties: true
-        selection_request:
-          $ref: "#/components/schemas/PolicySelectionRequest"
+      additionalProperties: false
 
     DecisionExploreResponse:
       type: object
@@ -814,9 +822,10 @@ components:
     PolicyDecision:
       type: object
       description: |
-        Explore ranking output without normative policy graph topology
-        (no nodeInstances / graphEdges / edgeIds). Candidates are structured
-        around required_posture + solution_profile_ref + resulting_posture.
+        Explore output without normative policy graph topology
+        (no nodeInstances / graphEdges / edgeIds). Public compatible list key is
+        `scan_compatible_providers` (ADR amendement). Until CPM-P9b the array may be empty
+        (degraded stub) while the key remains present.
       properties:
         observed_wallet_summary:
           type: object
@@ -828,7 +837,7 @@ components:
           type: string
         selected_policy_instance_id:
           type: string
-        ranked_candidates:
+        scan_compatible_providers:
           type: array
           items:
             $ref: "#/components/schemas/RankedPolicyCandidate"
@@ -1033,18 +1042,21 @@ components:
 
     PolicyAssessmentRequest:
       type: object
-      required: [scan_id, selection_request]
+      required: [scan_id, crypto_policy_id]
       description: |
         Async policy assessment trigger for a **Discovery wallet scan** only. Do **not** send
-        `policy_context` (returns **400** if present). CPM reconstructs observation from Discovery
-        wallet scan detail (`GET /discovery/v1/wallets/scans/{scan_id}`).
+        `policy_context` (returns **400** if present). Do **not** send `selection_request` or
+        couche-B fields (returns **400**). CPM reconstructs observation from Discovery
+        wallet scan detail (`GET /discovery/v1/wallets/scans/{scan_id}`) and publishes NATS
+        assessment payload v0.2 (`crypto_policy_id` + `observation`).
       properties:
         scan_id:
           type: string
           format: uuid
           description: Discovery wallet scan id (owner-scoped).
-        selection_request:
-          $ref: "#/components/schemas/PolicySelectionRequest"
+        crypto_policy_id:
+          type: string
+          description: Catalogue Crypto Policy id.
         client_request_id:
           type: string
           description: Optional client correlation id (not the NATS idempotence key).

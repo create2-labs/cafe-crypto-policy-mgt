@@ -4,10 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 
 	"github.com/create2-labs/cafe-contracts/cafenatsv01"
-	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/policy"
-	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/vocabulary"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/walletobserved"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/persistence"
 )
@@ -20,10 +19,11 @@ var (
 )
 
 // AssessmentRequestInput is the normalized input delegated to CPM assessment flow.
+// Wire v0.2: crypto_policy_id + observation (scan context); no selection_request / couche B.
 type AssessmentRequestInput struct {
-	Command          cafenatsv01.PolicyAssessmentRequested
-	Observation      walletobserved.Event
-	SelectionRequest policy.PolicySelectionRequest
+	Command        cafenatsv01.PolicyAssessmentRequested
+	Observation    walletobserved.Event
+	CryptoPolicyID string
 }
 
 // AssessmentRequestHandler executes the domain assessment flow.
@@ -53,6 +53,8 @@ func NewAssessmentRequestConsumer(store IdempotencyStore, handler AssessmentRequ
 }
 
 // HandleMessage processes one NATS message body for the given subject.
+// Legacy selection_request / couche-B fields fail at contracts decode (ErrLegacyAssessmentField)
+// and are returned as a validation error (reject/nack path) — not an HTTP 400.
 func (c *AssessmentRequestConsumer) HandleMessage(ctx context.Context, subject string, data []byte) error {
 	if subject != cafenatsv01.NATSSubjectPolicyAssessmentRequestedV01 {
 		return nil
@@ -60,9 +62,11 @@ func (c *AssessmentRequestConsumer) HandleMessage(ctx context.Context, subject s
 
 	var event cafenatsv01.PolicyAssessmentRequested
 	if err := json.Unmarshal(data, &event); err != nil {
+		log.Printf("event=cpm.assessment.validation_error subject=%q err=%q", subject, err.Error())
 		return err
 	}
 	if err := event.Validate(); err != nil {
+		log.Printf("event=cpm.assessment.validation_error event_id=%q err=%q", event.EventID, err.Error())
 		return err
 	}
 	normalizeWalletSubjects(&event)
@@ -76,9 +80,9 @@ func (c *AssessmentRequestConsumer) HandleMessage(ctx context.Context, subject s
 	}
 
 	input := AssessmentRequestInput{
-		Command:          event,
-		Observation:      event.Payload.Observation,
-		SelectionRequest: mapSelectionRequest(event.Payload.SelectionRequest),
+		Command:        event,
+		Observation:    event.Payload.Observation,
+		CryptoPolicyID: event.Payload.CryptoPolicyID,
 	}
 
 	if err := c.handler.HandleAssessmentRequest(ctx, input); err != nil {
@@ -94,32 +98,4 @@ func normalizeWalletSubjects(event *cafenatsv01.PolicyAssessmentRequested) {
 	}
 	event.Subject.ID = persistence.NormalizeWalletSubjectID(event.Subject.ID)
 	event.Payload.Observation.Subject.ID = persistence.NormalizeWalletSubjectID(event.Payload.Observation.Subject.ID)
-}
-
-func mapSelectionRequest(in cafenatsv01.PolicySelectionRequestWire) policy.PolicySelectionRequest {
-	out := policy.PolicySelectionRequest{
-		TargetPosture:             vocabulary.CurrentPQPosture(in.TargetPosture),
-		TargetChainIDs:            append([]int64(nil), in.TargetChainIDs...),
-		RequireMultichain:         in.RequireMultichain,
-		AllowNewWallet:            in.AllowNewWallet,
-		AddressContinuityRequired: in.AddressContinuityRequired,
-		KeyRotationModel:          policy.KeyRotationModel(in.KeyRotationModel),
-		RecoveryRequired:          in.RecoveryRequired,
-		MinimumMaturity:           in.MinimumMaturity,
-		AllowResearch:             in.AllowResearch,
-		PreferredFamilies:         append([]string(nil), in.PreferredFamilies...),
-		PreferredProviders:        append([]string(nil), in.PreferredProviders...),
-		RequireBundlerAvailable:   in.RequireBundlerAvailable,
-		RequirePaymasterAvailable: in.RequirePaymasterAvailable,
-		ApprovalMode:              policy.ApprovalMode(in.ApprovalMode),
-	}
-
-	if len(in.AllowedProviderModes) > 0 {
-		out.AllowedProviderModes = make([]policy.ProviderMode, 0, len(in.AllowedProviderModes))
-		for _, mode := range in.AllowedProviderModes {
-			out.AllowedProviderModes = append(out.AllowedProviderModes, policy.ProviderMode(mode))
-		}
-	}
-	out.Normalize()
-	return out
 }
