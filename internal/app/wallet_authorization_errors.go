@@ -15,11 +15,13 @@ const (
 	walletAuthCodeControlProofRequired  = "WALLET_CONTROL_PROOF_REQUIRED"
 	walletAuthCodeDraftAlreadyPersisted = "DRAFT_ALREADY_PERSISTED"
 
-	// CPM-P6 provider snapshot gates (ADR §9) — returned on draft persist before store write.
-	persistCodeCryptoPolicyPayloadInvalid   = "CRYPTO_POLICY_PAYLOAD_INVALID"
-	persistCodeProviderRefsUnpinned         = "PROVIDER_REFS_UNPINNED"
-	persistCodeProviderSoftFindingsRequired = "PROVIDER_SOFT_FINDINGS_REQUIRED"
-	persistCodeProviderChainPlanned         = "PROVIDER_CHAIN_PLANNED"
+	// CPM-P6/P10 provider snapshot gates (ADR §9) — returned on draft persist before store write.
+	persistCodeCryptoPolicyPayloadInvalid          = "CRYPTO_POLICY_PAYLOAD_INVALID"
+	persistCodeProviderRefsUnpinned                = "PROVIDER_REFS_UNPINNED"
+	persistCodeProviderSoftFindingsRequired        = "PROVIDER_SOFT_FINDINGS_REQUIRED"
+	persistCodeProviderChainPlanned                = "PROVIDER_CHAIN_PLANNED"
+	persistCodeProviderScanCompatFailed            = "PROVIDER_SCAN_COMPAT_FAILED"
+	persistCodeProviderUserConstraintsIncompatible = "PROVIDER_USER_CONSTRAINTS_INCOMPATIBLE"
 )
 
 func writeWalletAuthorizationError(w http.ResponseWriter, r *http.Request, obs *authObservability, status int, code string, message string) {

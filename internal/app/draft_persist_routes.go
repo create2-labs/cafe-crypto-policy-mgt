@@ -113,7 +113,7 @@ func handleDraftPersist(w http.ResponseWriter, r *http.Request, store persistenc
 		return
 	}
 
-	// CPM-P6: ADR §9 persist gate (snapshot + pinned refs + soft findings). Store stays opaque.
+	// CPM-P10: ADR §9 persist gate (crypto_policy_id + user_constraints + A+B replay + pinned refs).
 	if gateErr := policy.ValidateDraftPayloadForPersist(draft.Payload); gateErr != nil {
 		status, code, message := mapPersistProviderGateError(gateErr)
 		writeWalletAuthorizationError(w, r, obs, status, code, message)
@@ -250,6 +250,10 @@ func mapPersistProviderGateError(err error) (status int, code string, message st
 		return http.StatusBadRequest, persistCodeProviderSoftFindingsRequired, message
 	case errors.Is(err, policy.ErrProviderChainPlanned):
 		return http.StatusBadRequest, persistCodeProviderChainPlanned, message
+	case errors.Is(err, policy.ErrProviderScanCompatFailed):
+		return http.StatusBadRequest, persistCodeProviderScanCompatFailed, message
+	case errors.Is(err, policy.ErrProviderUserConstraintsIncompatible):
+		return http.StatusBadRequest, persistCodeProviderUserConstraintsIncompatible, message
 	case errors.Is(err, policy.ErrCryptoPolicyPayloadInvalid):
 		return http.StatusBadRequest, persistCodeCryptoPolicyPayloadInvalid, message
 	default:
