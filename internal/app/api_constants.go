@@ -39,9 +39,8 @@ const (
 	errMsgScanIDMalformed = "scan_id is malformed"
 
 	jsonFieldScanID           = "scan_id"
+	jsonFieldCryptoPolicyID   = "crypto_policy_id"
 	jsonFieldSelectionRequest = "selection_request"
-
-	errCodeSelectionRequestInvalid = "selection_request_invalid"
 
 	jwtAlgEdDSA   = "EdDSA"
 	jwtAlgMLDSA65 = "ML-DSA-65"

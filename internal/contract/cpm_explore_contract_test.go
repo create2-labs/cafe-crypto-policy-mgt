@@ -22,7 +22,7 @@ func TestCPMExplore_optionAValidReturns200(t *testing.T) {
 	body := map[string]any{
 		"scan_id":           optionAScanID,
 		"policy_context":    policyContextFromDiscoveryV1Detail(detail),
-		"selection_request": validOptionASelectionRequest(),
+		"crypto_policy_id": validOptionACryptoPolicyID(),
 	}
 	raw, _ := json.Marshal(body)
 
@@ -47,7 +47,7 @@ func TestCPMExplore_invalidPolicyContextReturns400(t *testing.T) {
 	}{
 		{
 			name: "missing policy_context",
-			body: map[string]any{"selection_request": validOptionASelectionRequest()},
+			body: map[string]any{"crypto_policy_id": validOptionACryptoPolicyID()},
 		},
 		{
 			name: "invalid pq posture",
@@ -57,7 +57,7 @@ func TestCPMExplore_invalidPolicyContextReturns400(t *testing.T) {
 					"chain_ids":          []int64{1},
 					"current_pq_posture": "not-a-real-posture",
 				},
-				"selection_request": validOptionASelectionRequest(),
+				"crypto_policy_id": validOptionACryptoPolicyID(),
 			},
 		},
 		{
@@ -69,7 +69,7 @@ func TestCPMExplore_invalidPolicyContextReturns400(t *testing.T) {
 					"current_pq_posture": "hybrid",
 					"scanned_at":         "not-rfc3339",
 				},
-				"selection_request": validOptionASelectionRequest(),
+				"crypto_policy_id": validOptionACryptoPolicyID(),
 			},
 		},
 	}

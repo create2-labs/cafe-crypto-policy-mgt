@@ -1,11 +1,12 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/policy"
@@ -122,12 +123,16 @@ func registerCatalogRoutes(mux *http.ServeMux, store *ReadStore) {
 }
 
 func registerExploreRoute(mux *http.ServeMux, store *ReadStore) {
-	// POST …/decisions/explore evaluates candidates in memory only (no persisted policy instances).
-	// Candidate construction from catalogue instances is transitional until CPM-P9.
+	// POST …/decisions/explore — HTTP explore wire v0.2 (CPM-P9a-cpm).
+	// Input: crypto_policy_id + policy_context only. Output: scan_compatible_providers (degraded until P9b).
 	mux.HandleFunc("POST "+cpmroutes.PoliciesDecisionsExplore, func(w http.ResponseWriter, r *http.Request) {
 		req, err := decodeDecisionExploreRequest(r)
 		if err != nil {
 			respondJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			return
+		}
+		if _, ok := store.cryptoPolicyByID[req.CryptoPolicyID]; !ok {
+			respondJSON(w, http.StatusBadRequest, map[string]any{"error": "unknown crypto_policy_id"})
 			return
 		}
 
@@ -137,24 +142,17 @@ func registerExploreRoute(mux *http.ServeMux, store *ReadStore) {
 			return
 		}
 
-		candidates := make([]policy.PolicyDecisionCandidate, 0, len(store.instances))
-		for _, inst := range store.instances {
-			candidates = append(candidates, policy.PolicyDecisionCandidate{
-				Instance:     inst,
-				CryptoPolicy: store.cryptoPolicyByID[inst.TemplateID],
-			})
-		}
-
-		decision, err := (policy.PolicyDecisionEvaluator{
-			CompatibilityEvaluator: policy.PolicyCompatibilityEvaluator{Providers: store.providers},
-		}).Evaluate(
-			observation,
-			&req.SelectionRequest,
-			candidates,
-		)
-		if err != nil {
-			respondJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
-			return
+		// P9a: normative output key with degraded/empty content until P9b couche A match.
+		decision := policy.PolicyDecision{
+			ObservedWalletSummary: policy.ObservedWalletSummary{
+				ChainIDs: append([]int64(nil), observation.ChainIDs...),
+			},
+			RequestSummary: policy.RequestSummary{
+				CryptoPolicyID: req.CryptoPolicyID,
+			},
+			RankedCandidates:   []policy.RankedPolicy{},
+			RejectedCandidates: []policy.RejectedPolicy{},
+			Warnings:           []string{policy.ExploreDegradedWarning},
 		}
 
 		recordExploreNoDeployableCandidate(r, req, decision, instanceScopeByID(store.instances))
@@ -164,17 +162,32 @@ func registerExploreRoute(mux *http.ServeMux, store *ReadStore) {
 }
 
 type decisionExploreRequest struct {
-	// Optional scan binding for AUTH-02 (scan authorization). Ignored by Evaluate; wire name is `scan_id` only.
+	// Optional scan binding for AUTH-02 (scan authorization). Wire name is `scan_id` only.
 	ScanID string `json:"scan_id,omitempty"`
-	// PolicyContext is required; evaluator input is derived from it (no top-level observation).
-	PolicyContext    *walletPolicyContextWire      `json:"policy_context"`
-	SelectionRequest policy.PolicySelectionRequest `json:"selection_request"`
+	// CryptoPolicyID is the catalogue Crypto Policy id (required posture lives on the CP).
+	CryptoPolicyID string `json:"crypto_policy_id"`
+	// PolicyContext is required; scan context for couche A (full match in P9b).
+	PolicyContext *walletPolicyContextWire `json:"policy_context"`
 }
 
-type decisionExploreBody struct {
-	ScanID           string          `json:"scan_id,omitempty"`
-	PolicyContext    json.RawMessage `json:"policy_context"`
-	SelectionRequest json.RawMessage `json:"selection_request"`
+// Legacy / couche-B keys rejected on explore HTTP v0.2 (aligned with cafenatsv01 assessment).
+var explorePayloadForbiddenKeys = map[string]struct{}{
+	"selection_request":           {},
+	"allow_new_wallet":            {},
+	"address_continuity_required": {},
+	"key_rotation_model":          {},
+	"target_posture":              {},
+	"target_chain_ids":            {},
+	"require_multichain":          {},
+	"recovery_required":           {},
+	"minimum_maturity":            {},
+	"allow_research":              {},
+	"allowed_provider_modes":      {},
+	"preferred_families":          {},
+	"preferred_providers":         {},
+	"require_bundler_available":   {},
+	"require_paymaster_available": {},
+	"approval_mode":               {},
 }
 
 func decodeDecisionExploreRequest(r *http.Request) (*decisionExploreRequest, error) {
@@ -184,35 +197,59 @@ func decodeDecisionExploreRequest(r *http.Request) (*decisionExploreRequest, err
 	defer func() {
 		_ = r.Body.Close()
 	}()
-	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
-	var body decisionExploreBody
-	if err := dec.Decode(&body); err != nil {
+	rawBody, err := io.ReadAll(r.Body)
+	if err != nil {
 		return nil, fmt.Errorf("invalid json body: %w", err)
 	}
-	if dec.More() {
-		return nil, errors.New("invalid json body: multiple values are not allowed")
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(rawBody, &raw); err != nil {
+		return nil, fmt.Errorf("invalid json body: %w", err)
 	}
-	if len(bytesTrimSpaceJSON(body.PolicyContext)) == 0 {
+	for key := range raw {
+		if _, forbidden := explorePayloadForbiddenKeys[key]; forbidden {
+			return nil, fmt.Errorf("legacy field rejected: %s", key)
+		}
+	}
+	for key := range raw {
+		switch key {
+		case "scan_id", "crypto_policy_id", "policy_context":
+		default:
+			return nil, fmt.Errorf("unknown field %s", key)
+		}
+	}
+
+	pcRaw, ok := raw["policy_context"]
+	if !ok || len(bytesTrimSpaceJSON(pcRaw)) == 0 {
 		return nil, errors.New("policy_context is required")
 	}
-	pc, err := parsePolicyContextFlexible(body.PolicyContext)
+	pc, err := parsePolicyContextFlexible(pcRaw)
 	if err != nil {
 		return nil, err
 	}
-	decSel := json.NewDecoder(bytes.NewReader(body.SelectionRequest))
-	decSel.DisallowUnknownFields()
-	var sel policy.PolicySelectionRequest
-	if err := decSel.Decode(&sel); err != nil {
-		return nil, fmt.Errorf("selection_request: %w", err)
+
+	cpRaw, ok := raw["crypto_policy_id"]
+	if !ok {
+		return nil, errors.New("crypto_policy_id is required")
 	}
-	if decSel.More() {
-		return nil, errors.New("selection_request: multiple values are not allowed")
+	var cryptoPolicyID string
+	if err := json.Unmarshal(cpRaw, &cryptoPolicyID); err != nil {
+		return nil, fmt.Errorf("crypto_policy_id: %w", err)
 	}
+	cryptoPolicyID = strings.TrimSpace(cryptoPolicyID)
+	if cryptoPolicyID == "" {
+		return nil, errors.New("crypto_policy_id is required")
+	}
+
+	var scanID string
+	if v, ok := raw["scan_id"]; ok {
+		_ = json.Unmarshal(v, &scanID)
+		scanID = strings.TrimSpace(scanID)
+	}
+
 	return &decisionExploreRequest{
-		ScanID:           body.ScanID,
-		PolicyContext:    pc,
-		SelectionRequest: sel,
+		ScanID:         scanID,
+		CryptoPolicyID: cryptoPolicyID,
+		PolicyContext:  pc,
 	}, nil
 }
 

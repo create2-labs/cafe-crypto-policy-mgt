@@ -9,7 +9,6 @@ import (
 
 	"github.com/create2-labs/cafe-contracts/cafenatsv01"
 	walletv01 "github.com/create2-labs/cafe-contracts/observation/wallet/v01"
-	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/vocabulary"
 )
 
 func TestAssessmentRequestConsumer_FirstDeliveryAndDuplicate(t *testing.T) {
@@ -36,14 +35,59 @@ func TestAssessmentRequestConsumer_FirstDeliveryAndDuplicate(t *testing.T) {
 	if got := handler.calls; got != 1 {
 		t.Fatalf("handler calls = %d, want 1", got)
 	}
-	if got := handler.last.SelectionRequest.TargetPosture; got != vocabulary.PQPostureHybrid {
-		t.Fatalf("mapped target posture = %q, want %q", got, vocabulary.PQPostureHybrid)
+	if got := handler.last.CryptoPolicyID; got != "cpm_pq_account_validation_v1" {
+		t.Fatalf("crypto_policy_id = %q, want catalogue id", got)
 	}
 	if got := handler.last.Command.Subject.ID; got != "wallet:0x742d35cc6634c0532925a3b844bc454e4438f44e" {
 		t.Fatalf("command subject.id = %q, want canonical lowercase wallet subject id", got)
 	}
 	if got := handler.last.Observation.Subject.ID; got != "wallet:0x742d35cc6634c0532925a3b844bc454e4438f44e" {
 		t.Fatalf("observation subject.id = %q, want canonical lowercase wallet subject id", got)
+	}
+}
+
+func TestAssessmentRequestConsumer_LegacySelectionRequestValidationError(t *testing.T) {
+	store := NewInMemoryIdempotencyStore()
+	handler := &fakeAssessmentHandler{}
+	consumer, err := NewAssessmentRequestConsumer(store, handler)
+	if err != nil {
+		t.Fatalf("NewAssessmentRequestConsumer() error = %v", err)
+	}
+
+	raw := map[string]any{
+		"event_id":       "evt_pol_req_legacy",
+		"event_type":     cafenatsv01.EventTypePolicyAssessmentRequested,
+		"event_version":  cafenatsv01.EventVersionV01,
+		"occurred_at":    time.Date(2026, time.April, 17, 10, 0, 2, 0, time.UTC),
+		"correlation_id": "corr_scan_0001",
+		"causation_id":   "ui_action_0001",
+		"producer":       cafenatsv01.ProducerCafeDiscovery,
+		"subject": map[string]any{
+			"type": cafenatsv01.SubjectTypeWallet,
+			"id":   "wallet:0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+		},
+		"payload": map[string]any{
+			"crypto_policy_id": "cpm_pq_account_validation_v1",
+			"observation":      validObservationEvent("evt_obs_legacy"),
+			"selection_request": map[string]any{
+				"target_posture": "hybrid",
+			},
+		},
+	}
+	payload, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+
+	err = consumer.HandleMessage(context.Background(), cafenatsv01.NATSSubjectPolicyAssessmentRequestedV01, payload)
+	if err == nil {
+		t.Fatal("expected validation error for legacy selection_request")
+	}
+	if !errors.Is(err, cafenatsv01.ErrLegacyAssessmentField) {
+		t.Fatalf("error = %v, want ErrLegacyAssessmentField", err)
+	}
+	if handler.calls != 0 {
+		t.Fatalf("handler must not run on validation error, calls=%d", handler.calls)
 	}
 }
 
@@ -151,18 +195,8 @@ func validAssessmentRequest(eventID string) cafenatsv01.PolicyAssessmentRequeste
 			ID:   "wallet:0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
 		},
 		Payload: cafenatsv01.PolicyAssessmentRequestedPayload{
-			Observation: validObservationEvent("evt_obs_2"),
-			SelectionRequest: cafenatsv01.PolicySelectionRequestWire{
-				TargetPosture:             cafenatsv01.TargetPostureHybrid,
-				TargetChainIDs:            []int64{1, 8453},
-				RequireMultichain:         true,
-				AllowNewWallet:            false,
-				AddressContinuityRequired: false,
-				KeyRotationModel:          cafenatsv01.KeyRotationModelPerUserOp,
-				RecoveryRequired:          true,
-				MinimumMaturity:           1,
-				ApprovalMode:              "manual",
-			},
+			CryptoPolicyID:  "cpm_pq_account_validation_v1",
+			Observation:     validObservationEvent("evt_obs_2"),
 			ClientRequestID: "req_0001",
 		},
 	}

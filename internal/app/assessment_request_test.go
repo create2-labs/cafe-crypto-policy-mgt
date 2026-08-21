@@ -15,7 +15,6 @@ import (
 	"github.com/create2-labs/cafe-contracts/cafenatsv01"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/api"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
-	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/vocabulary"
 )
 
 const testAssessmentScanID = "705c9700-0000-4000-8000-000000000001"
@@ -24,9 +23,25 @@ func TestPoliciesAssessmentRequest_policyContextForbidden(t *testing.T) {
 	h := newAssessmentTestHandler(t, assessmentHarness{})
 	token := mustAssessmentToken(t)
 	body := map[string]any{
-		"scan_id":           testAssessmentScanID,
-		"policy_context":    map[string]any{"wallet_address": "0x1"},
-		"selection_request": validAssessmentSelectionRequest(),
+		"scan_id":          testAssessmentScanID,
+		"policy_context":   map[string]any{"wallet_address": "0x1"},
+		"crypto_policy_id": "cpm_pq_account_validation_v1",
+	}
+	res := postAssessment(t, h, token, body)
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400 body=%s", res.Code, res.Body.String())
+	}
+}
+
+func TestPoliciesAssessmentRequest_legacySelectionRequestRejected(t *testing.T) {
+	h := newAssessmentTestHandler(t, assessmentHarness{})
+	token := mustAssessmentToken(t)
+	body := map[string]any{
+		"scan_id":          testAssessmentScanID,
+		"crypto_policy_id": "cpm_pq_account_validation_v1",
+		"selection_request": map[string]any{
+			"target_posture": "hybrid",
+		},
 	}
 	res := postAssessment(t, h, token, body)
 	if res.Code != http.StatusBadRequest {
@@ -71,6 +86,9 @@ func TestPoliciesAssessmentRequest_walletScanAccepted(t *testing.T) {
 	}
 	if len(cmd.Payload.Observation.Payload.ChainIDs) == 0 {
 		t.Fatalf("expected observation from Discovery detail")
+	}
+	if cmd.Payload.CryptoPolicyID != "cpm_pq_account_validation_v1" {
+		t.Fatalf("crypto_policy_id = %q", cmd.Payload.CryptoPolicyID)
 	}
 	const wantSubject = "wallet:0x742d35cc6634c0532925a3b844bc454e4438f44e"
 	if cmd.Subject.ID != wantSubject || cmd.Payload.Observation.Subject.ID != wantSubject {
@@ -261,22 +279,8 @@ func mustAssessmentToken(t *testing.T) string {
 
 func validAssessmentBody() map[string]any {
 	return map[string]any{
-		"scan_id":           testAssessmentScanID,
-		"selection_request": validAssessmentSelectionRequest(),
-	}
-}
-
-func validAssessmentSelectionRequest() map[string]any {
-	return map[string]any{
-		"target_posture":              string(vocabulary.PQPostureHybrid),
-		"target_chain_ids":            []int64{1},
-		"require_multichain":          false,
-		"allow_new_wallet":            false,
-		"address_continuity_required": true,
-		"key_rotation_model":          "per_userop",
-		"recovery_required":           true,
-		"minimum_maturity":            1,
-		"approval_mode":               "manual",
+		"scan_id":          testAssessmentScanID,
+		"crypto_policy_id": "cpm_pq_account_validation_v1",
 	}
 }
 

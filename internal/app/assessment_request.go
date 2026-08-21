@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -18,7 +17,6 @@ import (
 	walletv01 "github.com/create2-labs/cafe-contracts/observation/wallet/v01"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/api"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
-	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/policy"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/walletobserved"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/persistence"
 )
@@ -72,7 +70,7 @@ func handlePoliciesAssessmentRequest(w http.ResponseWriter, r *http.Request, aut
 
 type parsedAssessmentRequest struct {
 	normScanID      string
-	selection       policy.PolicySelectionRequest
+	cryptoPolicyID  string
 	clientRequestID string
 }
 
@@ -113,8 +111,14 @@ func parseAssessmentRequestBody(w http.ResponseWriter, body []byte) (parsedAsses
 		return parsedAssessmentRequest{}, false
 	}
 	for k := range raw {
+		if _, forbidden := assessmentHTTPForbiddenKeys[k]; forbidden {
+			writeJSON(w, http.StatusBadRequest, apiErrorJSON("legacy_field_rejected", "legacy field rejected: "+k))
+			return parsedAssessmentRequest{}, false
+		}
+	}
+	for k := range raw {
 		switch k {
-		case jsonFieldScanID, jsonFieldSelectionRequest, "client_request_id":
+		case jsonFieldScanID, jsonFieldCryptoPolicyID, "client_request_id":
 		default:
 			writeJSON(w, http.StatusBadRequest, apiErrorJSON("unknown_field", "unknown field "+k))
 			return parsedAssessmentRequest{}, false
@@ -137,13 +141,19 @@ func parseAssessmentRequestBody(w http.ResponseWriter, body []byte) (parsedAsses
 		return parsedAssessmentRequest{}, false
 	}
 
-	selRaw, ok := raw[jsonFieldSelectionRequest]
+	cpRaw, ok := raw[jsonFieldCryptoPolicyID]
 	if !ok {
-		writeJSON(w, http.StatusBadRequest, apiErrorJSON("selection_request_required", "selection_request is required"))
+		writeJSON(w, http.StatusBadRequest, apiErrorJSON("crypto_policy_id_required", "crypto_policy_id is required"))
 		return parsedAssessmentRequest{}, false
 	}
-	sel, ok := decodeAssessmentSelectionRequest(w, selRaw)
-	if !ok {
+	var cryptoPolicyID string
+	if err := json.Unmarshal(cpRaw, &cryptoPolicyID); err != nil {
+		writeJSON(w, http.StatusBadRequest, apiErrorJSON("crypto_policy_id_invalid", err.Error()))
+		return parsedAssessmentRequest{}, false
+	}
+	cryptoPolicyID = strings.TrimSpace(cryptoPolicyID)
+	if cryptoPolicyID == "" {
+		writeJSON(w, http.StatusBadRequest, apiErrorJSON("crypto_policy_id_required", "crypto_policy_id is required"))
 		return parsedAssessmentRequest{}, false
 	}
 
@@ -153,29 +163,30 @@ func parseAssessmentRequestBody(w http.ResponseWriter, body []byte) (parsedAsses
 	}
 	return parsedAssessmentRequest{
 		normScanID:      normScanID,
-		selection:       sel,
+		cryptoPolicyID:  cryptoPolicyID,
 		clientRequestID: clientRequestID,
 	}, true
 }
 
-func decodeAssessmentSelectionRequest(w http.ResponseWriter, selRaw json.RawMessage) (policy.PolicySelectionRequest, bool) {
-	decSel := json.NewDecoder(bytes.NewReader(selRaw))
-	decSel.DisallowUnknownFields()
-	var sel policy.PolicySelectionRequest
-	if err := decSel.Decode(&sel); err != nil {
-		writeJSON(w, http.StatusBadRequest, apiErrorJSON(errCodeSelectionRequestInvalid, err.Error()))
-		return policy.PolicySelectionRequest{}, false
-	}
-	if decSel.More() {
-		writeJSON(w, http.StatusBadRequest, apiErrorJSON(errCodeSelectionRequestInvalid, "multiple JSON values"))
-		return policy.PolicySelectionRequest{}, false
-	}
-	sel.Normalize()
-	if err := sel.Validate(); err != nil {
-		writeJSON(w, http.StatusBadRequest, apiErrorJSON(errCodeSelectionRequestInvalid, err.Error()))
-		return policy.PolicySelectionRequest{}, false
-	}
-	return sel, true
+// assessmentHTTPForbiddenKeys: selection_request and couche-B fields are invalid on this HTTP trigger
+// (same family as explore/assessment NATS v0.2; persist user_constraints is CPM-P10).
+var assessmentHTTPForbiddenKeys = map[string]struct{}{
+	jsonFieldSelectionRequest:     {},
+	"allow_new_wallet":            {},
+	"address_continuity_required": {},
+	"key_rotation_model":          {},
+	"target_posture":              {},
+	"target_chain_ids":            {},
+	"require_multichain":          {},
+	"recovery_required":           {},
+	"minimum_maturity":            {},
+	"allow_research":              {},
+	"allowed_provider_modes":      {},
+	"preferred_families":          {},
+	"preferred_providers":         {},
+	"require_bundler_available":   {},
+	"require_paymaster_available": {},
+	"approval_mode":               {},
 }
 
 func fetchWalletScanAssessmentSource(
@@ -254,11 +265,7 @@ func publishPolicyAssessmentRequest(
 	if !ok {
 		return
 	}
-	selWire, ok := wireAssessmentSelectionRequest(w, parsed.selection)
-	if !ok {
-		return
-	}
-	cmd, ok := buildPolicyAssessmentCommand(w, parsed, source, observation, selWire, now)
+	cmd, ok := buildPolicyAssessmentCommand(w, parsed, source, observation, now)
 	if !ok {
 		return
 	}
@@ -310,22 +317,11 @@ func buildWalletObservedEvent(
 	return observation, true
 }
 
-func wireAssessmentSelectionRequest(w http.ResponseWriter, sel policy.PolicySelectionRequest) (cafenatsv01.PolicySelectionRequestWire, bool) {
-	selWire := policySelectionRequestToWire(sel)
-	selWire.Normalize()
-	if err := selWire.Validate(); err != nil {
-		writeJSON(w, http.StatusBadRequest, apiErrorJSON(errCodeSelectionRequestInvalid, err.Error()))
-		return cafenatsv01.PolicySelectionRequestWire{}, false
-	}
-	return selWire, true
-}
-
 func buildPolicyAssessmentCommand(
 	w http.ResponseWriter,
 	parsed parsedAssessmentRequest,
 	source walletScanAssessmentSource,
 	observation walletv01.Event,
-	selWire cafenatsv01.PolicySelectionRequestWire,
 	now time.Time,
 ) (cafenatsv01.PolicyAssessmentRequested, bool) {
 	cmdEventID, err := newAssessmentEventID()
@@ -348,9 +344,9 @@ func buildPolicyAssessmentCommand(
 			ID:   source.walletSubjectID,
 		},
 		Payload: cafenatsv01.PolicyAssessmentRequestedPayload{
-			Observation:      observation,
-			SelectionRequest: selWire,
-			ClientRequestID:  strings.TrimSpace(parsed.clientRequestID),
+			CryptoPolicyID:  parsed.cryptoPolicyID,
+			Observation:     observation,
+			ClientRequestID: strings.TrimSpace(parsed.clientRequestID),
 		},
 	}
 	if err := cmd.Validate(); err != nil {
@@ -407,30 +403,6 @@ func targetAddressFromWalletScanDetailJSON(detail []byte) (string, error) {
 		return "", errDiscoveryScanNotWallet
 	}
 	return addr, nil
-}
-
-func policySelectionRequestToWire(r policy.PolicySelectionRequest) cafenatsv01.PolicySelectionRequestWire {
-	modes := make([]string, 0, len(r.AllowedProviderModes))
-	for _, m := range r.AllowedProviderModes {
-		modes = append(modes, string(m))
-	}
-	return cafenatsv01.PolicySelectionRequestWire{
-		TargetPosture:             string(r.TargetPosture),
-		TargetChainIDs:            append([]int64(nil), r.TargetChainIDs...),
-		RequireMultichain:         r.RequireMultichain,
-		AllowNewWallet:            r.AllowNewWallet,
-		AddressContinuityRequired: r.AddressContinuityRequired,
-		KeyRotationModel:          string(r.KeyRotationModel),
-		RecoveryRequired:          r.RecoveryRequired,
-		MinimumMaturity:           r.MinimumMaturity,
-		AllowResearch:             r.AllowResearch,
-		AllowedProviderModes:      modes,
-		PreferredFamilies:         append([]string(nil), r.PreferredFamilies...),
-		PreferredProviders:        append([]string(nil), r.PreferredProviders...),
-		RequireBundlerAvailable:   r.RequireBundlerAvailable,
-		RequirePaymasterAvailable: r.RequirePaymasterAvailable,
-		ApprovalMode:              string(r.ApprovalMode),
-	}
 }
 
 func newAssessmentEventID() (string, error) {

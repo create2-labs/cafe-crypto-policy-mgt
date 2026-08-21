@@ -92,8 +92,8 @@ func TestLoadReadStore_CatalogueIntentionOnly(t *testing.T) {
 	}
 }
 
-func TestDecisionExplorePreservesDeployabilityDistinction(t *testing.T) {
-	store := testReadStore(t, true)
+func TestDecisionExplore_v02_degradedScanCompatibleProviders(t *testing.T) {
+	store := testReadStore(t, false)
 
 	mux := http.NewServeMux()
 	if err := RegisterReadRoutes(mux, store); err != nil {
@@ -101,6 +101,7 @@ func TestDecisionExplorePreservesDeployabilityDistinction(t *testing.T) {
 	}
 
 	body := map[string]any{
+		"crypto_policy_id": "cpm_pq_account_validation_v1",
 		"policy_context": map[string]any{
 			"wallet_address":     "0x742d35cc6634c0532925a3b844bc454e4438f44e",
 			"wallet_type":        "eoa",
@@ -109,58 +110,80 @@ func TestDecisionExplorePreservesDeployabilityDistinction(t *testing.T) {
 			"current_pq_posture": "classical_only",
 			"scanned_at":         "2026-04-17T09:59:58Z",
 		},
-		"selection_request": map[string]any{
-			"target_posture":              string(vocabulary.PQPostureHybrid),
-			"target_chain_ids":            []int64{11155111},
-			"require_multichain":          false,
-			"allow_new_wallet":            true,
-			"address_continuity_required": false,
-			"key_rotation_model":          "per_userop",
-			"recovery_required":           true,
-			"minimum_maturity":            1,
-			"approval_mode":               "manual",
-		},
 	}
 	raw, err := json.Marshal(body)
 	if err != nil {
 		t.Fatalf("marshal request body: %v", err)
 	}
 
-	assertStatus := func(expected string) {
-		req := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, bytes.NewReader(raw))
-		rec := httptest.NewRecorder()
-		mux.ServeHTTP(rec, req)
-		if rec.Code != http.StatusOK {
-			t.Fatalf("status: got %d want %d body=%s", rec.Code, http.StatusOK, rec.Body.String())
-		}
-
-		var response struct {
-			Decision struct {
-				RankedCandidates []struct {
-					CompatibilityStatus string `json:"compatibility_status"`
-				} `json:"ranked_candidates"`
-			} `json:"decision"`
-		}
-		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
-			t.Fatalf("decode response: %v", err)
-		}
-		if len(response.Decision.RankedCandidates) != 1 {
-			t.Fatalf("ranked_candidates length: got %d want 1", len(response.Decision.RankedCandidates))
-		}
-		if got := response.Decision.RankedCandidates[0].CompatibilityStatus; got != expected {
-			t.Fatalf("compatibility_status: got %q want %q", got, expected)
-		}
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, bytes.NewReader(raw))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: got %d want %d body=%s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 
-	assertStatus("compatible_and_deployable")
+	var response struct {
+		Decision struct {
+			RequestSummary struct {
+				CryptoPolicyID string `json:"crypto_policy_id"`
+			} `json:"request_summary"`
+			ScanCompatibleProviders []any    `json:"scan_compatible_providers"`
+			RejectedCandidates      []any    `json:"rejected_candidates"`
+			Warnings                []string `json:"warnings"`
+		} `json:"decision"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.Decision.RequestSummary.CryptoPolicyID != "cpm_pq_account_validation_v1" {
+		t.Fatalf("crypto_policy_id: got %q", response.Decision.RequestSummary.CryptoPolicyID)
+	}
+	if response.Decision.ScanCompatibleProviders == nil {
+		t.Fatal("scan_compatible_providers key must be present (may be empty)")
+	}
+	if len(response.Decision.ScanCompatibleProviders) != 0 {
+		t.Fatalf("P9a degraded: want empty scan_compatible_providers, got %d", len(response.Decision.ScanCompatibleProviders))
+	}
+	if len(response.Decision.Warnings) == 0 {
+		t.Fatal("expected degraded warning")
+	}
+}
 
-	// Remove concrete chain scope to force known-but-not-deployable classification.
-	store.instances[0].Scope.ChainIDs = nil
-	assertStatus("compatible_but_not_deployable")
+func TestDecisionExplore_legacySelectionRequestRejected(t *testing.T) {
+	store := testReadStore(t, false)
+	mux := http.NewServeMux()
+	if err := RegisterReadRoutes(mux, store); err != nil {
+		t.Fatalf("RegisterReadRoutes: %v", err)
+	}
+
+	body := map[string]any{
+		"crypto_policy_id": "cpm_pq_account_validation_v1",
+		"policy_context": map[string]any{
+			"wallet_address":     "0x742d35cc6634c0532925a3b844bc454e4438f44e",
+			"wallet_type":        "eoa",
+			"chain_ids":          []int64{11155111},
+			"current_pq_posture": "classical_only",
+			"scanned_at":         "2026-04-17T09:59:58Z",
+		},
+		"selection_request": map[string]any{
+			"target_posture": string(vocabulary.PQPostureHybrid),
+		},
+	}
+	raw, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, bytes.NewReader(raw))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status: got %d want 400 body=%s", rec.Code, rec.Body.String())
+	}
 }
 
 func TestDecisionExplore_optionA_policy_context(t *testing.T) {
-	store := testReadStore(t, true)
+	store := testReadStore(t, false)
 
 	mux := http.NewServeMux()
 	if err := RegisterReadRoutes(mux, store); err != nil {
@@ -168,7 +191,8 @@ func TestDecisionExplore_optionA_policy_context(t *testing.T) {
 	}
 
 	body := map[string]any{
-		"scan_id": "705c9704-9428-45e0-882d-fae4cb9d2a0b",
+		"scan_id":          "705c9704-9428-45e0-882d-fae4cb9d2a0b",
+		"crypto_policy_id": "cpm_pq_account_validation_v1",
 		"policy_context": map[string]any{
 			"scan_id":            "705c9704-9428-45e0-882d-fae4cb9d2a0b",
 			"wallet_address":     "0x0802b015613ef6701192811e595e085a9c560caf",
@@ -177,17 +201,6 @@ func TestDecisionExplore_optionA_policy_context(t *testing.T) {
 			"current_pq_posture": "classical_only",
 			"scanned_at":         "2026-05-11T10:27:10.187512Z",
 			"status":             "completed",
-		},
-		"selection_request": map[string]any{
-			"target_posture":              string(vocabulary.PQPostureHybrid),
-			"target_chain_ids":            []int64{11155111},
-			"require_multichain":          false,
-			"allow_new_wallet":            true,
-			"address_continuity_required": false,
-			"key_rotation_model":          "per_userop",
-			"recovery_required":           true,
-			"minimum_maturity":            1,
-			"approval_mode":               "manual",
 		},
 	}
 	raw, err := json.Marshal(body)
@@ -203,7 +216,7 @@ func TestDecisionExplore_optionA_policy_context(t *testing.T) {
 }
 
 func TestDecisionExplore_discoveryV1WalletScanDetailEnvelope(t *testing.T) {
-	store := testReadStore(t, true)
+	store := testReadStore(t, false)
 
 	mux := http.NewServeMux()
 	if err := RegisterReadRoutes(mux, store); err != nil {
@@ -211,7 +224,8 @@ func TestDecisionExplore_discoveryV1WalletScanDetailEnvelope(t *testing.T) {
 	}
 
 	body := map[string]any{
-		"scan_id": "705c9704-9428-45e0-882d-fae4cb9d2a0b",
+		"scan_id":          "705c9704-9428-45e0-882d-fae4cb9d2a0b",
+		"crypto_policy_id": "cpm_pq_account_validation_v1",
 		"policy_context": map[string]any{
 			"scan_id": "705c9704-9428-45e0-882d-fae4cb9d2a0b",
 			"status":  "completed",
@@ -223,17 +237,6 @@ func TestDecisionExplore_discoveryV1WalletScanDetailEnvelope(t *testing.T) {
 				"algorithm":          "ECDSA-secp256k1",
 				"observations":       []any{},
 			},
-		},
-		"selection_request": map[string]any{
-			"target_posture":              string(vocabulary.PQPostureHybrid),
-			"target_chain_ids":            []int64{1},
-			"require_multichain":          false,
-			"allow_new_wallet":            false,
-			"address_continuity_required": true,
-			"key_rotation_model":          "per_userop",
-			"recovery_required":           true,
-			"minimum_maturity":            1,
-			"approval_mode":               "manual",
 		},
 	}
 	raw, err := json.Marshal(body)
@@ -250,7 +253,7 @@ func TestDecisionExplore_discoveryV1WalletScanDetailEnvelope(t *testing.T) {
 }
 
 func TestDecisionExplore_targetAddressFlatPolicyContext(t *testing.T) {
-	store := testReadStore(t, true)
+	store := testReadStore(t, false)
 
 	mux := http.NewServeMux()
 	if err := RegisterReadRoutes(mux, store); err != nil {
@@ -258,6 +261,7 @@ func TestDecisionExplore_targetAddressFlatPolicyContext(t *testing.T) {
 	}
 
 	body := map[string]any{
+		"crypto_policy_id": "cpm_pq_account_validation_v1",
 		"policy_context": map[string]any{
 			"scan_id":            "705c9704-9428-45e0-882d-fae4cb9d2a0b",
 			"target_address":     "0x742d35cc6634c0532925a3b844bc454e4438f44e",
@@ -265,17 +269,6 @@ func TestDecisionExplore_targetAddressFlatPolicyContext(t *testing.T) {
 			"chain_ids":          []int64{1},
 			"current_pq_posture": "pq_ready",
 			"scanned_at":         "2026-04-17T09:59:58Z",
-		},
-		"selection_request": map[string]any{
-			"target_posture":              string(vocabulary.PQPostureHybrid),
-			"target_chain_ids":            []int64{1},
-			"require_multichain":          false,
-			"allow_new_wallet":            false,
-			"address_continuity_required": true,
-			"key_rotation_model":          "per_userop",
-			"recovery_required":           true,
-			"minimum_maturity":            1,
-			"approval_mode":               "manual",
 		},
 	}
 	raw, err := json.Marshal(body)
@@ -291,58 +284,27 @@ func TestDecisionExplore_targetAddressFlatPolicyContext(t *testing.T) {
 	}
 }
 
-func TestDecisionExplore_doesNotMutateReadStoreInstances(t *testing.T) {
-	store := testReadStore(t, true)
-
+func TestDecisionExplore_unknownCryptoPolicyID(t *testing.T) {
+	store := testReadStore(t, false)
 	mux := http.NewServeMux()
 	if err := RegisterReadRoutes(mux, store); err != nil {
 		t.Fatalf("RegisterReadRoutes: %v", err)
 	}
-
-	n := len(store.instances)
-	if n == 0 {
-		t.Fatal("expected fixture instances")
-	}
-	firstID := store.instances[0].ID
-
 	body := map[string]any{
+		"crypto_policy_id": "does_not_exist",
 		"policy_context": map[string]any{
-			"wallet_address":     "0x742d35cc6634c0532925a3b844bc454e4438f44e",
 			"wallet_type":        "eoa",
-			"chain_ids":          []int{1, 8453},
-			"current_algorithm":  "secp256k1_ecrecover",
+			"chain_ids":          []int64{1},
 			"current_pq_posture": "classical_only",
 			"scanned_at":         "2026-04-17T09:59:58Z",
 		},
-		"selection_request": map[string]any{
-			"target_posture":              string(vocabulary.PQPostureHybrid),
-			"target_chain_ids":            []int64{1, 8453},
-			"require_multichain":          true,
-			"allow_new_wallet":            false,
-			"address_continuity_required": true,
-			"key_rotation_model":          "per_userop",
-			"recovery_required":           true,
-			"minimum_maturity":            1,
-			"approval_mode":               "manual",
-		},
 	}
-	raw, err := json.Marshal(body)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-
+	raw, _ := json.Marshal(body)
 	req := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, bytes.NewReader(raw))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status: got %d body=%s", rec.Code, rec.Body.String())
-	}
-
-	if len(store.instances) != n {
-		t.Fatalf("instances slice length changed: got %d want %d", len(store.instances), n)
-	}
-	if store.instances[0].ID != firstID {
-		t.Fatalf("instance id mutated: got %q want %q", store.instances[0].ID, firstID)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status: got %d want 400 body=%s", rec.Code, rec.Body.String())
 	}
 }
 
