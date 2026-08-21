@@ -187,6 +187,44 @@ func draftPersistUnpinnedPayloadJSON() string {
 	}`
 }
 
+// draftPersistNicetryFixturePinnedPayloadJSON copies the shipped Nicetry manifest pins (CPM-P7).
+func draftPersistNicetryFixturePinnedPayloadJSON() string {
+	return `{
+		"schema_version":"cafe.crypto_policy.v0.2",
+		"policy_kind":"wallet_migration_policy",
+		"crypto_policy_id":"cpm_pq_account_validation_v1",
+		"required_posture":"hybrid",
+		"user_constraints":{
+			"allow_new_wallet":true,
+			"address_continuity_required":false,
+			"key_rotation_model":"per_userop"
+		},
+		"solution_profile_ref":{
+			"provider_id":"nicetry",
+			"solution_profile_id":"nicetry.fors_c.erc4337.v0_1",
+			"manifest_version":"2026-08",
+			"verification_date":"2026-08-03"
+		},
+		"accepted_provider_snapshot":{
+			"maturity":"research",
+			"claim_status":"declared",
+			"resulting_posture":"hybrid",
+			"input_requirements":{"wallet_types":["EOA"],"requires_wallet_control_proof":true},
+			"signature":{"scheme":"FORS+C","family":"hash_based","key_rotation_model":"per_userop"},
+			"account_model":{"standard":"ERC-4337","execution_model":"erc4337_bundler","requires_bundler":true,"requires_entrypoint":true,"entrypoint_versions":["0.7"]},
+			"constraints":{"requires_new_account":true,"address_continuity_supported":false,"requires_local_signer_state":true},
+			"chain_support_used":{"chain_id":11155111,"status":"testnet_supported","capabilities":["deploy","sign_userop","rotate_signer"]},
+			"references":[
+				{"kind":"source_repo","url":"https://github.com/RivaLabs-Core/NiceTry","commit":"40a1286d18dee2a92631da82a52e484fa9a3628c"},
+				{"kind":"protocol_spec","url":"https://github.com/RivaLabs-Core/Ephemeral-Keys-Protocol","version":"ac140c71d400449adec18884c4fd3373592292f3"}
+			],
+			"accepted_findings":["requires_bundler","requires_local_signer_state"],
+			"accepted_risk_notes":["test note"]
+		},
+		"policy_context":{"wallet_address":"` + draftPersistTestWallet + `","wallet_type":"eoa","chain_ids":[11155111]}
+	}`
+}
+
 func draftPersistCoucheBKOPayloadJSON() string {
 	return `{
 		"schema_version":"cafe.crypto_policy.v0.2",
@@ -353,6 +391,28 @@ func TestDraftPersist_rejectsUnpinnedProviderRefs(t *testing.T) {
 		t.Fatalf("status = %d want 400 body=%s", rec.Code, rec.Body.String())
 	}
 	assertAuthErrorPayload(t, rec, persistCodeProviderRefsUnpinned)
+}
+
+// CPM-P7: real Nicetry fixture pins pass the persist gate (synthetic pins remain in happyPath).
+func TestDraftPersist_acceptsPinnedNicetryFixtureRefs(t *testing.T) {
+	h := newDraftPersistTestHandler(t)
+	token := mustToken(t, "draft-persist-nicetry-pin")
+	draftID := "draft-persist-nicetry-pin"
+	createDraftPersistBoundDraftWithPayload(t, h, token, draftID, draftPersistNicetryFixturePinnedPayloadJSON())
+
+	issued := time.Now().UTC().Truncate(time.Second)
+	expires := issued.Add(10 * time.Minute)
+	message, signature := buildDraftPersistSignedRequest(t, draftID, issued, expires)
+	body := `{"wallet_address":"` + draftPersistTestWallet + `","chain_id":1,"scan_id":"` + draftPersistTestScanID + `","signed_message":` + jsonString(message) + `,"signature":"` + signature + `"}`
+
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.DraftPersistPath(draftID), strings.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d want 200 body=%s", rec.Code, rec.Body.String())
+	}
 }
 
 func TestDraftPersist_rejectsLegacyTemplateID(t *testing.T) {

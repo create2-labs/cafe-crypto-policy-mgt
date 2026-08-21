@@ -33,11 +33,14 @@ func TestLoadProviderManifestFromFile_NicetryFixture(t *testing.T) {
 	if len(p.References) != 2 {
 		t.Fatalf("references len: %d", len(p.References))
 	}
-	if p.References[0].Commit != UnpinnedPendingFixture || p.References[1].Version != UnpinnedPendingFixture {
-		t.Fatalf("refs not unpinned: %#v", p.References)
+	// CPM-P7: real upstream pins (NiceTry main HEAD; Ephemeral-Keys-Protocol main HEAD — no release tags).
+	const wantNiceTryCommit = "40a1286d18dee2a92631da82a52e484fa9a3628c"
+	const wantProtocolVersion = "ac140c71d400449adec18884c4fd3373592292f3"
+	if p.References[0].Commit != wantNiceTryCommit || p.References[1].Version != wantProtocolVersion {
+		t.Fatalf("refs not pinned: %#v", p.References)
 	}
-	if !m.HasUnpinnedReferences() {
-		t.Fatal("expected HasUnpinnedReferences")
+	if m.HasUnpinnedReferences() {
+		t.Fatal("expected pinned Nicetry fixture (no unpinned_pending_fixture)")
 	}
 }
 

@@ -10,7 +10,7 @@ import (
 
 const (
 	SchemaVersionV01       = "cafe.provider_manifest.v0.1"
-	UnpinnedPendingFixture = "unpinned_pending_fixture" // fixture-only; not persistable (ADR §6)
+	UnpinnedPendingFixture = "unpinned_pending_fixture" // placeholder; not persistable (ADR §6 / §9)
 )
 
 type Maturity string

@@ -85,7 +85,7 @@ CPM’s catalogue and explore/persist paths follow the **posture + solution prof
 - `crypto_policy_id`, `required_posture`, `user_constraints`, `solution_profile_ref`, `accepted_provider_snapshot` required
 - legacy `template_id` / `selection_request` / top-level couche B fields → **400** `CRYPTO_POLICY_PAYLOAD_INVALID`
 - CPM **rejoue couche A puis couche B** against the snapshot (+ `policy_context` wallet/chains); couche B KO → `PROVIDER_USER_CONSTRAINTS_INCOMPATIBLE`
-- snapshot `references` must be **pinned** (commit/version must not be empty or `unpinned_pending_fixture` — the shipped Nicetry fixture is intentionally unpinned until **CPM-P7**)
+- snapshot `references` must be **pinned** (commit/version must not be empty or `unpinned_pending_fixture` — the shipped Nicetry fixture is pinned as of **CPM-P7**)
 - soft finding codes listed when account/constraint flags require them; `chain_support_used.status` must not be `planned`
 - stable error codes: `CRYPTO_POLICY_PAYLOAD_INVALID`, `PROVIDER_REFS_UNPINNED`, `PROVIDER_SOFT_FINDINGS_REQUIRED`, `PROVIDER_CHAIN_PLANNED`, `PROVIDER_SCAN_COMPAT_FAILED`, `PROVIDER_USER_CONSTRAINTS_INCOMPATIBLE` (OpenAPI `WalletAuthorizationErrorCode`)
 
@@ -275,7 +275,7 @@ CPM exposes read-only catalogue APIs backed by local Crypto Policy and provider 
 Environment variables:
 
 - `CPM_CRYPTO_POLICY_PATHS` (comma-separated, default: `/app/policy/crypto_policy_pq_account_validation_v1.json`) — ships Crypto Policy `cpm_pq_account_validation_v1` (`required_posture` + `allowed_providers: ["nicetry"]`)
-- `CPM_PROVIDER_MANIFEST_PATHS` (comma-separated, default: `/app/policy/provider_manifest_nicetry_v0_1.json`): Capability Provider manifests (`ProviderManifest` v0.1). Loaded for `GET /providers` and explore hard/soft checks. Fixture source: `internal/domain/provider/testdata/provider_manifest_nicetry_v0_1.json` (refs currently `unpinned_pending_fixture` — explore/draft OK; normative persist blocked until pin — **CPM-P7**).
+- `CPM_PROVIDER_MANIFEST_PATHS` (comma-separated, default: `/app/policy/provider_manifest_nicetry_v0_1.json`): Capability Provider manifests (`ProviderManifest` v0.1). Loaded for `GET /providers` and explore hard/soft checks. Fixture source: `internal/domain/provider/testdata/provider_manifest_nicetry_v0_1.json` (refs pinned — NiceTry `commit` `40a1286d18dee2a92631da82a52e484fa9a3628c`; Ephemeral-Keys-Protocol `version` `ac140c71d400449adec18884c4fd3373592292f3` = main HEAD SHA, no release tags yet — **CPM-P7**).
 
 Catalogue responses are posture + `allowed_providers` / provider-manifest oriented; they do **not** return templates, instances, or a business policy graph.
 
@@ -372,7 +372,7 @@ Environment variables:
 
 CP-PERSIST V1 does **not** add new mandatory runtime environment variables. Wallet authorization is verified at persist time from the request body (`signed_message`, `signature`) on `POST /api/cpm/v1/drafts/{draft_id}/persist` (PR4). Optional `CPM_WALLET_AUTH_DOMAIN` (or request host fallback) is embedded in canonical messages from `POST /api/cpm/v1/wallet-challenges`. See [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md).
 
-**Provider snapshot gate (CPM-P10 / ADR §9):** the draft `payload` must be a normative `cafe.crypto_policy.v0.2` document with `crypto_policy_id`, `user_constraints`, `required_posture`, `solution_profile_ref`, and `accepted_provider_snapshot` (pinned `references`, soft findings in `accepted_findings`, no `planned` chain). CPM rejoue couche A+B against the snapshot before the opaque write to cafe-persistence. Fixture refs `unpinned_pending_fixture` are **not** persistable until CPM-P7. Details: [Capability Providers](#capability-providers-adr-2026-08-03) and OpenAPI `CryptoPolicyPersistPayload`.
+**Provider snapshot gate (CPM-P10 / ADR §9):** the draft `payload` must be a normative `cafe.crypto_policy.v0.2` document with `crypto_policy_id`, `user_constraints`, `required_posture`, `solution_profile_ref`, and `accepted_provider_snapshot` (pinned `references`, soft findings in `accepted_findings`, no `planned` chain). CPM rejoue couche A+B against the snapshot before the opaque write to cafe-persistence. The shipped Nicetry fixture refs are pinned (**CPM-P7**); `unpinned_pending_fixture` (or empty commit/version) still fails the gate. Details: [Capability Providers](#capability-providers-adr-2026-08-03) and OpenAPI `CryptoPolicyPersistPayload`.
 
 **V2 optional (not V1):** `CPM_REDIS_URL` and ephemeral proof stores may be introduced later for advanced workflows — not required for CP-PERSIST V1.
 

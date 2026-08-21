@@ -2,6 +2,7 @@ package policy
 
 import (
 	"errors"
+	"path/filepath"
 	"testing"
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/provider"
@@ -46,6 +47,24 @@ func TestValidateForPersist_acceptsPinnedSnapshot(t *testing.T) {
 	p := validPersistPayload()
 	if err := p.ValidateForPersist(persistObsEOA()); err != nil {
 		t.Fatalf("ValidateForPersist: %v", err)
+	}
+}
+
+// CPM-P7: persist gate accepts the shipped Nicetry fixture once refs are real pins
+// (complements the synthetic pinned case above / P10).
+func TestValidateForPersist_acceptsPinnedNicetryFixtureRefs(t *testing.T) {
+	m, err := provider.LoadProviderManifestFromFile(filepath.Join("..", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"))
+	if err != nil {
+		t.Fatalf("load nicetry fixture: %v", err)
+	}
+	if m.HasUnpinnedReferences() {
+		t.Fatal("nicetry fixture must be pinned for CPM-P7")
+	}
+	profile := m.SolutionProfiles[0]
+	p := validPersistPayload()
+	p.AcceptedProviderSnapshot.References = append([]provider.Reference(nil), profile.References...)
+	if err := p.ValidateForPersist(persistObsEOA()); err != nil {
+		t.Fatalf("ValidateForPersist with nicetry fixture refs: %v", err)
 	}
 }
 
