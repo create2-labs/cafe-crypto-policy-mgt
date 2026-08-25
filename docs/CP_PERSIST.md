@@ -118,7 +118,121 @@
 | Jun 12th, 2026 | O. Lodygensky | 0.9.7   | Mark PR4 EOA persist enforcement implemented (CP-PERSIST-T4); update gaps and smoke script references                                                                                               |
 | Jun 13th, 2026 | O. Lodygensky | 0.9.8   | Mark PR7 E2E documentation and validation complete (CP-PERSIST-T7); cross-repo runbooks and troubleshooting                                                                                          |
 | Jun 18th, 2026 | O. Lodygensky | 0.9.9   | Clarify V1 CP delete vs deactivate: delete requires owner scope only; deactivate / remediation rollback out of scope                                                                                |
+| Aug 25th, 2026 | ADR RD-P1     | 1.0.0   | **Remove CP drafts.** Engagement = `POST /policies` signed + `payload_sha256` (JCS). No `/drafts*`. W2 on challenge/persist. See [ADR_20260824_remove_cp_drafts](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260824_remove_cp_drafts.md). |
 
+
+---
+
+## Current normative contract (v1.0.0 — no drafts)
+
+> **Supersedes** the draft-based CP-PERSIST V1 flow (`POST /drafts` → `POST /drafts/{id}/persist`).  
+> **Source of truth:** this section + [`openapi/cpm-v1.yaml`](../openapi/cpm-v1.yaml) + ADR §3.2.  
+> Historical Parts below (stories/PR breakdown with `draft_id`) remain for archaeology and are **not** the product contract.  
+> **Contract ahead of runtime (RD-P1):** handlers may still serve legacy `/drafts*` until RD-P4/P5; clients must follow this contract for new work.
+
+### Product flow (EOA)
+
+```text
+Discovery scan (owner-scoped)
+  → explore (catalogue / soft findings; no wallet proof)
+  → local editor state (sessionStorage NB2 — FE; no server draft API)
+  → POST /api/cpm/v1/wallet-challenges   # payload hashed; CPM computes payload_sha256; stores nothing
+  → EIP-191 personal_sign
+  → POST /api/cpm/v1/policies            # signed body; verify hash + signature; rejeu A+B; W1 write
+```
+
+### Removed from the public contract
+
+- `POST|GET|DELETE /api/cpm/v1/drafts`
+- `POST /api/cpm/v1/drafts/{draft_id}/persist`
+- Any `draft_id` in wallet-challenge request/response or canonical message
+- `DRAFT_ALREADY_PERSISTED` and other draft error codes
+
+### Engagement endpoint
+
+**`POST /api/cpm/v1/policies`** with body:
+
+- binding: `wallet_address`, `chain_id`, `scan_id`
+- `payload`: closed hashed set (`CryptoPolicyPersistPayload`)
+- `signed_message` + `signature`
+
+EOA without valid signed authorization → **403** `WALLET_CONTROL_PROOF_REQUIRED`. No product EOA unsigned persist path.
+
+### `payload_sha256` (server authority)
+
+Closed hashed fields:
+
+1. `schema_version`
+2. `crypto_policy_id`
+3. `required_posture`
+4. `user_constraints`
+5. `solution_profile_ref`
+6. `accepted_provider_snapshot`
+7. `accepted_findings` (top-level; authoritative)
+
+Rules:
+
+- Canonicalization: **RFC 8785 JCS**, then lowercase hex SHA-256.
+- Hashed subtree: **string | boolean | object | array only** — **no** `number`, **no** `null`.
+- Chain ids inside the snapshot are **strings** (e.g. `"11155111"`).
+- Before JCS: lexicographic sort + dedupe of `accepted_findings` (client should pre-normalize; server always normalizes).
+- Client-supplied `payload_sha256` on write is **ignored**.
+- Shared vectors: [`testdata/payload_sha256/`](../testdata/payload_sha256/).
+
+### W2 + Discovery fail-closed
+
+`POST /wallet-challenges` and `POST /policies` require `scan_id` = **latest completed** owner-scoped Discovery wallet scan for the address (**W2**). Non-latest → **422** `SCAN_NOT_LATEST`. Discovery unavailable → **503** `DISCOVERY_UNAVAILABLE`. Explore W2 wiring completes in RD-P6.
+
+### Signature ≠ business bypass
+
+After EIP-191 + `payload_sha256` match, CPM **rejoue** persist gates (couches A+B, pinned refs, soft findings, catalogue coherence). Failure → **400** (or existing provider codes), no write.
+
+### Idempotence / W1 (no draft_persist_state)
+
+Successful persist commits one active `crypto_policies` row (owner + wallet). Retry or second policy → **409** `POLICY_ALREADY_EXISTS`. Client reconciles via `GET /policies` + compare `payload_sha256`. Replace = **DELETE** then new signed persist (**NB1**).
+
+### Canonical message (replaces Draft ID line)
+
+```text
+CAFE Crypto Policy Persistence
+
+Domain: <frontend_or_api_domain>
+Action: persist_crypto_policy
+Wallet: <wallet_address>
+Chain ID: <chain_id>
+Scan ID: <scan_id>
+Payload SHA-256: <payload_sha256>
+Issued At: <issued_at>
+Expiration Time: <expires_at>
+
+By signing this message, I prove control of the wallet and authorize CAFE to persist this Crypto Policy for this wallet.
+```
+
+Binding:
+
+| Enforced via signed message | Enforced server-side only |
+| --------------------------- | ------------------------- |
+| `wallet_address` | `user_id` / `tenant_id` (JWT) |
+| `chain_id` | scan ownership |
+| `scan_id` | W2 latest-completed |
+| `payload_sha256` | business rejeu A+B |
+| `action`, `issued_at`, `expires_at` | EOA-only |
+
+Max validity **10 minutes**. `issued_at` clock skew ≤ **30 seconds**.
+
+### Error semantics (challenge / persist)
+
+| Code | Typical HTTP | When |
+| ---- | ------------ | ---- |
+| `WALLET_CONTROL_PROOF_REQUIRED` | 403 | Missing/invalid signed auth on EOA persist |
+| `SCAN_NOT_LATEST` | 422 | `scan_id` completed but not W2 |
+| `DISCOVERY_UNAVAILABLE` | 503 | Discovery fail-closed on W2 lookup |
+| `PAYLOAD_SHA256_MISMATCH` | 400 | Message hash ≠ recomputed payload hash |
+| `POLICY_ALREADY_EXISTS` | 409 | W1 unique active policy (retry or conflict) |
+| `CRYPTO_POLICY_PAYLOAD_INVALID` | 400 | null/number/unknown field/missing closed field |
+| Provider gate codes (`PROVIDER_*`) | 400 | Rejeu A+B / snapshot gates |
+
+Full OpenAPI enums: `WalletAuthorizationErrorCode` in [`openapi/cpm-v1.yaml`](../openapi/cpm-v1.yaml).
 
 ---
 
@@ -228,18 +342,16 @@ Examples:
 - Required algorithm transition.
 - Wallet migration target posture.
 
-### CP draft
+### CP draft (removed)
 
-A **CP draft** is a saved, non-actionable preparation of a Crypto Policy.
-
-A draft can be created before proving wallet control.
-
-A draft is not actionable.
+**Removed in v1.0.0.** There is no server-side CP draft resource and no `/drafts*` API.
+Pre-persist editing uses **local editor state** only (FE: `sessionStorage` indexed by `scan_id` — NB2).
+Historical text below that describes platform drafts is superseded.
 
 ### Persisted CP
 
-A **persisted CP** is an official Crypto Policy associated with a wallet in CAFE. A persisted CP is created from a CP draft.
-
+A **persisted CP** is an official Crypto Policy associated with a wallet in CAFE, created by
+**`POST /api/cpm/v1/policies`** with valid wallet signed authorization (and business rejeu).
 A CP can only become persisted after successful wallet control proof.
 
 ### Wallet control proof
@@ -723,11 +835,11 @@ Response:
 
 ## 12. Challenge message format
 
-**Decision (frozen for CP-PERSIST V1):** EIP-191 / `personal_sign`-compatible signed message.
+> **v1.0.0:** see [Current normative contract](#current-normative-contract-v100--no-drafts) for the authoritative message (Payload SHA-256 replaces Draft ID). Text below is historical draft-based V1.
 
-The message must be deterministic, human-readable and canonical.
+**Decision (frozen for draft-based CP-PERSIST V1 — superseded):** EIP-191 / `personal_sign`-compatible signed message.
 
-Normative message structure:
+Historical message structure (removed `Draft ID` in v1.0.0):
 
 ```text
 CAFE Crypto Policy Persistence
@@ -737,14 +849,14 @@ Action: persist_crypto_policy
 Wallet: <wallet_address>
 Chain ID: <chain_id>
 Scan ID: <scan_id>
-Draft ID: <draft_id>
+Draft ID: <draft_id>            # REMOVED in v1.0.0 — replaced by Payload SHA-256
 Issued At: <issued_at>
 Expiration Time: <expires_at>
 
 By signing this message, I prove control of the wallet and authorize CAFE to persist the selected Crypto Policy draft for this wallet.
 ```
 
-**Binding model (signed message vs server-side):**
+**Binding model (signed message vs server-side) — historical:**
 
 
 | Enforced via signed message        | Enforced server-side only                          |
@@ -1636,53 +1748,38 @@ Define audit requirements for institutional custody.
 
 # Part VI — Frozen decisions
 
-The following decisions are frozen for **CP-PERSIST V1** (stateless signature-at-persist). **CP-PERSIST V1 is signed off independently through this document** — it does not require global acceptance of `[workplans/WORKPLAN_API.md](../workplans/WORKPLAN_API.md)`. Implementation PRs must not reopen frozen decisions without an explicit spec revision.
+> **v1.0.0 amendment:** §§33–40 below are **superseded** by [Current normative contract (v1.0.0 — no drafts)](#current-normative-contract-v100--no-drafts)
+> and [`openapi/cpm-v1.yaml`](../openapi/cpm-v1.yaml). Kept for history of the draft-based V1 sign-off.
+
+The following decisions were frozen for the **draft-based** CP-PERSIST V1 (stateless signature-at-persist). **As of v1.0.0 / ADR_20260824_remove_cp_drafts**, engagement is **`POST /policies` signed** with `payload_sha256`; `/drafts*` is removed.
 
 ## 33. Persistence endpoint
+
+**Superseded (v1.0.0):**
+
+```text
+POST /api/cpm/v1/policies
+```
+
+Historical (removed):
 
 ```text
 POST /api/cpm/v1/drafts/{draft_id}/persist
 ```
 
-Request body (V1):
-
-```json
-{
-  "wallet_address": "0xabc...",
-  "chain_id": 1,
-  "scan_id": "uuid",
-  "signed_message": "string",
-  "signature": "0x..."
-}
-```
-
-Rationale: expresses draft → persisted policy transition; wallet authorization verified at persist time.
-
 ## 34. Legacy `POST /api/cpm/v1/policies`
 
-`POST /api/cpm/v1/policies` is **not** the CP persistence endpoint for this workflow.
-
-For EOA wallet flows, it must **not** create a persisted CP without valid signed wallet authorization and must return `WALLET_CONTROL_PROOF_REQUIRED` (or equivalent).
+**Superseded (v1.0.0):** `POST /api/cpm/v1/policies` **is** the normative EOA persistence endpoint (signed body). Unsigned EOA persist → `WALLET_CONTROL_PROOF_REQUIRED`.
 
 ## 35. Message helper API path
 
 Clients **must** obtain the canonical authorization message from CPM before signing:
 
 ```text
-POST /api/cpm/v1/wallet-challenges   # mandatory stateless helper — CPM-issued canonical message; stores nothing
+POST /api/cpm/v1/wallet-challenges   # mandatory stateless helper — includes hashed payload; CPM computes payload_sha256; stores nothing
 ```
 
-The client **must** obtain the canonical authorization message from CPM before signing by calling:
-
-```http
-POST /api/cpm/v1/wallet-challenges
-```
-
-This helper is **stateless**: it validates draft / scan / wallet bindings and returns the canonical message to sign, but it stores nothing server-side.
-
-At persist time, CPM does not rely on stored challenge state. CPM verifies that the submitted `signed_message` exactly matches the canonical message expected for the wallet, chain, scan, draft, action and validity window (see §12 binding model), then verifies the EIP-191 / `personal_sign` signature. User and tenant scope are enforced separately via session/JWT and draft/scan ownership.
-
-Advanced clients must not invent an alternative message format. They may only sign the canonical message returned by CPM.
+No `draft_id`. Signature verification at **`POST /policies`**. Advanced clients must not invent an alternative message format.
 
 `POST /api/cpm/v1/wallet-challenges/verify` is **not** part of CP-PERSIST V1 security path (V2 optional UX only).
 
