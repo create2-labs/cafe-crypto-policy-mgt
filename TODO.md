@@ -9,6 +9,17 @@ Items deferred; not blocking current IMM work unless noted.
 See [ADR](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction.md) / [PR plan](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_provider_abstraction_PR_PLAN.md). **CPM-P1–P11b** delivered through runtime signals. **CPM-P7** (this train): pin Nicetry manifest refs for normative persist. Next: FE amendement train (FE-P6+).
 
 ---
+
+## Remove CP drafts (ADR 2026-08-24) — **Validé** / RD-P1 in progress
+
+Suppression des drafts CP (produit + API + tables). Exécution : [ADR](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260824_remove_cp_drafts.md) / [PR plan RD-P*](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260824_remove_cp_drafts_PR_PLAN.md).
+
+- **RD-P0** ✅ (cafe-adr)
+- **RD-P1** (cette PR) : OpenAPI + `CP_PERSIST.md` + vecteurs JCS — **contrat ahead of runtime**
+- **Next :** **RD-P2** (lib JCS / `payload_sha256`) ; **RD-P3** (persistence drop drafts) en parallèle possible
+- FE après smokes backend (**RD-P8**). Détail IMM/TODO frontend → **RD-P14**.
+
+---
 ## Open — Retirer entièrement le mode CPM mock (frontend)
 
 **Décision produit :** supprimer **tout** le mock CPM côté `**cafe-frontend`** — pas seulement le switch runtime `VITE_CPM_DATA_SOURCE=mock`, mais aussi `**mockCpmDataSource.ts**`, le placeholder `mock-discovery-scan-placeholder`, et l’UI / composables dédiés au parcours démo sans stack.

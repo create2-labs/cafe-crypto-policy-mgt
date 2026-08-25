@@ -1,0 +1,58 @@
+{
+  "schema_version": "cafe.crypto_policy.v0.2",
+  "crypto_policy_id": "cpm_pq_account_validation_v1",
+  "required_posture": "hybrid",
+  "user_constraints": {
+    "allow_new_wallet": true,
+    "address_continuity_required": false,
+    "key_rotation_model": "per_userop"
+  },
+  "solution_profile_ref": {
+    "provider_id": "nicetry",
+    "solution_profile_id": "nicetry.fors_c.erc4337.v0_1",
+    "manifest_version": "2026-08"
+  },
+  "accepted_provider_snapshot": {
+    "maturity": "research",
+    "claim_status": "declared",
+    "resulting_posture": "hybrid",
+    "signature": {
+      "scheme": "FORS+C",
+      "family": "hash_based",
+      "key_rotation_model": "per_userop"
+    },
+    "account_model": {
+      "standard": "ERC-4337",
+      "execution_model": "erc4337_bundler",
+      "requires_bundler": true
+    },
+    "constraints": {
+      "requires_new_account": true,
+      "requires_local_signer_state": true
+    },
+    "chain_support_used": {
+      "chain_id": "11155111",
+      "status": "testnet_supported",
+      "capabilities": [
+        "deploy",
+        "sign_userop",
+        "rotate_signer"
+      ]
+    },
+    "references": [
+      {
+        "kind": "source_repo",
+        "url": "https://example.com/a",
+        "commit": "deadbeef"
+      }
+    ],
+    "accepted_findings": [
+      "requires_bundler",
+      "requires_local_signer_state"
+    ]
+  },
+  "accepted_findings": [
+    "requires_bundler",
+    "requires_local_signer_state"
+  ]
+}

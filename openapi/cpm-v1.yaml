@@ -6,17 +6,27 @@ info:
     name: Proprietary
     url: https://example.com/license
   description: |
-    Target HTTP contract for persisted policies, drafts, catalogue reads, and decision exploration
-    per **WORKPLAN_API.md** §0.2, §2.3–2.4, §4.3–4.4, §5.1–5.2, §8.
+    Target HTTP contract for persisted policies, catalogue reads, and decision exploration
+    per **WORKPLAN_API.md** §0.2, §2.3–2.4, §4.3–4.4, §5.1–5.2, §8 and
+    [ADR_20260824_remove_cp_drafts](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260824_remove_cp_drafts.md).
 
-    **CP-PERSIST V1 (EOA wallet authorization):** normative spec [`docs/CP_PERSIST.md`](../docs/CP_PERSIST.md)
-    (OpenAPI PR2 — [`cafe-crypto-policy-mgt` PR #51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51)).
-    Wallet signed authorization is required for EOA CP persistence regardless of whether the caller is the
-    Web UI, CLI or a direct API client. Signature verification happens at
-    **`POST /drafts/{draft_id}/persist`**. Clients **must** call **`POST /wallet-challenges`** (stateless;
-    stores nothing) to obtain the CPM-issued canonical message before signing (EIP-191 / `personal_sign`).
-    Maximum signed message validity: **10 minutes**. **EOA-only** for this release.
-    **`POST /wallet-challenges/verify` is not a V1 security requirement.**
+    **No public `/drafts*` routes.** Platform CP drafts are removed from the product contract.
+
+    **CP-PERSIST (EOA, post-draft):** normative spec [`docs/CP_PERSIST.md`](../docs/CP_PERSIST.md).
+    Wallet signed authorization is required for EOA CP persistence (Web UI, CLI, direct API).
+    Clients **must** call **`POST /wallet-challenges`** (stateless; stores nothing) with the normative
+    hashed payload; CPM computes **`payload_sha256`** (JCS RFC 8785 + SHA-256) and returns the
+    canonical message. Signature verification and business rejeu happen at
+    **`POST /policies`** (signed body). Maximum signed message validity: **10 minutes**. **EOA-only**.
+    **`POST /wallet-challenges/verify` is not a security requirement.**
+
+    **W2 (owner-scoped latest completed scan):** `POST /wallet-challenges` and `POST /policies`
+    require `scan_id` to be the latest completed Discovery wallet scan for the authenticated user
+    and address. Non-latest completed → **422** `SCAN_NOT_LATEST`. Discovery unavailable → **503**
+    `DISCOVERY_UNAVAILABLE` (fail-closed). Explore W2 harmonization lands with RD-P6.
+
+    **Contract ahead of runtime (RD-P1):** this OpenAPI / `CP_PERSIST.md` may lead handlers until
+    RD-P4/P5 wire the new routes. Legacy `/drafts*` handlers may still exist in code until removed.
 
     **Public URL prefix:** `/api/cpm/v1`. Do **not** publish paths like `/api/cpm/v1/cpm/...` (no duplicated `cpm` segment).
 
@@ -30,7 +40,8 @@ info:
       shared lookup with **`GET …/policies?scan_id=`** (**PR7**).
     - `POST /internal/policies/references/wallet-target` — request **`{ "target_address", "user_id", "tenant_id" }`**
       (`target_address` normalized like Discovery wallet scans); response
-      **`{ "exists": boolean, "policy_count": number, "draft_count": number }`**. Discovery **`POST …/scan`** W1 guard (**IMM-9b**).
+      **`{ "exists": boolean, "policy_count": number }`** (no `draft_count` — drafts removed).
+      Discovery **`POST …/scan`** W1 guard (**IMM-9b** / RD-P3+).
 servers:
   - url: https://{host}/api/cpm/v1
     description: Canonical product base (§0.2).
@@ -40,17 +51,15 @@ servers:
 
 tags:
   - name: policies
-    description: Persisted policy instances and related operations (§0.2).
-  - name: drafts
-    description: Policy drafts (§0.2).
+    description: Persisted policy instances and signed EOA persist (§0.2 / CP-PERSIST).
   - name: catalog
     description: Static catalogue reads (Crypto Policies and Capability Providers).
   - name: decisions
     description: Non-persisted decision exploration (`explore`).
   - name: wallet-authorization
     description: |
-      Stateless EOA wallet signed authorization for CP persistence (CP-PERSIST V1).
-      Mandatory canonical message helper and normative draft persist route.
+      Stateless EOA wallet signed authorization for CP persistence.
+      Mandatory canonical message helper (`POST /wallet-challenges`); normative persist is `POST /policies`.
       UI, CLI and direct API share the same contract.
 
 security:
@@ -264,43 +273,119 @@ paths:
         "404":
           description: Unknown id (single-instance mode only).
     post:
-      tags: [policies]
-      summary: Persist a policy instance (legacy / non-EOA paths)
+      tags: [policies, wallet-authorization]
+      summary: Persist a Crypto Policy (normative EOA signed route)
       description: |
-        **Not the normative CP-PERSIST endpoint.** For EOA wallet flows, **`POST /drafts/{draft_id}/persist`**
-        with valid **`signed_message`** and **`signature`** is the only normative persistence route
-        ([`docs/CP_PERSIST.md`](../docs/CP_PERSIST.md), WORKPLAN_API.md §2.5).
+        **Normative EOA CP persistence** ([`docs/CP_PERSIST.md`](../docs/CP_PERSIST.md),
+        ADR_20260824_remove_cp_drafts §3.2). Replaces the former
+        **`POST /drafts/{draft_id}/persist`** path (removed from this contract — no shim).
 
-        **`POST /policies` must not create or update an EOA persisted CP without wallet signed authorization.**
-        Legacy or pre-CP_PERSIST callers attempting EOA persistence without proof receive
-        **`WALLET_CONTROL_PROOF_REQUIRED`** (blocking error). Fixture, catalog and explicitly non-EOA flows
-        may still use this route under explicit rules (WORKPLAN_API.md §2.4, §5.2).
+        Clients **must** obtain the CPM-issued canonical message via **`POST /wallet-challenges`**,
+        sign it (EIP-191 / `personal_sign`), then submit the **same** normative `payload` plus
+        `signed_message` + `signature`.
 
-        **`scan_id` is mandatory** for instances created from Discovery-bound flows (WORKPLAN_API.md §5.2).
-        May be absent only for catalogue fixtures, manual drafts not yet bound, or explicit non-product tests
-        — distinguish in validation and tests.
+        Server responsibilities at persist (clients are **not** trusted):
+
+        - session JWT ownership of `scan_id` (user / tenant)
+        - **W2**: `scan_id` is the latest completed owner-scoped wallet scan for the address
+          (else **422** `SCAN_NOT_LATEST`); Discovery fail → **503** `DISCOVERY_UNAVAILABLE`
+        - recompute `payload_sha256` (JCS + SHA-256) from the closed hashed field set; ignore any
+          client-supplied `payload_sha256`
+        - `signed_message` exactly matches the canonical message for wallet, chain, scan,
+          `action = persist_crypto_policy`, validity window, and `payload_sha256`
+        - EIP-191 signature recovers the expected EOA address
+        - max validity **10 minutes**; `issued_at` not more than **30 seconds** in the future
+        - **business rejeu A+B** after signature (pinned refs, soft findings vs `accepted_findings`,
+          couche A+B, catalogue coherence) — signature does **not** bypass persist gates
+        - **W1**: at most one active policy per owner+wallet → **409** `POLICY_ALREADY_EXISTS`
+          (retry-after-success and conflicting second policy share this code; reconcile via GET)
+
+        EOA persistence **without** valid signed authorization → **403**
+        `WALLET_CONTROL_PROOF_REQUIRED`. There is **no** product EOA path that persists without
+        wallet signed authorization. Fixture / non-wallet flows are out of product scope.
+
+        Raw signature bytes must **not** be stored. Audit fields are derived from the verified
+        message (`challenge_issued_at`, `challenge_expires_at`, `signed_message_hash`, …).
       operationId: postPolicies
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/PolicyRecordWrite"
+              $ref: "#/components/schemas/PolicyPersistRequest"
+            examples:
+              signedPersist:
+                value:
+                  wallet_address: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0"
+                  chain_id: 1
+                  scan_id: 550e8400-e29b-41d4-a716-446655440000
+                  payload:
+                    schema_version: cafe.crypto_policy.v0.2
+                    crypto_policy_id: cpm_pq_account_validation_v1
+                    required_posture: hybrid
+                    user_constraints:
+                      allow_new_wallet: true
+                      address_continuity_required: false
+                      key_rotation_model: per_userop
+                    solution_profile_ref:
+                      provider_id: nicetry
+                      solution_profile_id: nicetry.fors_c.erc4337.v0_1
+                      manifest_version: "2026-08"
+                    accepted_provider_snapshot:
+                      maturity: research
+                      claim_status: declared
+                      resulting_posture: hybrid
+                      signature:
+                        scheme: FORS+C
+                        family: hash_based
+                        key_rotation_model: per_userop
+                      account_model:
+                        standard: ERC-4337
+                        execution_model: erc4337_bundler
+                        requires_bundler: true
+                      constraints:
+                        requires_new_account: true
+                        requires_local_signer_state: true
+                      chain_support_used:
+                        chain_id: "11155111"
+                        status: testnet_supported
+                        capabilities: [deploy, sign_userop, rotate_signer]
+                      references:
+                        - kind: source_repo
+                          url: https://github.com/RivaLabs-Core/NiceTry
+                          commit: 40a1286d18dee2a92631da82a52e484fa9a3628c
+                      accepted_findings: [requires_bundler, requires_local_signer_state]
+                    accepted_findings: [requires_bundler, requires_local_signer_state]
+                  signed_message: |
+                    CAFE Crypto Policy Persistence
+
+                    Domain: api.example.com
+                    Action: persist_crypto_policy
+                    Wallet: 0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0
+                    Chain ID: 1
+                    Scan ID: 550e8400-e29b-41d4-a716-446655440000
+                    Payload SHA-256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+                    Issued At: 2026-08-25T12:00:00Z
+                    Expiration Time: 2026-08-25T12:10:00Z
+
+                    By signing this message, I prove control of the wallet and authorize CAFE to persist this Crypto Policy for this wallet.
+                  signature: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12"
       responses:
         "200":
-          description: Created or updated instance as per implementation (non-EOA or explicit legacy/fixture flows).
+          description: Crypto Policy persisted (W1 unique active policy for owner+wallet).
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PolicyRecord"
+                $ref: "#/components/schemas/PolicyPersistResponse"
         "400":
-          $ref: "#/components/responses/BadRequest"
+          $ref: "#/components/responses/PolicyPersistBadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
           description: |
             EOA wallet persistence attempted without valid signed wallet authorization
-            (`WALLET_CONTROL_PROOF_REQUIRED`).
+            (`WALLET_CONTROL_PROOF_REQUIRED`), or signature/message verification failed
+            (`INVALID_WALLET_SIGNATURE`, `WALLET_SIGNATURE_ADDRESS_MISMATCH`).
           content:
             application/json:
               schema:
@@ -312,6 +397,20 @@ paths:
                     message: Persisting a Crypto Policy for a wallet requires a valid signed wallet authorization.
                     details: {}
                     request_id: req_example
+        "409":
+          $ref: "#/components/responses/PolicyPersistConflict"
+        "410":
+          $ref: "#/components/responses/WalletAuthorizationExpired"
+        "422":
+          description: |
+            Non-EOA wallet (`UNSUPPORTED_WALLET_TYPE`) or `scan_id` not latest completed
+            (`SCAN_NOT_LATEST`).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WalletAuthorizationErrorResponse"
+        "503":
+          $ref: "#/components/responses/DiscoveryUnavailable"
     delete:
       tags: [policies]
       summary: Delete persisted policy instance by id
@@ -333,120 +432,28 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
-  /drafts:
-    get:
-      tags: [drafts]
-      summary: Get platform draft by id (owner)
-      description: |
-        Single draft by query **`id`** (required). There is **no** owner-scoped list without `id`.
-        See `workplans/CPM_DRAFT_1_PR.md` (CPM-DRAFT-1A).
-      operationId: getDraftById
-      parameters:
-        - name: id
-          in: query
-          required: true
-          schema:
-            type: string
-          description: Client-supplied draft key (same as POST body `id`).
-      responses:
-        "200":
-          description: Draft record for this owner.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DraftRecord"
-              examples:
-                sample:
-                  value:
-                    id: draft-1
-                    scan_id: 550e8400-e29b-41d4-a716-446655440000
-                    payload:
-                      selected_candidate_id: cpx_pq_account_validation_v1
-                    created_at: "2026-06-01T12:00:00Z"
-                    updated_at: "2026-06-02T10:00:00Z"
-        "400":
-          $ref: "#/components/responses/DraftBadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "404":
-          $ref: "#/components/responses/NotFound"
-    post:
-      tags: [drafts]
-      summary: Upsert platform draft (owner)
-      description: |
-        **Upsert** by client-supplied **`id`** (required). Owner scope from JWT only;
-        **`owner_user_id`** / **`tenant_id`** / **`binding`** in the body are rejected.
-        Response is minimal metadata (`draft_id`, `saved_at`, `status`) — no `draft_version` until versioning exists.
-      operationId: postDraftUpsert
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/DraftUpsertRequest"
-            examples:
-              upsert:
-                value:
-                  id: 550e8400-e29b-41d4-a716-446655440001
-                  scan_id: 550e8400-e29b-41d4-a716-446655440000
-                  payload:
-                    selected_candidate_id: cpx_pq_account_validation_v1
-      responses:
-        "200":
-          description: Draft created or updated.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DraftUpsertResponse"
-              examples:
-                upserted:
-                  value:
-                    draft_id: 550e8400-e29b-41d4-a716-446655440001
-                    saved_at: "2026-06-02T10:00:00Z"
-                    status: server_draft
-        "400":
-          $ref: "#/components/responses/DraftBadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-    delete:
-      tags: [drafts]
-      summary: Delete platform draft by id
-      description: |
-        **204** if deleted; **404** if unknown / out of scope / already deleted (idempotent). Removes
-        the platform draft to satisfy **W1** and unblock **`POST /api/discovery/v1/scan`** (WORKPLAN_API.md
-        §2.2, §2.4). **Never** deletes the Discovery scan row referenced by the draft.
-      operationId: deleteDrafts
-      parameters:
-        - name: id
-          in: query
-          required: true
-          schema:
-            type: string
-      responses:
-        "204":
-          description: Draft removed.
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "404":
-          $ref: "#/components/responses/NotFound"
-
   /wallet-challenges:
     post:
       tags: [wallet-authorization]
       summary: Obtain canonical wallet authorization message (stateless, mandatory before sign)
       description: |
-        **CP-PERSIST V1 — mandatory stateless helper.** Clients (Web UI, CLI, direct API) **must** call
-        this route to obtain the CPM-issued canonical authorization message before signing with
-        EIP-191 / `personal_sign`. The helper validates draft / scan / wallet bindings and returns the
-        canonical message plus `issued_at` / `expires_at`, but **stores nothing** server-side.
+        **Mandatory stateless helper.** Clients (Web UI, CLI, direct API) **must** call this route
+        to obtain the CPM-issued canonical authorization message before signing with
+        EIP-191 / `personal_sign`.
 
-        Advanced clients must **not** invent an alternative message format.
+        The request includes the **normative hashed payload** (closed field set). CPM computes
+        **`payload_sha256`** (JCS RFC 8785 + SHA-256) after normalizing `accepted_findings`
+        (lexicographic sort + dedupe), embeds it in the canonical message, and **stores nothing**.
+        There is **no** `draft_id` and no client-authoritative hash endpoint.
 
-        **EOA-only** for this release (`wallet_type = eoa` implied; other wallet types →
-        `UNSUPPORTED_WALLET_TYPE`).
+        **W2:** `scan_id` must be the latest completed owner-scoped Discovery wallet scan for the
+        address (else **422** `SCAN_NOT_LATEST`). Discovery unavailable → **503**
+        `DISCOVERY_UNAVAILABLE` (fail-closed).
 
-        **`POST /wallet-challenges/verify` is not part of the V1 security path** — signature verification
-        happens at **`POST /drafts/{draft_id}/persist`**.
+        **EOA-only** (`UNSUPPORTED_WALLET_TYPE` otherwise).
+
+        Signature verification happens at **`POST /policies`**, not here.
+        **`POST /wallet-challenges/verify` is not part of the security path.**
       operationId: postWalletChallenges
       requestBody:
         required: true
@@ -460,8 +467,44 @@ paths:
                   wallet_address: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0"
                   chain_id: 1
                   scan_id: 550e8400-e29b-41d4-a716-446655440000
-                  draft_id: 550e8400-e29b-41d4-a716-446655440001
                   action: persist_crypto_policy
+                  payload:
+                    schema_version: cafe.crypto_policy.v0.2
+                    crypto_policy_id: cpm_pq_account_validation_v1
+                    required_posture: hybrid
+                    user_constraints:
+                      allow_new_wallet: true
+                      address_continuity_required: false
+                      key_rotation_model: per_userop
+                    solution_profile_ref:
+                      provider_id: nicetry
+                      solution_profile_id: nicetry.fors_c.erc4337.v0_1
+                      manifest_version: "2026-08"
+                    accepted_provider_snapshot:
+                      maturity: research
+                      claim_status: declared
+                      resulting_posture: hybrid
+                      signature:
+                        scheme: FORS+C
+                        family: hash_based
+                        key_rotation_model: per_userop
+                      account_model:
+                        standard: ERC-4337
+                        execution_model: erc4337_bundler
+                        requires_bundler: true
+                      constraints:
+                        requires_new_account: true
+                        requires_local_signer_state: true
+                      chain_support_used:
+                        chain_id: "11155111"
+                        status: testnet_supported
+                        capabilities: [deploy, sign_userop, rotate_signer]
+                      references:
+                        - kind: source_repo
+                          url: https://github.com/RivaLabs-Core/NiceTry
+                          commit: 40a1286d18dee2a92631da82a52e484fa9a3628c
+                      accepted_findings: [requires_bundler, requires_local_signer_state]
+                    accepted_findings: [requires_bundler, requires_local_signer_state]
       responses:
         "200":
           description: Canonical authorization message ready for EIP-191 / personal_sign.
@@ -475,92 +518,16 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/WalletChallengeNotFound"
-        "409":
-          $ref: "#/components/responses/WalletChallengeConflict"
         "422":
-          $ref: "#/components/responses/UnsupportedWalletType"
-
-  /drafts/{draft_id}/persist:
-    post:
-      tags: [wallet-authorization, drafts]
-      summary: Persist draft to official CP (normative EOA route)
-      description: |
-        **Normative EOA CP persistence endpoint** (CP-PERSIST V1). Expresses the domain transition from
-        draft to persisted policy. The backend verifies at persist time (clients are **not** trusted):
-
-        - session auth and draft / scan ownership (user / tenant via JWT — **not** embedded in signed message)
-        - draft is not already persisted
-        - `signed_message` **exactly matches** the canonical message for wallet, chain, scan, draft,
-          `action = persist_crypto_policy` and validity window (`issued_at`, `expires_at`)
-        - EIP-191 / `personal_sign` signature recovers the expected EOA address
-        - max validity window **10 minutes**; `issued_at` not more than **30 seconds** in the future (clock skew)
-        - draft payload is a **cafe.crypto_policy.v0.2** document with `crypto_policy_id`,
-          `user_constraints`, `accepted_provider_snapshot`, soft findings listed in
-          `accepted_findings`, provider `references` that are **pinned** (not
-          `unpinned_pending_fixture`), and CPM rejeu couche A+B against the snapshot
-          (legacy `template_id` / `selection_request` → 400)
-
-        Transactional **persist-once** semantics: replay after success → `DRAFT_ALREADY_PERSISTED`.
-        If CP creation fails before the draft is marked persisted, the client may retry with the **same
-        signature** while still valid.
-
-        Raw signature bytes must **not** be stored in the durable database.
-        Provider/Nicetry logic stays in CPM; `cafe-persistence` stores the payload as opaque JSON.
-
-        Web UI, CLI and direct API **must** use this same contract.
-      operationId: postDraftPersist
-      parameters:
-        - name: draft_id
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Platform draft id (must match draft referenced in signed message).
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/DraftPersistRequest"
-            examples:
-              signedPersist:
-                value:
-                  wallet_address: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0"
-                  chain_id: 1
-                  scan_id: 550e8400-e29b-41d4-a716-446655440000
-                  signed_message: |
-                    CAFE Crypto Policy Persistence
-
-                    Domain: api.example.com
-                    Action: persist_crypto_policy
-                    Wallet: 0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0
-                    Chain ID: 1
-                    Scan ID: 550e8400-e29b-41d4-a716-446655440000
-                    Draft ID: 550e8400-e29b-41d4-a716-446655440001
-                    Issued At: 2026-06-10T12:00:00Z
-                    Expiration Time: 2026-06-10T12:10:00Z
-
-                    By signing this message, I prove control of the wallet and authorize CAFE to persist the selected Crypto Policy draft for this wallet.
-                  signature: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12"
-      responses:
-        "200":
-          description: Draft persisted to official CP (transactional persist-once).
+          description: |
+            Non-EOA wallet (`UNSUPPORTED_WALLET_TYPE`) or `scan_id` not latest completed
+            (`SCAN_NOT_LATEST`).
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DraftPersistResponse"
-        "400":
-          $ref: "#/components/responses/DraftPersistBadRequest"
-        "401":
-          $ref: "#/components/responses/DraftPersistUnauthorized"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "409":
-          $ref: "#/components/responses/DraftPersistConflict"
-        "410":
-          $ref: "#/components/responses/WalletAuthorizationExpired"
-        "422":
-          $ref: "#/components/responses/UnsupportedWalletType"
+                $ref: "#/components/schemas/WalletAuthorizationErrorResponse"
+        "503":
+          $ref: "#/components/responses/DiscoveryUnavailable"
 
 components:
   securitySchemes:
@@ -578,12 +545,6 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
-    DraftBadRequest:
-      description: Draft contract validation failure (structured `code`).
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/StructuredErrorResponse"
     NotFound:
       description: Unknown resource or idempotent delete miss.
       content:
@@ -593,51 +554,37 @@ components:
     WalletChallengeBadRequest:
       description: |
         Invalid wallet-challenge input (`WALLET_ADDRESS_REQUIRED`, `INVALID_WALLET_ADDRESS`,
-        `CHAIN_ID_REQUIRED`).
+        `CHAIN_ID_REQUIRED`, `CRYPTO_POLICY_PAYLOAD_INVALID` including `null`/`number` in hashed
+        subtree or unknown hashed fields).
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/WalletAuthorizationErrorResponse"
     WalletChallengeNotFound:
-      description: Unknown draft or scan (`DRAFT_NOT_FOUND`, `SCAN_NOT_FOUND`).
+      description: Unknown scan (`SCAN_NOT_FOUND`).
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/WalletAuthorizationErrorResponse"
-    WalletChallengeConflict:
-      description: |
-        Draft binding mismatch (`DRAFT_SCAN_MISMATCH`, `DRAFT_WALLET_MISMATCH`).
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/WalletAuthorizationErrorResponse"
-    DraftPersistBadRequest:
+    PolicyPersistBadRequest:
       description: |
         Missing or invalid persist authorization (`WALLET_CONTROL_PROOF_REQUIRED`,
-        `WALLET_AUTHORIZATION_NOT_YET_VALID`, `WALLET_AUTHORIZATION_VALIDITY_TOO_LONG`),
-        or CPM-P10 provider snapshot gate failures (`CRYPTO_POLICY_PAYLOAD_INVALID`,
-        `PROVIDER_REFS_UNPINNED`, `PROVIDER_SOFT_FINDINGS_REQUIRED`, `PROVIDER_CHAIN_PLANNED`,
+        `WALLET_AUTHORIZATION_NOT_YET_VALID`, `WALLET_AUTHORIZATION_VALIDITY_TOO_LONG`,
+        `PAYLOAD_SHA256_MISMATCH`), or provider snapshot gate failures
+        (`CRYPTO_POLICY_PAYLOAD_INVALID`, `PROVIDER_REFS_UNPINNED`,
+        `PROVIDER_SOFT_FINDINGS_REQUIRED`, `PROVIDER_CHAIN_PLANNED`,
         `PROVIDER_SCAN_COMPAT_FAILED`, `PROVIDER_USER_CONSTRAINTS_INCOMPATIBLE`).
-        Legacy `template_id` / missing `crypto_policy_id` / missing `user_constraints` →
-        `CRYPTO_POLICY_PAYLOAD_INVALID`.
+        Legacy `template_id` / missing closed hashed fields → `CRYPTO_POLICY_PAYLOAD_INVALID`.
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/WalletAuthorizationErrorResponse"
-    DraftPersistUnauthorized:
+    PolicyPersistConflict:
       description: |
-        Invalid or mismatched wallet signature (`INVALID_WALLET_SIGNATURE`,
-        `WALLET_SIGNATURE_ADDRESS_MISMATCH`).
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/WalletAuthorizationErrorResponse"
-    DraftPersistConflict:
-      description: |
-        Binding mismatch or already persisted (`WALLET_AUTHORIZATION_DRAFT_MISMATCH`,
-        `WALLET_AUTHORIZATION_SCAN_MISMATCH`, `WALLET_AUTHORIZATION_WALLET_MISMATCH`,
-        `WALLET_AUTHORIZATION_CHAIN_MISMATCH`, `WALLET_AUTHORIZATION_ACTION_MISMATCH`,
-        `DRAFT_ALREADY_PERSISTED`).
+        Binding mismatch on signed message (`WALLET_AUTHORIZATION_SCAN_MISMATCH`,
+        `WALLET_AUTHORIZATION_WALLET_MISMATCH`, `WALLET_AUTHORIZATION_CHAIN_MISMATCH`,
+        `WALLET_AUTHORIZATION_ACTION_MISMATCH`) or **W1** unique active policy
+        (`POLICY_ALREADY_EXISTS` — covers retry-after-success and conflicting second policy).
       content:
         application/json:
           schema:
@@ -650,6 +597,14 @@ components:
             $ref: "#/components/schemas/WalletAuthorizationErrorResponse"
     UnsupportedWalletType:
       description: Non-EOA wallet type for persistence (`UNSUPPORTED_WALLET_TYPE`).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/WalletAuthorizationErrorResponse"
+    DiscoveryUnavailable:
+      description: |
+        Discovery lookup required for W2 failed (fail-closed) — `DISCOVERY_UNAVAILABLE` on
+        `POST /wallet-challenges` and `POST /policies`.
       content:
         application/json:
           schema:
@@ -668,42 +623,50 @@ components:
     PolicyRecord:
       type: object
       required: [id, payload, created_at, updated_at]
-      description: Persisted instance (WORKPLAN_API.md §4.4, §8.3 `PolicyRecord`). Public JSON mirrors `draftRecordResponse` field naming.
+      description: |
+        Persisted instance (WORKPLAN_API.md §4.4, §8.3). After signed persist, exposes
+        server-authoritative `payload_sha256` for post-409 reconciliation.
       properties:
         id:
           type: string
         scan_id:
           type: string
           format: uuid
-          description: Required for Discovery→CPM flows; optional only for catalogue/fixture/manual-exception cases (§5.2).
+          description: Required for Discovery→CPM product flows (§5.2).
         payload:
           type: object
           additionalProperties: true
+        payload_sha256:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: |
+            Server-computed hex SHA-256 of JCS(hashed payload). Client-supplied values on write
+            are ignored. Present after signed persist (RD-P3+/P5).
+        wallet_control_method:
+          type: string
+          enum: [eoa_signature]
+        wallet_control_verified_at:
+          type: string
+          format: date-time
+        challenge_issued_at:
+          type: string
+          format: date-time
+        challenge_expires_at:
+          type: string
+          format: date-time
+        chain_id:
+          type: integer
+          format: int64
+          description: EOA binding chain from the verified signed message (not the scan chain list).
+        signed_message_hash:
+          type: string
+          description: Hash of the verified canonical message (no raw signature storage).
         created_at:
           type: string
           format: date-time
         updated_at:
           type: string
           format: date-time
-
-    PolicyRecordWrite:
-      type: object
-      required: [id, payload]
-      properties:
-        id:
-          type: string
-        scan_id:
-          type: string
-          format: uuid
-        binding:
-          type: string
-          enum: [discovery, fixture, catalog, none]
-          description: |
-            **`discovery`** (default when omitted): `scan_id` is mandatory (UUID) for Discovery→CPM persisted instances.
-            **`fixture`**, **`catalog`**, **`none`**: optional `scan_id` for non-product tests and catalogue-aligned payloads (WORKPLAN_API.md §5.2).
-        payload:
-          type: object
-          additionalProperties: true
 
     PolicyListByScanIdResponse:
       type: object
@@ -727,11 +690,10 @@ components:
     StructuredErrorResponse:
       type: object
       required: [code, message, details, request_id]
-      description: AUTH-04 style error payload (draft routes — CPM-DRAFT-1B).
+      description: AUTH-04 style structured error payload.
       properties:
         code:
           type: string
-          example: DRAFT_ID_REQUIRED
         message:
           type: string
         details:
@@ -739,64 +701,6 @@ components:
           additionalProperties: true
         request_id:
           type: string
-
-    DraftUpsertRequest:
-      type: object
-      required: [id, payload]
-      additionalProperties: false
-      description: |
-        Platform draft upsert body (WORKPLAN_API.md §4.4.1, CPM_DRAFT_1_PR.md).
-        Client generates stable `id` on first save; reuse on update.
-        `binding` is forbidden for drafts in CPM-DRAFT-1 (`DRAFT_BINDING_FORBIDDEN`).
-      properties:
-        id:
-          type: string
-          minLength: 1
-          description: Client-supplied draft key (required).
-        scan_id:
-          type: string
-          format: uuid
-          description: Optional Discovery scan binding (recommended for wallet flows).
-        payload:
-          type: object
-          additionalProperties: true
-          description: Required JSON object (may be empty `{}`).
-
-    DraftUpsertResponse:
-      type: object
-      required: [draft_id, saved_at, status]
-      description: Minimal upsert acknowledgement — no draft_version until store versioning exists.
-      properties:
-        draft_id:
-          type: string
-        saved_at:
-          type: string
-          format: date-time
-          description: Mapped from persistence `updated_at` (RFC3339 UTC).
-        status:
-          type: string
-          enum: [server_draft]
-          description: Platform work-in-progress; not a persisted policy instance.
-
-    DraftRecord:
-      type: object
-      required: [id, payload, created_at, updated_at]
-      description: Full draft row returned by GET …/drafts?id=….
-      properties:
-        id:
-          type: string
-        scan_id:
-          type: string
-          format: uuid
-        payload:
-          type: object
-          additionalProperties: true
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
 
     DecisionExploreRequest:
       type: object
@@ -1103,8 +1007,7 @@ components:
       type: object
       required: [code, message, details, request_id]
       description: |
-        CP-PERSIST wallet authorization errors (AUTH-04 style; see `docs/CP_PERSIST.md` § Error semantics).
-        Legacy `POST /policies` EOA blocking may also return `WALLET_CONTROL_PROOF_REQUIRED`.
+        CP-PERSIST wallet authorization errors (AUTH-04 style; see `docs/CP_PERSIST.md`).
       properties:
         code:
           $ref: "#/components/schemas/WalletAuthorizationErrorCode"
@@ -1118,15 +1021,14 @@ components:
 
     WalletAuthorizationErrorCode:
       type: string
-      description: CP-PERSIST V1 error codes (EOA wallet authorization).
+      description: CP-PERSIST error codes (EOA wallet authorization; no draft codes).
       enum:
         - WALLET_ADDRESS_REQUIRED
         - INVALID_WALLET_ADDRESS
         - CHAIN_ID_REQUIRED
-        - DRAFT_NOT_FOUND
         - SCAN_NOT_FOUND
-        - DRAFT_SCAN_MISMATCH
-        - DRAFT_WALLET_MISMATCH
+        - SCAN_NOT_LATEST
+        - DISCOVERY_UNAVAILABLE
         - UNSUPPORTED_WALLET_TYPE
         - WALLET_CONTROL_PROOF_REQUIRED
         - INVALID_WALLET_SIGNATURE
@@ -1134,12 +1036,12 @@ components:
         - WALLET_AUTHORIZATION_EXPIRED
         - WALLET_AUTHORIZATION_NOT_YET_VALID
         - WALLET_AUTHORIZATION_VALIDITY_TOO_LONG
-        - WALLET_AUTHORIZATION_DRAFT_MISMATCH
         - WALLET_AUTHORIZATION_SCAN_MISMATCH
         - WALLET_AUTHORIZATION_WALLET_MISMATCH
         - WALLET_AUTHORIZATION_CHAIN_MISMATCH
         - WALLET_AUTHORIZATION_ACTION_MISMATCH
-        - DRAFT_ALREADY_PERSISTED
+        - PAYLOAD_SHA256_MISMATCH
+        - POLICY_ALREADY_EXISTS
         - CRYPTO_POLICY_PAYLOAD_INVALID
         - PROVIDER_REFS_UNPINNED
         - PROVIDER_SOFT_FINDINGS_REQUIRED
@@ -1172,18 +1074,22 @@ components:
         - user_constraints
         - solution_profile_ref
         - accepted_provider_snapshot
+        - accepted_findings
+      additionalProperties: false
       description: |
-        Normative draft `payload` body for `POST /drafts/{draft_id}/persist` (ADR §9 / CPM-P10).
-        Requires `crypto_policy_id` + `user_constraints`; CPM rejoue couche A then couche B
-        against `accepted_provider_snapshot` before write. `template_id`, `selection_request`,
-        and top-level couche B fields are **rejected** (400). `policy_context` may coexist;
-        CP-PERSIST stamp fields are applied at persist.
+        Closed hashed payload set (ADR_20260824_remove_cp_drafts §3.2.1). Used as `payload` on
+        `POST /wallet-challenges` and `POST /policies`. Server builds JCS over exactly these
+        fields (after normalizing top-level `accepted_findings`: lexico sort + dedupe).
+        Types in the hashed subtree: **string | boolean | object | array only** — **no** `number`,
+        **no** `null`. Numeric identifiers (e.g. chain) are **strings**.
+        Top-level `accepted_findings` is authoritative for the fingerprint and persist rejeu;
+        if `accepted_provider_snapshot.accepted_findings` is present and diverges → 400.
+        Extra keys (including client `payload_sha256`) are rejected on this object.
+        `template_id` / `selection_request` / top-level couche B fields → 400.
       properties:
         schema_version:
           type: string
           enum: [cafe.crypto_policy.v0.2]
-        policy_kind:
-          type: string
         crypto_policy_id:
           type: string
           description: Catalogue Crypto Policy id (replaces legacy template_id).
@@ -1196,16 +1102,23 @@ components:
           $ref: "#/components/schemas/SolutionProfileRef"
         accepted_provider_snapshot:
           $ref: "#/components/schemas/AcceptedProviderSnapshot"
+        accepted_findings:
+          type: array
+          items:
+            type: string
+            enum: [requires_bundler, requires_local_signer_state]
+          description: |
+            Soft findings explicitly accepted by the user. Normalized server-side (and by clients
+            before challenge) via lexicographic sort + dedupe before JCS.
 
     AcceptedProviderSnapshot:
       type: object
       required: [maturity, claim_status, resulting_posture, signature, account_model, constraints, chain_support_used, references, accepted_findings]
       description: |
-        Frozen provider constraints at persist. `declared` is not audited/executed proof.
-        Soft findings (`requires_bundler`, `requires_local_signer_state`) must be listed when
-        snapshot flags are true. Refs must be pinned (not unpinned_pending_fixture).
-        Wallet-control proof is the CP-PERSIST signature, not an explore finding.
-        chain_support_used.status planned is not persistable.
+        Frozen provider constraints at persist. Nested under hashed payload — **no** `number`/`null`
+        anywhere in this subtree. `chain_support_used.chain_id` is a **string**.
+        Soft findings must be listed when snapshot flags require them. Refs must be pinned.
+        `status: planned` is not persistable.
       properties:
         maturity:
           type: string
@@ -1233,8 +1146,13 @@ components:
           required: [chain_id, status]
           additionalProperties: true
           properties:
-            chain_id: {type: integer, format: int64}
-            status: {type: string, enum: [testnet_supported, production_supported]}
+            chain_id:
+              type: string
+              description: Chain id as decimal string (hashed subtree forbids JSON numbers).
+              example: "11155111"
+            status:
+              type: string
+              enum: [testnet_supported, production_supported]
         references:
           type: array
           minItems: 1
@@ -1256,11 +1174,11 @@ components:
 
     WalletChallengeRequest:
       type: object
-      required: [wallet_address, chain_id, scan_id, draft_id, action]
+      required: [wallet_address, chain_id, scan_id, action, payload]
       additionalProperties: false
       description: |
-        Request canonical authorization message before EIP-191 / personal_sign (CP-PERSIST V1).
-        **EOA-only** for this release.
+        Request canonical authorization message before EIP-191 / personal_sign.
+        Includes the normative hashed `payload` (no `draft_id`). **EOA-only.**
       properties:
         wallet_address:
           type: string
@@ -1270,18 +1188,18 @@ components:
           type: integer
           format: int64
           minimum: 1
-          description: Target chain id for persistence.
+          description: |
+            EOA binding chain id for the signed message (outside the hashed payload).
+            Singular chain — not the scan `chain_ids` list.
         scan_id:
           type: string
           format: uuid
-          description: Discovery wallet scan id bound to the draft.
-        draft_id:
-          type: string
-          description: Platform draft id to persist.
+          description: Discovery wallet scan id (must be W2 latest completed for owner+address).
         action:
           type: string
           enum: [persist_crypto_policy]
-          description: Fixed action for CP persistence authorization.
+        payload:
+          $ref: "#/components/schemas/CryptoPolicyPersistPayload"
 
     WalletChallengeResponse:
       type: object
@@ -1290,18 +1208,18 @@ components:
         - wallet_address
         - chain_id
         - scan_id
-        - draft_id
         - action
+        - payload_sha256
         - issued_at
         - expires_at
       description: |
-        Canonical authorization message and metadata. `message` is the exact string the client must sign
-        (EIP-191 / personal_sign). Maximum validity window between `issued_at` and `expires_at` is
-        **10 minutes**.
+        Canonical authorization message and metadata. `message` is the exact string the client
+        must sign. Includes server-computed `payload_sha256`. Max validity **10 minutes**.
+        No `draft_id`.
       properties:
         message:
           type: string
-          description: Human-readable canonical message per CP_PERSIST.md §12.
+          description: Human-readable canonical message per CP_PERSIST.md (Payload SHA-256 line).
         wallet_address:
           type: string
         chain_id:
@@ -1310,37 +1228,41 @@ components:
         scan_id:
           type: string
           format: uuid
-        draft_id:
-          type: string
         action:
           type: string
           enum: [persist_crypto_policy]
+        payload_sha256:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: Server-computed hex SHA-256 of JCS(payload) after findings normalization.
         issued_at:
           type: string
           format: date-time
-          description: Message issuance time (RFC3339 UTC).
         expires_at:
           type: string
           format: date-time
-          description: Message expiration time (RFC3339 UTC; max 10 minutes after `issued_at`).
 
-    DraftPersistRequest:
+    PolicyPersistRequest:
       type: object
-      required: [wallet_address, chain_id, scan_id, signed_message, signature]
+      required: [wallet_address, chain_id, scan_id, signed_message, signature, payload]
       additionalProperties: false
       description: |
-        Signed wallet authorization for normative EOA CP persistence. `signed_message` must exactly match
-        the canonical message returned by `POST /wallet-challenges` for the same bindings and validity window.
+        Signed EOA persist body. `payload` must match the object hashed at challenge time.
+        Optional `payload_sha256` if present is **ignored** (server recomputes).
       properties:
         wallet_address:
           type: string
-          description: EOA wallet address (must match signed message and recovered signer).
         chain_id:
           type: integer
           format: int64
         scan_id:
           type: string
           format: uuid
+        payload:
+          $ref: "#/components/schemas/CryptoPolicyPersistPayload"
+        payload_sha256:
+          type: string
+          description: Ignored if supplied; server is the hash authority.
         signed_message:
           type: string
           description: Exact canonical message string signed with EIP-191 / personal_sign.
@@ -1349,25 +1271,22 @@ components:
           description: Hex-encoded EIP-191 signature (`0x` prefix).
           pattern: "^0x[0-9a-fA-F]+$"
 
-    DraftPersistResponse:
+    PolicyPersistResponse:
       type: object
       required:
         - policy_id
-        - draft_id
         - scan_id
         - wallet_address
         - chain_id
         - status
         - ownership_status
         - wallet_control_method
+        - payload_sha256
         - persisted_at
       description: |
-        Persisted CP acknowledgement. Does not include raw signature bytes.
+        Persisted CP acknowledgement. No `draft_id`. Does not include raw signature bytes.
       properties:
         policy_id:
-          type: string
-          description: Created persisted policy instance id.
-        draft_id:
           type: string
         scan_id:
           type: string
@@ -1383,11 +1302,12 @@ components:
         ownership_status:
           type: string
           enum: [verified]
-          description: Wallet control verified at persist time.
         wallet_control_method:
           type: string
           enum: [eoa_signature]
-          description: EOA EIP-191 / personal_sign for V1.
+        payload_sha256:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
         persisted_at:
           type: string
           format: date-time
