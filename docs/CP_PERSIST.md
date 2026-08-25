@@ -178,6 +178,7 @@ Rules:
 - Before JCS: lexicographic sort + dedupe of `accepted_findings` (client should pre-normalize; server always normalizes).
 - Client-supplied `payload_sha256` on write is **ignored**.
 - Shared vectors: [`internal/contract/testdata/payload_sha256/`](../internal/contract/testdata/payload_sha256/).
+- **Go authority (RD-P2):** [`internal/payloadhash`](../internal/payloadhash/) — `Digest` / `DigestJSON` + `NormalizeAcceptedFindings` (wired by RD-P4/P5; no HTTP change in P2).
 
 ### W2 + Discovery fail-closed
 

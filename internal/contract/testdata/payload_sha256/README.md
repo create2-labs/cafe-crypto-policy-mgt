@@ -17,15 +17,17 @@ Golden inputs for the **closed hashed payload** ([ADR_20260824_remove_cp_drafts 
 | ---- | ------- |
 | `hashed_payload_minimal.json` | Small closed-set baseline |
 | `hashed_payload_realistic_nested.json` | Realistic nested `accepted_provider_snapshot` (Nicetry-shaped) **without** number/null |
-| *(RD-P2)* | Findings order/dedupe invariance tested in Go lib against these vectors |
+
+Findings order/dedupe invariance is covered by Go tests in [`internal/payloadhash`](../../../payloadhash/) (RD-P2).
 
 ## Reject cases (not golden)
 
-RD-P2 must reject before JCS when the hashed subtree contains `null`, a JSON number, an unknown top-level hashed field, or a missing required closed field.
+`payloadhash.Digest` / `DigestJSON` reject before JCS when the hashed subtree contains `null`, a JSON number, an unknown top-level hashed field, or a missing required closed field.
 
 ## Consumers
 
-- RD-P2: Go `payloadhash` / `walletauth` table-driven tests
-- RD-P9+: frontend / CLI must match these digests
+- **RD-P2:** Go [`internal/payloadhash`](../../../payloadhash/) — table-driven tests vs these vectors
+- **RD-P4/P5:** challenge + persist handlers call the same Digester
+- **RD-P9+:** frontend / CLI must match these digests
 
-Hashes produced with Python `jcs` 0.2.1 (RFC 8785) for RD-P1; RD-P2 Go implementation must reproduce them.
+Hashes produced with Python `jcs` 0.2.1 (RFC 8785) for RD-P1; Go uses [`github.com/gowebpki/jcs`](https://github.com/gowebpki/jcs) (RFC 8785) and must reproduce them.

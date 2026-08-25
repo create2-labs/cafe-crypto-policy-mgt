@@ -10,13 +10,14 @@ See [ADR](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_pro
 
 ---
 
-## Remove CP drafts (ADR 2026-08-24) — **Validé** / RD-P1 in progress
+## Remove CP drafts (ADR 2026-08-24) — **Validé** / RD-P2 in progress
 
 Suppression des drafts CP (produit + API + tables). Exécution : [ADR](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260824_remove_cp_drafts.md) / [PR plan RD-P*](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260824_remove_cp_drafts_PR_PLAN.md).
 
 - **RD-P0** ✅ (cafe-adr)
-- **RD-P1** (cette PR) : OpenAPI + `CP_PERSIST.md` + vecteurs JCS — **contrat ahead of runtime**
-- **Next :** **RD-P2** (lib JCS / `payload_sha256`) ; **RD-P3** (persistence drop drafts) en parallèle possible
+- **RD-P1** ✅ ([#81](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/81)) : OpenAPI + `CP_PERSIST.md` + vecteurs JCS
+- **RD-P2** (cette PR) : lib [`internal/payloadhash`](./internal/payloadhash/) (JCS + `payload_sha256`) — **pas** de branchement HTTP
+- **Next :** **RD-P4** (wallet-challenges stateless, dépend P2) ; **RD-P3** (persistence drop drafts) // possible
 - FE après smokes backend (**RD-P8**). Détail IMM/TODO frontend → **RD-P14**.
 
 ---
