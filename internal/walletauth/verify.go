@@ -12,12 +12,15 @@ import (
 )
 
 // VerifyInput is the expected binding set for persist-time authorization checks.
+// Set PayloadSHA256 for the normative (RD-P4+) message binding, or DraftID for
+// legacy draft-persist until RD-P5 removes it.
 type VerifyInput struct {
 	Domain        string
 	WalletAddress string
 	ChainID       int64
 	ScanID        string
 	DraftID       string
+	PayloadSHA256 string
 	SignedMessage string
 	Signature     string
 	Now           time.Time
@@ -52,15 +55,17 @@ func VerifyAuthorization(in VerifyInput) error {
 		return err
 	}
 
-	expected := ExpectedMessage(
-		in.Domain,
-		normalizedWalletForMessage(in.WalletAddress),
-		in.ChainID,
-		strings.TrimSpace(in.ScanID),
-		strings.TrimSpace(in.DraftID),
-		parsed.IssuedAt,
-		parsed.ExpiresAt,
-	)
+	expected := ExpectedMessageFromFields(Fields{
+		Domain:        in.Domain,
+		Action:        ActionPersistCryptoPolicy,
+		WalletAddress: normalizedWalletForMessage(in.WalletAddress),
+		ChainID:       in.ChainID,
+		ScanID:        strings.TrimSpace(in.ScanID),
+		DraftID:       strings.TrimSpace(in.DraftID),
+		PayloadSHA256: strings.TrimSpace(in.PayloadSHA256),
+		IssuedAt:      parsed.IssuedAt,
+		ExpiresAt:     parsed.ExpiresAt,
+	})
 	if in.SignedMessage != expected {
 		return verificationError(CodeInvalidWalletSignature, "signed_message does not match the canonical authorization message")
 	}
@@ -96,7 +101,13 @@ func compareBindings(parsed Fields, in VerifyInput) error {
 	if parsed.Action != ActionPersistCryptoPolicy {
 		return verificationError(CodeWalletAuthorizationActionMismatch, "signed authorization action mismatch")
 	}
-	if strings.TrimSpace(parsed.DraftID) != strings.TrimSpace(in.DraftID) {
+	wantSHA := strings.TrimSpace(in.PayloadSHA256)
+	gotSHA := strings.TrimSpace(parsed.PayloadSHA256)
+	if wantSHA != "" || gotSHA != "" {
+		if wantSHA == "" || gotSHA == "" || !strings.EqualFold(wantSHA, gotSHA) {
+			return verificationError(CodePayloadSHA256Mismatch, "signed authorization payload_sha256 mismatch")
+		}
+	} else if strings.TrimSpace(parsed.DraftID) != strings.TrimSpace(in.DraftID) {
 		return verificationError(CodeWalletAuthorizationDraftMismatch, "signed authorization draft mismatch")
 	}
 	if strings.TrimSpace(parsed.ScanID) != strings.TrimSpace(in.ScanID) {
@@ -174,4 +185,3 @@ func addressesEqual(a, b string) bool {
 	}
 	return na == nb
 }
-

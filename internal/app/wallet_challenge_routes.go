@@ -8,16 +8,17 @@ import (
 	"time"
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/payloadhash"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/persistence"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/walletauth"
 )
 
 type walletChallengeRequest struct {
-	WalletAddress string `json:"wallet_address"`
-	ChainID       int64  `json:"chain_id"`
-	ScanID        string `json:"scan_id"`
-	DraftID       string `json:"draft_id"`
-	Action        string `json:"action"`
+	WalletAddress string          `json:"wallet_address"`
+	ChainID       int64           `json:"chain_id"`
+	ScanID        string          `json:"scan_id"`
+	Action        string          `json:"action"`
+	Payload       json.RawMessage `json:"payload"`
 }
 
 type walletChallengeResponse struct {
@@ -25,21 +26,26 @@ type walletChallengeResponse struct {
 	WalletAddress string `json:"wallet_address"`
 	ChainID       int64  `json:"chain_id"`
 	ScanID        string `json:"scan_id"`
-	DraftID       string `json:"draft_id"`
 	Action        string `json:"action"`
+	PayloadSHA256 string `json:"payload_sha256"`
 	IssuedAt      string `json:"issued_at"`
 	ExpiresAt     string `json:"expires_at"`
 }
 
-func registerWalletChallengeRoutes(mux *http.ServeMux, store persistence.PolicyStore, cfg authConfig, obs *authObservability) {
+// registerWalletChallengeRoutes registers POST /wallet-challenges.
+// RD-P4: strictly stateless — hash payload via payloadhash, build canonical
+// message, store nothing. No draft/policy store reads and no Discovery W2
+// (W2 engagement gates land in RD-P5). Legacy /drafts* handlers may still
+// exist elsewhere until RD-P5/P7.
+func registerWalletChallengeRoutes(mux *http.ServeMux, cfg authConfig, obs *authObservability) {
 	mux.HandleFunc("POST "+cpmroutes.WalletChallenges, func(w http.ResponseWriter, r *http.Request) {
-		handleWalletChallenge(w, r, store, cfg, obs)
+		handleWalletChallenge(w, r, cfg, obs)
 	})
 }
 
-func handleWalletChallenge(w http.ResponseWriter, r *http.Request, store persistence.PolicyStore, cfg authConfig, obs *authObservability) {
+func handleWalletChallenge(w http.ResponseWriter, r *http.Request, cfg authConfig, obs *authObservability) {
 	requestID := obs.ensureRequestID(w, r)
-	principal, ok := principalFromContext(r.Context())
+	_, ok := principalFromContext(r.Context())
 	if !ok {
 		obs.recordDecision(r, requestID, authCategoryOwner, authOutcomeDenied, authCodePrincipalRequired, authReasonPrincipalMissing, "", "")
 		obs.writeAuthError(w, r, http.StatusUnauthorized, authCodePrincipalRequired, errMsgAuthenticationRequired, reasonDetails(authReasonPrincipalMissing))
@@ -63,43 +69,9 @@ func handleWalletChallenge(w http.ResponseWriter, r *http.Request, store persist
 		return
 	}
 
-	draft, draftErr := store.GetDraft(principal, req.DraftID)
-	switch {
-	case errors.Is(draftErr, persistence.ErrDraftNotFound), errors.Is(draftErr, persistence.ErrForbidden):
-		writeWalletAuthorizationError(w, r, obs, http.StatusNotFound, walletAuthCodeDraftNotFound, "draft not found")
-		return
-	case draftErr != nil:
-		writeWalletAuthorizationError(w, r, obs, http.StatusInternalServerError, errCodeInternalError, errMsgInternalServerError)
-		return
-	}
-
-	if walletType := draftWalletType(draft.Payload); walletType != "" && !strings.EqualFold(walletType, "eoa") {
-		writeWalletAuthorizationError(w, r, obs, http.StatusUnprocessableEntity, walletAuthCodeUnsupportedWallet, "only EOA wallets are supported for CP persistence in V1")
-		return
-	}
-
-	draftWallet := walletAddressFromDraftPayload(draft.Payload)
-	if draftWallet == "" {
-		writeWalletAuthorizationError(w, r, obs, http.StatusConflict, walletAuthCodeDraftWalletMismatch, "draft wallet does not match requested wallet")
-		return
-	}
-	if !walletAddressesEqual(draftWallet, normWallet) {
-		writeWalletAuthorizationError(w, r, obs, http.StatusConflict, walletAuthCodeDraftWalletMismatch, "draft wallet does not match requested wallet")
-		return
-	}
-
-	draftScan := strings.TrimSpace(draft.ScanID)
-	if draftScan == "" {
-		writeWalletAuthorizationError(w, r, obs, http.StatusConflict, walletAuthCodeDraftScanMismatch, "draft scan does not match requested scan")
-		return
-	}
-	if !strings.EqualFold(draftScan, normScanID) {
-		writeWalletAuthorizationError(w, r, obs, http.StatusConflict, walletAuthCodeDraftScanMismatch, "draft scan does not match requested scan")
-		return
-	}
-
-	if scanErr := ensureWalletScanExists(r, cfg, requestID, normScanID); scanErr != nil {
-		writeWalletAuthorizationError(w, r, obs, scanErr.status, scanErr.code, scanErr.message)
+	digest, digestErr := payloadhash.DigestJSON(req.Payload)
+	if digestErr != nil {
+		writeWalletAuthorizationError(w, r, obs, http.StatusBadRequest, persistCodeCryptoPolicyPayloadInvalid, cryptoPolicyPayloadInvalidMessage(digestErr))
 		return
 	}
 
@@ -112,7 +84,7 @@ func handleWalletChallenge(w http.ResponseWriter, r *http.Request, store persist
 		WalletAddress: normWallet,
 		ChainID:       req.ChainID,
 		ScanID:        normScanID,
-		DraftID:       strings.TrimSpace(req.DraftID),
+		PayloadSHA256: digest,
 		IssuedAt:      issuedAt,
 		ExpiresAt:     expiresAt,
 	})
@@ -122,8 +94,8 @@ func handleWalletChallenge(w http.ResponseWriter, r *http.Request, store persist
 		WalletAddress: normWallet,
 		ChainID:       req.ChainID,
 		ScanID:        normScanID,
-		DraftID:       strings.TrimSpace(req.DraftID),
 		Action:        walletauth.ActionPersistCryptoPolicy,
+		PayloadSHA256: digest,
 		IssuedAt:      issuedAt.Format(time.RFC3339),
 		ExpiresAt:     expiresAt.Format(time.RFC3339),
 	})
@@ -154,16 +126,16 @@ func decodeWalletChallengeRequest(r *http.Request) (walletChallengeRequest, *wal
 			message: "chain_id is required",
 		}
 	}
-	if strings.TrimSpace(req.DraftID) == "" {
-		return walletChallengeRequest{}, &walletChallengeDecodeError{
-			code:    walletAuthCodeDraftNotFound,
-			message: "draft_id is required",
-		}
-	}
 	if strings.TrimSpace(req.ScanID) == "" {
 		return walletChallengeRequest{}, &walletChallengeDecodeError{
 			code:    walletAuthCodeScanNotFound,
 			message: "scan_id is required",
+		}
+	}
+	if len(req.Payload) == 0 || string(req.Payload) == "null" {
+		return walletChallengeRequest{}, &walletChallengeDecodeError{
+			code:    persistCodeCryptoPolicyPayloadInvalid,
+			message: "payload is required",
 		}
 	}
 	if action := strings.TrimSpace(req.Action); action == "" {
@@ -178,6 +150,17 @@ func decodeWalletChallengeRequest(r *http.Request) (walletChallengeRequest, *wal
 		}
 	}
 	return req, nil
+}
+
+func cryptoPolicyPayloadInvalidMessage(err error) string {
+	var pe *payloadhash.Error
+	if errors.As(err, &pe) && pe != nil && pe.Message != "" {
+		return pe.Message
+	}
+	if err != nil && err.Error() != "" {
+		return err.Error()
+	}
+	return "crypto policy payload is invalid"
 }
 
 type walletScanLookupError struct {

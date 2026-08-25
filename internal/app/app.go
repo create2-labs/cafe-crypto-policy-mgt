@@ -97,7 +97,7 @@ func handlerWithOwnerStore(serviceName string, store *api.ReadStore, ownerStore 
 	}
 	registerPoliciesAssessmentRequestRoute(mux, authCfg)
 	registerOwnerScopedRoutes(mux, ownerStore, obs)
-	registerWalletChallengeRoutes(mux, ownerStore, authCfg, obs)
+	registerWalletChallengeRoutes(mux, authCfg, obs)
 	registerDraftPersistRoutes(mux, ownerStore, authCfg, obs)
 	protected, err := withAuthentication(mux, authCfg)
 	if err != nil {
