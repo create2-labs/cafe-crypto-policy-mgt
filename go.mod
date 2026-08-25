@@ -5,6 +5,7 @@ go 1.26.6
 require (
 	github.com/create2-labs/cafe-contracts v0.0.2-0.20260820143337-15bfb255b4ed
 	github.com/ethereum/go-ethereum v1.17.2
+	github.com/gowebpki/jcs v1.0.1
 	github.com/nats-io/nats.go v1.51.0
 	github.com/prometheus/client_golang v1.23.2
 	go.yaml.in/yaml/v2 v2.4.2
