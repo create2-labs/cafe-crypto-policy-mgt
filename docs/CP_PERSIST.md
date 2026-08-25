@@ -128,7 +128,7 @@
 > **Supersedes** the draft-based CP-PERSIST V1 flow (`POST /drafts` → `POST /drafts/{id}/persist`).  
 > **Source of truth:** this section + [`openapi/cpm-v1.yaml`](../openapi/cpm-v1.yaml) + ADR §3.2.  
 > Historical Parts below (stories/PR breakdown with `draft_id`) remain for archaeology and are **not** the product contract.  
-> **Contract ahead of runtime (RD-P1):** handlers may still serve legacy `/drafts*` until RD-P4/P5; clients must follow this contract for new work.
+> **Contract ahead of runtime:** OpenAPI + this section are normative. **RD-P4** wires `POST /wallet-challenges` (stateless hash + canonical message; **no W2** yet). **RD-P5** adds W2 on challenge/persist, `POST /policies` signed, and removes `/drafts*` handlers. Until then, legacy draft handlers may still exist in the binary — clients must follow this contract for new work.
 
 ### Product flow (EOA)
 
@@ -178,11 +178,13 @@ Rules:
 - Before JCS: lexicographic sort + dedupe of `accepted_findings` (client should pre-normalize; server always normalizes).
 - Client-supplied `payload_sha256` on write is **ignored**.
 - Shared vectors: [`internal/contract/testdata/payload_sha256/`](../internal/contract/testdata/payload_sha256/).
-- **Go authority (RD-P2):** [`internal/payloadhash`](../internal/payloadhash/) — `Digest` / `DigestJSON` + `NormalizeAcceptedFindings` (wired by RD-P4/P5; no HTTP change in P2).
+- **Go authority (RD-P2):** [`internal/payloadhash`](../internal/payloadhash/) — `Digest` / `DigestJSON` + `NormalizeAcceptedFindings`. **RD-P4** wires digest into `POST /wallet-challenges`. Persist write → RD-P5.
 
 ### W2 + Discovery fail-closed
 
-`POST /wallet-challenges` and `POST /policies` require `scan_id` = **latest completed** owner-scoped Discovery wallet scan for the address (**W2**). Non-latest → **422** `SCAN_NOT_LATEST`. Discovery unavailable → **503** `DISCOVERY_UNAVAILABLE`. Explore W2 wiring completes in RD-P6.
+**Contract:** `POST /wallet-challenges` and `POST /policies` require `scan_id` = **latest completed** owner-scoped Discovery wallet scan for the address (**W2**). Non-latest → **422** `SCAN_NOT_LATEST`. Discovery unavailable → **503** `DISCOVERY_UNAVAILABLE`. Explore W2 wiring completes in RD-P6.
+
+**Runtime (RD-P4):** challenge handler is **strictly stateless** (hash + message only) — **no W2 / Discovery call** yet. W2 engagement gates on challenge + persist land in **RD-P5**.
 
 ### Signature ≠ business bypass
 
