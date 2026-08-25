@@ -1,0 +1,80 @@
+{
+  "schema_version": "cafe.crypto_policy.v0.2",
+  "crypto_policy_id": "cpm_pq_account_validation_v1",
+  "required_posture": "hybrid",
+  "user_constraints": {
+    "allow_new_wallet": true,
+    "address_continuity_required": false,
+    "key_rotation_model": "per_userop"
+  },
+  "solution_profile_ref": {
+    "provider_id": "nicetry",
+    "solution_profile_id": "nicetry.fors_c.erc4337.v0_1",
+    "manifest_version": "2026-08",
+    "verification_date": "2026-08-03"
+  },
+  "accepted_provider_snapshot": {
+    "maturity": "research",
+    "claim_status": "declared",
+    "resulting_posture": "hybrid",
+    "input_requirements": {
+      "wallet_types": [
+        "EOA"
+      ],
+      "requires_wallet_control_proof": true
+    },
+    "signature": {
+      "scheme": "FORS+C",
+      "family": "hash_based",
+      "key_rotation_model": "per_userop"
+    },
+    "account_model": {
+      "standard": "ERC-4337",
+      "execution_model": "erc4337_bundler",
+      "requires_bundler": true,
+      "requires_entrypoint": true,
+      "entrypoint_versions": [
+        "0.7"
+      ]
+    },
+    "constraints": {
+      "requires_new_account": true,
+      "address_continuity_supported": false,
+      "requires_local_signer_state": true
+    },
+    "chain_support_used": {
+      "chain_id": "11155111",
+      "network": "sepolia",
+      "status": "testnet_supported",
+      "capabilities": [
+        "deploy",
+        "sign_userop",
+        "rotate_signer"
+      ]
+    },
+    "references": [
+      {
+        "kind": "source_repo",
+        "url": "https://github.com/RivaLabs-Core/NiceTry",
+        "commit": "40a1286d18dee2a92631da82a52e484fa9a3628c"
+      },
+      {
+        "kind": "protocol_spec",
+        "url": "https://github.com/RivaLabs-Core/Ephemeral-Keys-Protocol",
+        "version": "ac140c71d400449adec18884c4fd3373592292f3"
+      }
+    ],
+    "accepted_findings": [
+      "requires_bundler",
+      "requires_local_signer_state"
+    ],
+    "accepted_risk_notes": [
+      "FORS+C parameters are still presented as tunable by upstream documentation.",
+      "Signer state management and bounded reuse semantics are part of the security model."
+    ]
+  },
+  "accepted_findings": [
+    "requires_bundler",
+    "requires_local_signer_state"
+  ]
+}

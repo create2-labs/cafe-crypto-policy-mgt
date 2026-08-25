@@ -12,7 +12,7 @@ import (
 
 // RD-P1: shared payload_sha256 vectors must be free of JSON number/null in the hashed subtree.
 func TestPayloadSHA256Vectors_NoNumberOrNull(t *testing.T) {
-	dir := filepath.Join("..", "..", "testdata", "payload_sha256")
+	dir := filepath.Join("testdata", "payload_sha256")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		t.Fatalf("read testdata: %v", err)
@@ -52,7 +52,7 @@ func TestPayloadSHA256Vectors_NoNumberOrNull(t *testing.T) {
 }
 
 func TestPayloadSHA256Vectors_RealisticNestedPresent(t *testing.T) {
-	dir := filepath.Join("..", "..", "testdata", "payload_sha256")
+	dir := filepath.Join("testdata", "payload_sha256")
 	raw, err := os.ReadFile(filepath.Join(dir, "hashed_payload_realistic_nested.json"))
 	if err != nil {
 		t.Fatal(err)

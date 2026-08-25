@@ -177,7 +177,7 @@ Rules:
 - Chain ids inside the snapshot are **strings** (e.g. `"11155111"`).
 - Before JCS: lexicographic sort + dedupe of `accepted_findings` (client should pre-normalize; server always normalizes).
 - Client-supplied `payload_sha256` on write is **ignored**.
-- Shared vectors: [`testdata/payload_sha256/`](../testdata/payload_sha256/).
+- Shared vectors: [`internal/contract/testdata/payload_sha256/`](../internal/contract/testdata/payload_sha256/).
 
 ### W2 + Discovery fail-closed
 
