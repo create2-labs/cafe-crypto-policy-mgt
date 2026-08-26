@@ -11,19 +11,20 @@ const (
 	walletAuthCodeDiscoveryUnavailable = "DISCOVERY_UNAVAILABLE"
 )
 
-// engagementW2Error is returned when W2 (latest completed owner-scoped scan) fails.
-type engagementW2Error struct {
+// w2GateError is returned when W2 (latest completed owner-scoped scan) fails.
+// Shared by explore, wallet-challenges, and signed POST /policies (RD-P6).
+type w2GateError struct {
 	code    string
 	message string
 	status  int
 }
 
-// ensureEngagementW2 requires scanID to be the latest completed Discovery wallet
+// ensureOwnerScopedW2 requires scanID to be the latest completed Discovery wallet
 // scan for walletAddress (owner-scoped via the caller's JWT). Fail-closed when
-// Discovery is unset, times out, or returns 5xx (RD-P5).
-func ensureEngagementW2(ctx context.Context, r *http.Request, cfg authConfig, requestID, walletAddress, scanID string) *engagementW2Error {
+// Discovery is unset, times out, or returns 5xx (ADR §3.2 norme 8 / RD-P5–P6).
+func ensureOwnerScopedW2(ctx context.Context, r *http.Request, cfg authConfig, requestID, walletAddress, scanID string) *w2GateError {
 	if strings.TrimSpace(cfg.DiscoveryHTTPBaseURL) == "" {
-		return &engagementW2Error{
+		return &w2GateError{
 			code:    walletAuthCodeDiscoveryUnavailable,
 			message: "discovery is unavailable",
 			status:  http.StatusServiceUnavailable,
@@ -35,14 +36,14 @@ func ensureEngagementW2(ctx context.Context, r *http.Request, cfg authConfig, re
 	}
 	latest, err := fetchWalletLatestCompletedScanID(ctx, cfg, authz, requestID, walletAddress)
 	if err != nil {
-		return &engagementW2Error{
+		return &w2GateError{
 			code:    walletAuthCodeDiscoveryUnavailable,
 			message: "discovery is unavailable",
 			status:  http.StatusServiceUnavailable,
 		}
 	}
 	if strings.TrimSpace(latest) == "" {
-		return &engagementW2Error{
+		return &w2GateError{
 			code:    walletAuthCodeScanNotLatest,
 			message: "scan_id is not the latest completed wallet scan for this address",
 			status:  http.StatusUnprocessableEntity,
@@ -50,14 +51,14 @@ func ensureEngagementW2(ctx context.Context, r *http.Request, cfg authConfig, re
 	}
 	normLatest, normErr := NormalizeDiscoveryScanID(latest)
 	if normErr != nil {
-		return &engagementW2Error{
+		return &w2GateError{
 			code:    walletAuthCodeDiscoveryUnavailable,
 			message: "discovery is unavailable",
 			status:  http.StatusServiceUnavailable,
 		}
 	}
 	if !strings.EqualFold(normLatest, strings.TrimSpace(scanID)) {
-		return &engagementW2Error{
+		return &w2GateError{
 			code:    walletAuthCodeScanNotLatest,
 			message: "scan_id is not the latest completed wallet scan for this address",
 			status:  http.StatusUnprocessableEntity,
@@ -65,4 +66,3 @@ func ensureEngagementW2(ctx context.Context, r *http.Request, cfg authConfig, re
 	}
 	return nil
 }
-

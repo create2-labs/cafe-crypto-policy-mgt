@@ -10,7 +10,7 @@ See [ADR](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_pro
 
 ---
 
-## Remove CP drafts (ADR 2026-08-24) — **Validé** / RD-P4 in progress
+## Remove CP drafts (ADR 2026-08-24) — **Validé** / RD-P6 in progress
 
 Suppression des drafts CP (produit + API + tables). Exécution : [ADR](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260824_remove_cp_drafts.md) / [PR plan RD-P*](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260824_remove_cp_drafts_PR_PLAN.md).
 
@@ -18,10 +18,11 @@ Suppression des drafts CP (produit + API + tables). Exécution : [ADR](https://g
 - **RD-P1** ✅ ([#81](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/81)) : OpenAPI + `CP_PERSIST.md` + vecteurs JCS
 - **RD-P2** ✅ ([#82](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/82)) : lib [`internal/payloadhash`](./internal/payloadhash/) (JCS + `payload_sha256`)
 - **RD-P3** ✅ ([cafe-persistence #9](https://github.com/create2-labs/cafe-persistence/pull/9)) : drop draft tables / W1 / audit
-- **RD-P4** (cette PR) : `POST /wallet-challenges` **stateless** (payload → `payload_sha256` → message canonique ; **pas** W2 / pas de lecture store)
-- **Next :** **RD-P5** (`POST /policies` signé + W2 engagement + retrait `/drafts*`)
+- **RD-P4** ✅ ([#83](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/83)) : `POST /wallet-challenges` stateless
+- **RD-P5** ✅ ([#84](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/84) + deploy [#42](https://github.com/create2-labs/cafe-deploy/pull/42)) : signed `POST /policies` + W2 engagement + retrait `/drafts*`
+- **RD-P6** (cette PR) : harmoniser W2 explore + helper partagé `ensureOwnerScopedW2` + smoke W2
+- **Next :** **RD-P7** (dead code sweep draft)
 - FE après smokes backend (**RD-P8**). Détail IMM/TODO frontend → **RD-P14**.
-- **Note runtime :** handlers `/drafts*` + `drafts/{id}/persist` **peuvent encore exister** jusqu’à RD-P5/P7 (contrat OpenAPI déjà sans drafts).
 ---
 ## Open — Retirer entièrement le mode CPM mock (frontend)
 
