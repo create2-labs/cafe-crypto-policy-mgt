@@ -128,7 +128,7 @@
 > **Supersedes** the draft-based CP-PERSIST V1 flow (`POST /drafts` → `POST /drafts/{id}/persist`).  
 > **Source of truth:** this section + [`openapi/cpm-v1.yaml`](../openapi/cpm-v1.yaml) + ADR §3.2.  
 > Historical Parts below (stories/PR breakdown with `draft_id`) remain for archaeology and are **not** the product contract.  
-> **Contract / runtime:** OpenAPI + this section are normative. **RD-P4** wired `POST /wallet-challenges` (stateless hash + canonical message). **RD-P5** adds W2 on challenge/persist, signed `POST /policies`, and removes `/drafts*` handlers. Explore W2 harmonization → **RD-P6**. Store draft methods may remain until **RD-P7** dead-code sweep.
+> **Contract / runtime:** OpenAPI + this section are normative. **RD-P4** wired `POST /wallet-challenges` (stateless hash + canonical message). **RD-P5** adds W2 on challenge/persist, signed `POST /policies`, and removes `/drafts*` handlers. **RD-P6** harmonizes explore onto the same owner-scoped W2 helper (`SCAN_NOT_LATEST` / `DISCOVERY_UNAVAILABLE`). Store draft methods may remain until **RD-P7** dead-code sweep.
 
 ### Product flow (EOA)
 
@@ -183,9 +183,9 @@ Rules:
 
 ### W2 + Discovery fail-closed
 
-**Contract:** `POST /wallet-challenges` and `POST /policies` require `scan_id` = **latest completed** owner-scoped Discovery wallet scan for the address (**W2**). Non-latest → **422** `SCAN_NOT_LATEST`. Discovery unavailable → **503** `DISCOVERY_UNAVAILABLE`. Explore W2 wiring completes in RD-P6.
+**Contract:** `POST /policies/decisions/explore`, `POST /wallet-challenges`, and `POST /policies` require `scan_id` = **latest completed** owner-scoped Discovery wallet scan for the address (**W2**). Non-latest → **422** `SCAN_NOT_LATEST`. Discovery unavailable → **503** `DISCOVERY_UNAVAILABLE`.
 
-**Runtime (RD-P5):** `POST /wallet-challenges` and `POST /policies` enforce **W2** (latest completed owner-scoped scan). Discovery unset / timeout / 5xx → **503** `DISCOVERY_UNAVAILABLE`. Non-latest → **422** `SCAN_NOT_LATEST`. Explore W2 → **RD-P6**.
+**Runtime (RD-P6):** shared helper `ensureOwnerScopedW2` gates explore (auth middleware), challenge, and persist. Discovery unset / timeout / 5xx → **503** `DISCOVERY_UNAVAILABLE`. Non-latest → **422** `SCAN_NOT_LATEST`. Legacy IMM-10 codes `SCAN_ID_NOT_LATEST_FOR_TARGET` / `LATEST_SCAN_NOT_COMPLETED` are no longer emitted on explore.
 
 ### Signature ≠ business bypass
 

@@ -78,7 +78,7 @@ func handlePolicyPersist(w http.ResponseWriter, r *http.Request, store persisten
 		return
 	}
 
-	if w2Err := ensureEngagementW2(r.Context(), r, cfg, requestID, normWallet, normScanID); w2Err != nil {
+	if w2Err := ensureOwnerScopedW2(r.Context(), r, cfg, requestID, normWallet, normScanID); w2Err != nil {
 		writeWalletAuthorizationError(w, r, obs, w2Err.status, w2Err.code, w2Err.message)
 		return
 	}

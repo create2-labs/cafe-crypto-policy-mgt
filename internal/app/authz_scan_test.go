@@ -224,7 +224,8 @@ func TestWithAuthenticationAllowsRequestWhenScanAuthzAllowed(t *testing.T) {
 	}
 }
 
-func TestWithAuthentication_IMM10_W7RejectsWhenNewestIsFailed(t *testing.T) {
+func TestWithAuthentication_RDP6_W2AllowsLatestCompletedEvenIfNewestRowFailed(t *testing.T) {
+	const latestScanID = "705c9704-9428-45e0-882d-fae4cb9d2a0b"
 	introspect := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"accepted":true}`))
@@ -239,16 +240,21 @@ func TestWithAuthentication_IMM10_W7RejectsWhenNewestIsFailed(t *testing.T) {
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/discovery/v1/wallets/scans/"):
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"scan_id":"705c9704-9428-45e0-882d-fae4cb9d2a0b","status":"completed","result":{"target_address":"0xabc"}}`))
-		case r.URL.Path == "/discovery/v1/wallets/scans" && r.URL.Query().Get("limit") == "1":
+			_, _ = w.Write([]byte(`{"scan_id":"` + latestScanID + `","status":"completed","result":{"target_address":"0xabc"}}`))
+		case r.URL.Path == "/discovery/v1/wallets/scans" && r.URL.Query().Get("latest") == "true":
+			// Newest row may be failed/pending; W2 only requires latest completed.
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"items":[{"scan_id":"scan-newest","status":"failed"}],"total":1,"limit":1,"offset":0}`))
+			_, _ = w.Write([]byte(`{"items":[{"scan_id":"` + latestScanID + `","status":"completed"}],"total":1,"limit":1,"offset":0}`))
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
 	defer discovery.Close()
-	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+	called := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	})
 	handler, err := withAuthentication(next, authConfig{
 		Required:                    true,
 		SessionValidationURL:        introspect.URL,
@@ -270,16 +276,19 @@ func TestWithAuthentication_IMM10_W7RejectsWhenNewestIsFailed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("make token: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, strings.NewReader(`{"scan_id":"705c9704-9428-45e0-882d-fae4cb9d2a0b","crypto_policy_id":"cpm_pq_account_validation_v1","policy_context":{"scan_id":"705c9704-9428-45e0-882d-fae4cb9d2a0b","wallet_type":"EOA","current_pq_posture":"classical_only","chain_ids":[1],"scanned_at":"2026-01-01T00:00:00Z"}}`))
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, strings.NewReader(`{"scan_id":"`+latestScanID+`","crypto_policy_id":"cpm_pq_account_validation_v1","policy_context":{"scan_id":"`+latestScanID+`","wallet_type":"EOA","current_pq_posture":"classical_only","chain_ids":[1],"scanned_at":"2026-01-01T00:00:00Z"}}`))
 	req.Header.Set("Authorization", "Bearer "+token)
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, req)
-	if res.Code != http.StatusBadRequest || !strings.Contains(res.Body.String(), "LATEST_SCAN_NOT_COMPLETED") {
-		t.Fatalf("want 400 LATEST_SCAN_NOT_COMPLETED, got %d body=%s", res.Code, res.Body.String())
+	if res.Code != http.StatusOK {
+		t.Fatalf("want 200 explore on latest completed (W2), got %d body=%s", res.Code, res.Body.String())
+	}
+	if !called {
+		t.Fatalf("expected next handler to be called")
 	}
 }
 
-func TestWithAuthentication_IMM10_W2RejectsHistoricalScanID(t *testing.T) {
+func TestWithAuthentication_RDP6_W2RejectsHistoricalScanID(t *testing.T) {
 	introspect := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"accepted":true}`))
@@ -295,9 +304,6 @@ func TestWithAuthentication_IMM10_W2RejectsHistoricalScanID(t *testing.T) {
 		case strings.HasPrefix(r.URL.Path, "/discovery/v1/wallets/scans/"):
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"scan_id":"705c9704-9428-45e0-882d-fae4cb9d2a0b","status":"completed","result":{"target_address":"0xabc"}}`))
-		case r.URL.Path == "/discovery/v1/wallets/scans" && r.URL.Query().Get("limit") == "1":
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"items":[{"scan_id":"scan-newest","status":"completed"}],"total":1,"limit":1,"offset":0}`))
 		case r.URL.Path == "/discovery/v1/wallets/scans" && r.URL.Query().Get("latest") == "true":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"items":[{"scan_id":"11111111-1111-4111-8111-111111111111","status":"completed"}],"total":1,"limit":1,"offset":0}`))
@@ -332,8 +338,59 @@ func TestWithAuthentication_IMM10_W2RejectsHistoricalScanID(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+token)
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, req)
-	if res.Code != http.StatusBadRequest || !strings.Contains(res.Body.String(), "SCAN_ID_NOT_LATEST_FOR_TARGET") {
-		t.Fatalf("want 400 SCAN_ID_NOT_LATEST_FOR_TARGET, got %d body=%s", res.Code, res.Body.String())
+	if res.Code != http.StatusUnprocessableEntity || !strings.Contains(res.Body.String(), "SCAN_NOT_LATEST") {
+		t.Fatalf("want 422 SCAN_NOT_LATEST, got %d body=%s", res.Code, res.Body.String())
+	}
+}
+
+func TestWithAuthentication_RDP6_ExploreDiscoveryUnavailable(t *testing.T) {
+	introspect := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"accepted":true}`))
+	}))
+	defer introspect.Close()
+	authzServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"allowed":true}`))
+	}))
+	defer authzServer.Close()
+	discovery := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/discovery/v1/wallets/scans/") {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"scan_id":"705c9704-9428-45e0-882d-fae4cb9d2a0b","status":"completed","result":{"target_address":"0xabc"}}`))
+			return
+		}
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer discovery.Close()
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+	handler, err := withAuthentication(next, authConfig{
+		Required:                    true,
+		SessionValidationURL:        introspect.URL,
+		SessionValidationTimeoutSec: 1,
+		ScanAuthorizationURL:        authzServer.URL,
+		ScanAuthorizationTimeoutSec: 1,
+		DiscoveryHTTPBaseURL:        discovery.URL,
+		DiscoveryHTTPTimeoutSec:     1,
+		ClockSkewSec:                30,
+	})
+	if err != nil {
+		t.Fatalf("withAuthentication: %v", err)
+	}
+	token, err := makeTokenEnvelope(map[string]any{
+		"user_id": "u1",
+		"email":   "u@example.com",
+		"exp":     time.Now().Add(time.Hour).Unix(),
+	}, []string{"EdDSA", "ML-DSA-65"})
+	if err != nil {
+		t.Fatalf("make token: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, strings.NewReader(`{"scan_id":"705c9704-9428-45e0-882d-fae4cb9d2a0b","policy_context":{"wallet_address":"0xabc","wallet_type":"eoa","chain_ids":[1]}}`))
+	req.Header.Set("Authorization", "Bearer "+token)
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusServiceUnavailable || !strings.Contains(res.Body.String(), "DISCOVERY_UNAVAILABLE") {
+		t.Fatalf("want 503 DISCOVERY_UNAVAILABLE, got %d body=%s", res.Code, res.Body.String())
 	}
 }
 

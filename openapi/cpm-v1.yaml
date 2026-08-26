@@ -20,13 +20,13 @@ info:
     **`POST /policies`** (signed body). Maximum signed message validity: **10 minutes**. **EOA-only**.
     **`POST /wallet-challenges/verify` is not a security requirement.**
 
-    **W2 (owner-scoped latest completed scan):** `POST /wallet-challenges` and `POST /policies`
-    require `scan_id` to be the latest completed Discovery wallet scan for the authenticated user
-    and address. Non-latest completed → **422** `SCAN_NOT_LATEST`. Discovery unavailable → **503**
-    `DISCOVERY_UNAVAILABLE` (fail-closed). Explore W2 harmonization lands with RD-P6.
+    **W2 (owner-scoped latest completed scan):** `POST /policies/decisions/explore`,
+    `POST /wallet-challenges`, and `POST /policies` require `scan_id` to be the latest completed
+    Discovery wallet scan for the authenticated user and address. Non-latest completed → **422**
+    `SCAN_NOT_LATEST`. Discovery unavailable → **503** `DISCOVERY_UNAVAILABLE` (fail-closed).
 
-    **Contract / runtime (RD-P5):** OpenAPI matches signed `POST /policies` and
-    `POST /wallet-challenges` with W2 engagement. Explore W2 harmonization lands with RD-P6.
+    **Contract / runtime (RD-P6):** OpenAPI matches signed `POST /policies`,
+    `POST /wallet-challenges`, and explore with shared owner-scoped W2.
 
     **Public URL prefix:** `/api/cpm/v1`. Do **not** publish paths like `/api/cpm/v1/cpm/...` (no duplicated `cpm` segment).
 
@@ -159,6 +159,10 @@ paths:
         Discovery **`current_pq_posture`** labels `pq_ready` / `not_pq_ready` map to evaluator exports;
         `wallet_type` **`smart_account`** maps like Option A `AA`.
 
+        **W2 (RD-P6):** `scan_id` must be the latest completed owner-scoped Discovery wallet scan for the
+        address (else **422** `SCAN_NOT_LATEST`). Discovery unavailable → **503** `DISCOVERY_UNAVAILABLE`
+        (fail-closed). Same helper as `POST /wallet-challenges` and `POST /policies`.
+
         Legacy **`selection_request`** / couche-B fields → **400**. Public output key is
         **`scan_compatible_providers`** with ADR couche A match (CPM-P9b): posture, wallet type,
         deployable chain + capabilities (`deploy`, `sign_userop`, + `rotate_signer` if `per_userop`),
@@ -182,6 +186,22 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Scan not found or not a wallet scan.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: |
+            `scan_id` is not the latest completed owner-scoped wallet scan for the address
+            (`SCAN_NOT_LATEST`).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WalletAuthorizationErrorResponse"
+        "503":
+          $ref: "#/components/responses/DiscoveryUnavailable"
 
   /policies/assessment/request:
     post:
@@ -604,7 +624,7 @@ components:
     DiscoveryUnavailable:
       description: |
         Discovery lookup required for W2 failed (fail-closed) — `DISCOVERY_UNAVAILABLE` on
-        `POST /wallet-challenges` and `POST /policies`.
+        `POST /policies/decisions/explore`, `POST /wallet-challenges`, and `POST /policies`.
       content:
         application/json:
           schema:

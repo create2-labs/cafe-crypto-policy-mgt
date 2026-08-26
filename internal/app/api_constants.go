@@ -16,11 +16,10 @@ const (
 	errMsgScanNotFound                 = "scan not found"
 	errMsgScanAuthorizationUnavailable = "scan authorization unavailable"
 
-	errCodeNotFound                     = "not_found"
-	errCodeDiscoveryUnavailable         = "discovery_unavailable"
-	errCodeInternalError                = "internal_error"
-	errCodeDiscoveryUpstreamUnavailable = "DISCOVERY_UPSTREAM_UNAVAILABLE"
-	errCodePersistenceUnavailable       = "PERSISTENCE_UNAVAILABLE"
+	errCodeNotFound               = "not_found"
+	errCodeDiscoveryUnavailable   = "discovery_unavailable"
+	errCodeInternalError          = "internal_error"
+	errCodePersistenceUnavailable = "PERSISTENCE_UNAVAILABLE"
 
 	authOutcomeDenied        = "denied"
 	authOutcomeUnavailable   = "unavailable"

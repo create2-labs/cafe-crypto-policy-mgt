@@ -161,9 +161,6 @@ func enforceScanImmutabilityGuards(ctx context.Context, r *http.Request, cfg aut
 	if !isImmutabilityGuardRoute(r) {
 		return nil, http.StatusOK
 	}
-	if strings.TrimSpace(cfg.DiscoveryHTTPBaseURL) == "" {
-		return nil, http.StatusOK
-	}
 	scanIDs, scanErr, status := extractScanIDsForAuthorization(r)
 	if scanErr.Code != "" || len(scanIDs) == 0 {
 		return nil, status
@@ -171,6 +168,15 @@ func enforceScanImmutabilityGuards(ctx context.Context, r *http.Request, cfg aut
 	requestedScanID, err := NormalizeDiscoveryScanID(scanIDs[0])
 	if err != nil {
 		return nil, http.StatusOK
+	}
+	// RD-P6: explore uses the same W2 helper as challenge/persist (422 SCAN_NOT_LATEST /
+	// 503 DISCOVERY_UNAVAILABLE). Resolve owner-scoped address from Discovery scan detail
+	// first (404 if unknown / non-wallet), then require latest completed.
+	if strings.TrimSpace(cfg.DiscoveryHTTPBaseURL) == "" {
+		return &immutabilityGuardError{
+			code:    walletAuthCodeDiscoveryUnavailable,
+			message: "discovery is unavailable",
+		}, http.StatusServiceUnavailable
 	}
 	authz := r.Header.Get("Authorization")
 	targetAddress, derr := fetchWalletTargetAddressForScan(ctx, cfg, authz, requestID, requestedScanID)
@@ -183,8 +189,8 @@ func enforceScanImmutabilityGuards(ctx context.Context, r *http.Request, cfg aut
 			}, http.StatusNotFound
 		}
 		return &immutabilityGuardError{
-			code:    errCodeDiscoveryUpstreamUnavailable,
-			message: derr.Error(),
+			code:    walletAuthCodeDiscoveryUnavailable,
+			message: "discovery is unavailable",
 		}, http.StatusServiceUnavailable
 	}
 	if targetAddress == "" {
@@ -193,31 +199,11 @@ func enforceScanImmutabilityGuards(ctx context.Context, r *http.Request, cfg aut
 			message: "scan_id is not a wallet target",
 		}, http.StatusBadRequest
 	}
-	newestScan, gerr := fetchWalletNewestScanByAddress(ctx, cfg, authz, requestID, targetAddress)
-	if gerr != nil {
+	if w2Err := ensureOwnerScopedW2(ctx, r, cfg, requestID, targetAddress, requestedScanID); w2Err != nil {
 		return &immutabilityGuardError{
-			code:    errCodeDiscoveryUpstreamUnavailable,
-			message: gerr.Error(),
-		}, http.StatusServiceUnavailable
-	}
-	if strings.ToLower(strings.TrimSpace(newestScan.Status)) != "completed" {
-		return &immutabilityGuardError{
-			code:    "LATEST_SCAN_NOT_COMPLETED",
-			message: "latest scan row is not completed",
-		}, http.StatusBadRequest
-	}
-	latestCompletedScanID, lerr := fetchWalletLatestCompletedScanID(ctx, cfg, authz, requestID, targetAddress)
-	if lerr != nil {
-		return &immutabilityGuardError{
-			code:    errCodeDiscoveryUpstreamUnavailable,
-			message: lerr.Error(),
-		}, http.StatusServiceUnavailable
-	}
-	if latestCompletedScanID == "" || latestCompletedScanID != requestedScanID {
-		return &immutabilityGuardError{
-			code:    "SCAN_ID_NOT_LATEST_FOR_TARGET",
-			message: "scan_id is not latest completed for target",
-		}, http.StatusBadRequest
+			code:    w2Err.code,
+			message: w2Err.message,
+		}, w2Err.status
 	}
 	return nil, http.StatusOK
 }
@@ -226,8 +212,9 @@ func isImmutabilityGuardRoute(r *http.Request) bool {
 	if r.Method != http.MethodPost {
 		return false
 	}
-	// RD-P5: W2 on POST /policies + /wallet-challenges is handled in-route (SCAN_NOT_LATEST / DISCOVERY_UNAVAILABLE).
-	// Explore keeps the legacy IMM-10 guard until RD-P6 harmonizes codes.
+	// RD-P6: explore shares owner-scoped W2 with challenge/persist (in-route helpers).
+	// Challenge + persist call ensureOwnerScopedW2 directly; explore goes through this guard
+	// so scan detail → address resolution stays centralized with authz middleware.
 	return r.URL.Path == cpmroutes.PoliciesDecisionsExplore
 }
 
@@ -254,19 +241,6 @@ func fetchWalletTargetAddressForScan(ctx context.Context, cfg authConfig, author
 		return "", fmt.Errorf("discovery wallet scan detail returned %d", st)
 	}
 	return targetAddressFromWalletScanDetailJSON(detailJSON)
-}
-
-func fetchWalletNewestScanByAddress(ctx context.Context, cfg authConfig, authorization, requestID, targetAddress string) (walletScanListItem, error) {
-	list, err := fetchWalletScanList(ctx, cfg, authorization, requestID, targetAddress, map[string]string{
-		"limit": "1",
-	})
-	if err != nil {
-		return walletScanListItem{}, err
-	}
-	if len(list.Items) == 0 {
-		return walletScanListItem{}, fmt.Errorf("no wallet scans found for target")
-	}
-	return list.Items[0], nil
 }
 
 func fetchWalletLatestCompletedScanID(ctx context.Context, cfg authConfig, authorization, requestID, targetAddress string) (string, error) {
