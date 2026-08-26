@@ -1,3 +1,5 @@
+//go:build dev
+
 package app
 
 import (
@@ -6,8 +8,12 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/authz"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/persistence"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/walletauth"
 )
 
 func TestGETWalletTargetContextRequiresAddress(t *testing.T) {
@@ -23,24 +29,23 @@ func TestGETWalletTargetContextRequiresAddress(t *testing.T) {
 	}
 }
 
-func TestGETWalletTargetContextExistsWithDraftID(t *testing.T) {
-	h := newAuthedTestHandler(t)
+func TestGETWalletTargetContextExistsWithPolicy(t *testing.T) {
+	h := newPolicyPersistTestHandler(t)
 	token := mustToken(t, "wtc-exists-user")
-	addr := "0x70Af6FeA3DF8a81fA71E5E5abc2989F6880CFa21"
-	draftID := "draft-wtc-single"
+	payloadJSON, digest := policyPersistHashedPayload(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	body := buildSignedPolicyPersistBody(t, payloadJSON, digest, now, now.Add(walletauth.MaxValidityWindow))
 
-	post := httptest.NewRequest(http.MethodPost, cpmroutes.Drafts, strings.NewReader(
-		`{"id":"`+draftID+`","payload":{"policy_context":{"result":{"target_address":"`+addr+`"}}}}`,
-	))
+	post := httptest.NewRequest(http.MethodPost, cpmroutes.Policies, strings.NewReader(body))
 	post.Header.Set("Authorization", "Bearer "+token)
 	post.Header.Set("Content-Type", "application/json")
 	pr := httptest.NewRecorder()
 	h.ServeHTTP(pr, post)
 	if pr.Code != http.StatusOK {
-		t.Fatalf("draft post: %d %s", pr.Code, pr.Body.String())
+		t.Fatalf("persist: %d %s", pr.Code, pr.Body.String())
 	}
 
-	get := httptest.NewRequest(http.MethodGet, cpmroutes.WalletTargetContext+"?target_address="+addr, nil)
+	get := httptest.NewRequest(http.MethodGet, cpmroutes.WalletTargetContext+"?target_address="+policyPersistTestWallet, nil)
 	get.Header.Set("Authorization", "Bearer "+token)
 	gr := httptest.NewRecorder()
 	h.ServeHTTP(gr, get)
@@ -54,7 +59,30 @@ func TestGETWalletTargetContextExistsWithDraftID(t *testing.T) {
 	if out["exists"] != true {
 		t.Fatalf("exists = %v", out["exists"])
 	}
-	if out["platform_draft_id"] != draftID {
-		t.Fatalf("platform_draft_id = %v, want %s", out["platform_draft_id"], draftID)
+	if pc, ok := out["policy_count"].(float64); !ok || pc < 1 {
+		t.Fatalf("policy_count = %v", out["policy_count"])
+	}
+}
+
+func TestWalletTargetContextStoreCountViaCreatePolicy(t *testing.T) {
+	store := persistence.NewOwnerScopedStore()
+	principal := authz.Principal{UserID: "u1", Subject: "u1", TenantID: ""}
+	_, err := store.CreatePolicy(principal, persistence.CreatePolicyInput{
+		ScanID:                  policyPersistTestScanID,
+		WalletAddress:           policyPersistTestWallet,
+		ChainID:                 1,
+		Payload:                 map[string]any{"k": "v"},
+		PayloadSHA256:           "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		WalletControlVerifiedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	counts, err := store.CountActiveWalletCPMContext(principal, policyPersistTestWallet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !counts.Exists || counts.PolicyCount < 1 {
+		t.Fatalf("counts = %+v", counts)
 	}
 }

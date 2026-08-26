@@ -26,7 +26,7 @@
    13. [Auth/Authz contract (AUTH-00)](#authauthz-contract-auth-00)
    14. [AUTH-01 runtime authentication wiring](#auth-01-runtime-authentication-wiring)
        1. [CP-PERSIST runtime](#cp-persist-runtime)
-       2. [Platform drafts API (CPM-DRAFT-1 contract)](#platform-drafts-api-cpm-draft-1-contract)
+       2. [Platform drafts API (removed — RD-P5)](#platform-drafts-api-removed--rd-p5)
    15. [AUTH-03 owner-scoped persistence](#auth-03-owner-scoped-persistence)
    16. [Durable CP storage (`CPM_STORE`)](#durable-cp-storage-cpm_store)
    17. [AUTH-04 auth error contract and observability](#auth-04-auth-error-contract-and-observability)
@@ -48,9 +48,9 @@ Normative provider model: [ADR — Capability Provider abstraction](https://gith
 
 Wallet control proof for CP persistence (EOA) is specified in [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md). **CP-PERSIST V1 is signed off independently** through that document (Part VI frozen decisions); [`workplans/WORKPLAN_API.md`](./workplans/WORKPLAN_API.md) remains the broader API workplan.
 
-**CP-PERSIST (EOA, no drafts — ADR 2026-08-24 / RD-P1–P4):** clients **must** obtain the canonical authorization message from CPM via `POST /api/cpm/v1/wallet-challenges` (stateless; request includes hashed `payload`; CPM computes `payload_sha256` and embeds it in the message; **stores nothing**; **no W2 yet** — W2 engagement → RD-P5) before signing. Normative persist is **`POST /api/cpm/v1/policies`** with `signed_message` + `signature` + the same `payload` (runtime → RD-P5). **No public `/drafts*`** in the OpenAPI contract (handlers may lag until RD-P5 — contrat ahead of runtime for persist/delete drafts). Server hash lib: [`internal/payloadhash`](./internal/payloadhash/) (JCS RFC 8785 + SHA-256; shared vectors [`internal/contract/testdata/payload_sha256/`](./internal/contract/testdata/payload_sha256/)). Spec: [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md) v1.0.0. **No Redis** / `ProofStore` in this model. Session auth (JWT) and wallet signature are orthogonal.
+**CP-PERSIST (EOA, no drafts — ADR 2026-08-24 / RD-P1–P5):** clients **must** obtain the canonical authorization message from CPM via `POST /api/cpm/v1/wallet-challenges` (request includes hashed `payload`; CPM computes `payload_sha256` and embeds it in the message; **stores nothing**) before signing. **W2** (latest completed owner-scoped Discovery scan) is mandatory on challenge **and** persist — non-latest → **422** `SCAN_NOT_LATEST`; Discovery down → **503** `DISCOVERY_UNAVAILABLE`. Normative persist is **`POST /api/cpm/v1/policies`** with `signed_message` + `signature` + the same closed `payload` (`payload_sha256` server-only; client value ignored). **No public `/drafts*`** routes in OpenAPI **or** runtime (RD-P5). Server hash lib: [`internal/payloadhash`](./internal/payloadhash/) (JCS RFC 8785 + SHA-256; shared vectors [`internal/contract/testdata/payload_sha256/`](./internal/contract/testdata/payload_sha256/)). Spec: [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md) v1.0.0. **No Redis** / `ProofStore` in this model. Session auth (JWT) and wallet signature are orthogonal. Explore W2 harmonization → RD-P6; draft store method sweep → RD-P7.
 
-**Historical CP-PERSIST V1 (draft-based, superseded):** former normative persist was `POST /api/cpm/v1/drafts/{draft_id}/persist` (OpenAPI PR2 [#51](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/51) … PR7). Runtime still implements that path until RD-P5/P7 remove it. After RD-P4, `POST /wallet-challenges` no longer accepts `draft_id` (payload + `payload_sha256` message binding only).
+**Historical CP-PERSIST V1 (draft-based, superseded):** former normative persist was `POST /api/cpm/v1/drafts/{draft_id}/persist`. Removed from the public surface in **RD-P5**. Legacy cafe-deploy smokes T4/T6 remain red until retired.
 
 **Provider persist gate (CPM-P6):** normative body `cafe.crypto_policy.v0.2` + `accepted_provider_snapshot` (pinned refs, soft findings) — see [Capability Providers](#capability-providers-adr-2026-08-03). **Remaining runtime gap:** Smart Account / non-EOA CP persist (`UNSUPPORTED_WALLET_TYPE`).
 
@@ -63,7 +63,7 @@ CPM’s catalogue and explore/persist paths follow the **posture + solution prof
 | **Crypto Policy** | `cpm_pq_account_validation_v1` | CAFE intention: `required_posture` + `allowed_providers` (e.g. `["nicetry"]`) — not a concrete technique |
 | **ProviderManifest** | `cafe.provider_manifest.v0.1` | Declares solution profiles (`resulting_posture`, signature, constraints, chain support, references, `maturity`, `claim_status`) |
 | **Selection wire** | `PolicySelectionRequest` | Internal transitional only; **removed from explore & assessment input** in CPM-P9a; couche B lives in persist `user_constraints` (CPM-P10) |
-| **Persisted CP** | `cafe.crypto_policy.v0.2` | Normative hashed `payload` at `POST …/policies` (signed) — closed set incl. top-level `accepted_findings` + snapshot (RD-P1 contract; runtime wires in RD-P5) |
+| **Persisted CP** | `cafe.crypto_policy.v0.2` | Normative hashed `payload` at signed `POST …/policies` — closed set incl. top-level `accepted_findings` + snapshot (RD-P5 runtime) |
 
 **Posture naming**
 
@@ -76,7 +76,7 @@ CPM’s catalogue and explore/persist paths follow the **posture + solution prof
 **Hard vs soft (Nicetry pilot, ADR §7)**
 
 - **Hard** failures reject the candidate (`incompatible.provider.*` — posture, chain, rotation, continuity, new wallet, wallet type, unresolved ref, etc.).
-- **Soft** findings on ranked candidates: `requires_bundler`, `requires_local_signer_state` (`severity: warning`; do not block ranking). Persist must list them in `accepted_provider_snapshot.accepted_findings` when the snapshot flags require them.
+- **Soft** findings on ranked candidates: `requires_bundler`, `requires_local_signer_state` (`severity: warning`; do not block ranking). Persist must list them in top-level `accepted_findings` (and matching snapshot copy when present).
 - `requires_wallet_control_proof` is **persist-only** (CP-PERSIST EOA signature), not an explore soft finding.
 
 **`claim_status` / `maturity`:** ranked and rejected explore candidates expose `maturity` and `claim_status` from the resolved profile. **`claim_status=declared` is a declaration only** — never present it as CAFE-audited or execution-observed proof (`cafe_reviewed` / `externally_audited` / `executed_observed` are distinct levels).
@@ -105,8 +105,8 @@ Schemas: OpenAPI `CryptoPolicyPersistPayload`, `UserConstraints`, `AcceptedProvi
 | `internal/domain/policy` | Policy domain contracts (`PolicySelectionRequest`, catalogue `CryptoPolicy` with `required_posture` + `allowed_providers`, explorers, `CryptoPolicyPersistPayload` / persist gate) — **no** business policy graph |
 | `internal/api` | PR17 read-only HTTP APIs for policy inspection and decision exploration |
 | `internal/persistence` | Durable CP via **cafe-persistence** (`cphttp.Client`); see [Durable CP storage](#durable-cp-storage-cpm_store). `OwnerScopedStore` is compiled **only for tests** (`-tags dev`) — not used at runtime in deployed images. Opaque JSON only — no provider/Nicetry evaluation here. |
-| `internal/walletauth` | CP-PERSIST V1 canonical wallet authorization message builder and EIP-191 / `personal_sign` verifier (PR3); used at persist time by PR4 handlers |
-| `internal/payloadhash` | Server-authoritative `payload_sha256` (closed hashed set → RFC 8785 JCS → SHA-256 hex; findings sort+dedupe) — RD-P2; wired by **RD-P4** challenges / RD-P5 persist |
+| `internal/walletauth` | CP-PERSIST canonical wallet authorization message builder and EIP-191 / `personal_sign` verifier; used by challenge + signed `POST /policies` |
+| `internal/payloadhash` | Server-authoritative `payload_sha256` (closed hashed set → RFC 8785 JCS → SHA-256 hex; findings sort+dedupe) — RD-P2; wired by **RD-P4** challenges / **RD-P5** persist (`DigestCanonical`) |
 | `docs/` | Integration narratives — [`docs/CPM_OPTION_A_INTEGRATED.md`](./docs/CPM_OPTION_A_INTEGRATED.md) (Option A v1 flow); [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md) (EOA wallet control proof for CP persistence) |
 | `scripts/` | Operational helpers — [`scripts/test-imm-ops-1.sh`](./scripts/test-imm-ops-1.sh) (IMM-OPS-1 explore observability smoke); Option A v1 smoke lives in [`cafe-deploy`](https://github.com/create2-labs/cafe-deploy/scripts/test-discovery-v1-wallet-scans-to-cpm.sh) |
 | `internal/metrics` | Prometheus registry and CPM application counters (IMM-OPS-1) |
@@ -178,7 +178,7 @@ Golden JSON: [`internal/domain/walletobserved/testdata/discovery_wallet_observed
 
 When `CPM_PROVIDER_MANIFEST_PATHS` is set (default: Nicetry fixture), explore resolves each instance `solution_profile_ref` and applies ADR §7 **hard** provider checks (`required_posture` / wire `target_posture` vs `solution_profile.resulting_posture`, rotation model, chain support, continuity, wallet type, etc.). Hard fail → `rejected_candidate` with stable codes such as `incompatible.provider.posture`, `incompatible.provider.chain`, `incompatible.provider.rotation`, `incompatible.provider.continuity`, `incompatible.provider.new_wallet`, `incompatible.provider.wallet_type`. Ranked candidates keep ADR §7 **soft** findings `requires_bundler` and `requires_local_signer_state` (`severity: warning`; they do not block ranking). `requires_wallet_control_proof` is persist-only (CP-PERSIST stamp). **`claim_status=declared` remains a declaration, not audited/executed proof.** Ranked/rejected explore candidates expose structured fields (`candidate_id`, `required_posture`, `resulting_posture`, `solution_profile_ref`, `maturity`, `claim_status`) without graph topology arrays. See [Capability Providers](#capability-providers-adr-2026-08-03).
 
-Normative draft persist (`POST /drafts/{draft_id}/persist`) requires a `cafe.crypto_policy.v0.2` payload with `crypto_policy_id`, `user_constraints`, and `accepted_provider_snapshot`: soft findings listed in `accepted_findings`, provider `references` pinned (not `unpinned_pending_fixture`), and CPM rejeu couche A+B against the snapshot. Persistence stores the JSON opaquely — no Nicetry logic in `cafe-persistence`.
+Normative signed persist (`POST /policies`) requires a closed hashed `cafe.crypto_policy.v0.2` payload with `crypto_policy_id`, `user_constraints`, top-level `accepted_findings`, and `accepted_provider_snapshot`: soft findings listed in `accepted_findings`, provider `references` pinned (not `unpinned_pending_fixture`), and CPM rejeu couche A+B against the snapshot **after** EIP-191 verification. Persistence stores the JSON opaquely — no Nicetry logic in `cafe-persistence`.
 
 ## Ranking and policy decision output 
 
@@ -373,13 +373,14 @@ Environment variables:
 
 ### CP-PERSIST runtime
 
-CP-PERSIST V1 does **not** add new mandatory runtime environment variables. Wallet authorization is verified at persist time from the request body (`signed_message`, `signature`) on `POST /api/cpm/v1/drafts/{draft_id}/persist` (PR4). Optional `CPM_WALLET_AUTH_DOMAIN` (or request host fallback) is embedded in canonical messages from `POST /api/cpm/v1/wallet-challenges`. See [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md).
+CP-PERSIST does **not** add new mandatory runtime environment variables. Wallet authorization is verified at persist time from the request body (`signed_message`, `signature`) on **`POST /api/cpm/v1/policies`** (RD-P5). Optional `CPM_WALLET_AUTH_DOMAIN` (or request host fallback) is embedded in canonical messages from `POST /api/cpm/v1/wallet-challenges`. **W2** uses Discovery (`CPM` Discovery HTTP base / timeout already required for explore/guards). See [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md).
 
-**Provider snapshot gate (CPM-P10 / ADR §9):** the draft `payload` must be a normative `cafe.crypto_policy.v0.2` document with `crypto_policy_id`, `user_constraints`, `required_posture`, `solution_profile_ref`, and `accepted_provider_snapshot` (pinned `references`, soft findings in `accepted_findings`, no `planned` chain). CPM rejoue couche A+B against the snapshot before the opaque write to cafe-persistence. The shipped Nicetry fixture refs are pinned (**CPM-P7**); `unpinned_pending_fixture` (or empty commit/version) still fails the gate. Details: [Capability Providers](#capability-providers-adr-2026-08-03) and OpenAPI `CryptoPolicyPersistPayload`.
+**Provider snapshot gate (CPM-P10 / ADR §9):** the closed hashed `payload` must be a normative `cafe.crypto_policy.v0.2` document with `crypto_policy_id`, `user_constraints`, `required_posture`, `solution_profile_ref`, top-level `accepted_findings`, and `accepted_provider_snapshot` (pinned `references`, soft findings, no `planned` chain; `chain_support_used.chain_id` as **string** in the hashed subtree). CPM rejoue couche A+B against the snapshot **after** EIP-191 + hash checks (signature ≠ bypass). The shipped Nicetry fixture refs are pinned (**CPM-P7**); `unpinned_pending_fixture` (or empty commit/version) still fails the gate. Details: [Capability Providers](#capability-providers-adr-2026-08-03) and OpenAPI `CryptoPolicyPersistPayload`.
 
 **V2 optional (not V1):** `CPM_REDIS_URL` and ephemeral proof stores may be introduced later for advanced workflows — not required for CP-PERSIST V1.
 
-Remaining client-side gaps are documented in [`docs/CP_PERSIST.md`](./docs/CP_PERSIST.md#expected-implementation-gaps-after-pr4). Smokes: backend [`test-cpm-cp-persist-t4-draft-persist.sh`](https://github.com/create2-labs/cafe-deploy/blob/main/scripts/test-cpm-cp-persist-t4-draft-persist.sh); Web UI [`test-cpm-cp-persist-t5-web-ui-flow.sh`](https://github.com/create2-labs/cafe-deploy/blob/main/scripts/test-cpm-cp-persist-t5-web-ui-flow.sh); CLI [`test-cpm-cp-persist-t6-cli-flow.sh`](https://github.com/create2-labs/cafe-deploy/blob/main/scripts/test-cpm-cp-persist-t6-cli-flow.sh). E2E product doc: [cafe-documentation `docs/security/cp-persist-v1.md`](https://github.com/create2-labs/cafe-documentation/blob/main/docs/security/cp-persist-v1.md).
+**Smokes (cafe-deploy):** happy path [`test-cpm-rd-p5-policies-persist-cli.sh`](https://github.com/create2-labs/cafe-deploy/blob/main/scripts/test-cpm-rd-p5-policies-persist-cli.sh); negatives [`test-cpm-rd-p5-policies-persist-negatives.sh`](https://github.com/create2-labs/cafe-deploy/blob/main/scripts/test-cpm-rd-p5-policies-persist-negatives.sh) (`PAYLOAD_SHA256_MISMATCH`, `POLICY_ALREADY_EXISTS`, optional Discovery `503`). Legacy draft smokes T4/T6 are **red** until retired. E2E product doc: [cafe-documentation `docs/security/cp-persist-v1.md`](https://github.com/create2-labs/cafe-documentation/blob/main/docs/security/cp-persist-v1.md).
+
 Important:
 - **`CPM_AUTH_REQUIRED=false`** disables the entire auth middleware: user JWT routes and **`POST /internal/policies/references/scan`** are unauthenticated at CPM — use only in controlled local dev. **Staging/production** should keep **`CPM_AUTH_REQUIRED=true`** and set **`CAFE_POLICY_REFERENCE_INTERNAL_SERVICE_TOKEN`** (see `cafe-deploy` env templates and **WORKPLAN_API_PR** PR9).
 - CPM validates **Discovery-issued session JWTs**.
@@ -408,77 +409,21 @@ Authenticated business routes:
 - `GET /api/cpm/v1/providers/{provider_id}`
 - `POST /api/cpm/v1/policies/decisions/explore`
 
-Additional authenticated routes (owner-scoped draft / policy payloads):
+Additional authenticated routes (owner-scoped policies + wallet challenge):
 
-- `POST /api/cpm/v1/drafts` — upsert platform draft (`DraftUpsertRequest`)
-- `GET /api/cpm/v1/drafts?id=...` — single draft by id (query `id` required; no list without `id`)
-- `DELETE /api/cpm/v1/drafts?id=...` — remove platform draft (W1 unblock)
-- `POST /api/cpm/v1/policies` — upsert `{ "id", "scan_id?", "payload" }`
-- `GET /api/cpm/v1/policies?id=...`
+- `POST /api/cpm/v1/wallet-challenges` — canonical message helper (`payload` → `payload_sha256`; **W2**)
+- `POST /api/cpm/v1/policies` — signed persist `{ wallet_address, chain_id, scan_id, payload, signed_message, signature }` (**W2**, W1 → `409 POLICY_ALREADY_EXISTS`)
+- `GET /api/cpm/v1/policies?id=...` or `?scan_id=...` — owner-scoped read (exposes `payload_sha256`)
+- `DELETE /api/cpm/v1/policies?id=...` — JWT only; optional `reason` query (best-effort log)
+- `GET /api/cpm/v1/wallet-target-context?target_address=...` — IMM-9b proactive UI lookup
 
-### Platform drafts API (CPM-DRAFT-1 contract)
+### Platform drafts API (removed — RD-P5)
 
-Canonical spec: [`workplans/CPM_DRAFT_1_PR.md`](workplans/CPM_DRAFT_1_PR.md), OpenAPI [`openapi/cpm-v1.yaml`](openapi/cpm-v1.yaml), WORKPLAN [`workplans/WORKPLAN_API.md`](workplans/WORKPLAN_API.md) §4.4.1.
-
-**Decisions (frozen):**
-
-- **`draft_id`:** client-supplied `id` on every `POST` (generate UUID on first save; reuse on update).
-- **Response:** `draft_id`, `saved_at`, `status: "server_draft"` — no `draft_version` until versioning exists.
-- **`DELETE`:** `204` if removed; `404` if unknown / out of scope / already deleted (product effect is idempotent).
-
-**POST body (`DraftUpsertRequest`):**
-
-```json
-{
-  "id": "550e8400-e29b-41d4-a716-446655440001",
-  "scan_id": "550e8400-e29b-41d4-a716-446655440000",
-  "payload": { "selected_candidate_id": "cpx_pq_account_validation_v1" }
-}
-```
-
-**POST response (`DraftUpsertResponse`):**
-
-```json
-{
-  "draft_id": "550e8400-e29b-41d4-a716-446655440001",
-  "saved_at": "2026-06-02T10:00:00.000Z",
-  "status": "server_draft"
-}
-```
-
-**Rejected client fields:** `owner_user_id`, `tenant_id`, `binding` (owner scope from JWT only; `binding` forbidden on drafts).
-
-**Structured errors (`4xx`):**
-
-| Code | HTTP | When |
-|------|------|------|
-| `DRAFT_ID_REQUIRED` | 400 | Missing `id` on POST or missing query `id` on GET/DELETE |
-| `DRAFT_PAYLOAD_REQUIRED` | 400 | Missing `payload` or not a JSON object |
-| `DRAFT_SCAN_ID_INVALID` | 400 | `scan_id` present but not a valid UUID |
-| `DRAFT_BINDING_FORBIDDEN` | 400 | Client sent `binding` in draft upsert body |
-| `DRAFT_OWNER_FIELDS_FORBIDDEN` | 400 | Client sent `owner_user_id` or `tenant_id` |
-| `DRAFT_NOT_FOUND` | 404 | GET unknown id; DELETE unknown / already deleted |
-
-**curl examples** (replace `$TOKEN`, `$SCAN_ID`, `$DRAFT_ID`):
-
-```bash
-curl -sS -X POST "https://localhost/api/cpm/v1/drafts" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{\"id\":\"$DRAFT_ID\",\"scan_id\":\"$SCAN_ID\",\"payload\":{\"selected_candidate_id\":\"cpx_pq_account_validation_v1\"}}"
-
-curl -sS "https://localhost/api/cpm/v1/drafts?id=$DRAFT_ID" \
-  -H "Authorization: Bearer $TOKEN"
-
-curl -sS -X DELETE "https://localhost/api/cpm/v1/drafts?id=$DRAFT_ID" \
-  -H "Authorization: Bearer $TOKEN" -w "\nHTTP %{http_code}\n"
-```
-
-**Not accepted:** `{ "draft": { ... } }` request body; `{ "item": { ... } }` Go-struct leak on POST response (removed in CPM-DRAFT-1B).
+Public `/api/cpm/v1/drafts*` routes are **removed** (OpenAPI + runtime). Do not call `POST/GET/DELETE /drafts` or `POST /drafts/{id}/persist`. Engagement path: explore → local editor → `POST /wallet-challenges` → sign → `POST /policies`. Historical CPM-DRAFT-1 contract docs remain under `workplans/` for archaeology only. Remaining draft symbols in `PolicyStore` / cphttp are cleaned in **RD-P7**.
 
 ## AUTH-03 owner-scoped persistence
 
-Draft and policy records are **owner-scoped**: access is always tied to the authenticated principal (`user_id`, optional `tenant_id`), never to client-supplied owner fields.
+Policy records are **owner-scoped**: access is always tied to the authenticated principal (`user_id`, optional `tenant_id`), never to client-supplied owner fields.
 
 Rules enforced by the `PolicyStore` layer (`internal/persistence`):
 
@@ -510,7 +455,7 @@ Environment variables (runtime — **persistence required**):
 
 **Postgres only — no Redis CP cache (P0):** cafe-persistence stores durable CP in Postgres (`crypto_policy_*` tables) via `internal/cp/v1`. Unlike wallet/TLS scans (Postgres + Redis cache in cafe-persistence), **there is no Redis layer for CP** in P0. CPM never talks to Postgres or Redis directly. Optional Redis CP accelerators are P1+ only (ADR §8.2). See [`cafe-deploy/docs/RUNBOOK_CP_PERSISTENCE.md`](https://github.com/create2-labs/cafe-deploy/blob/main/docs/RUNBOOK_CP_PERSISTENCE.md#storage-postgres-only-no-redis-cp-cache).
 
-**Why `memory` still exists:** handler tests (`draft_persist`, wallet challenge, policy references, etc.) exercise owner-scoped routes against an in-memory `PolicyStore` without Postgres, Redis, or HTTP to cafe-persistence. That keeps CI fast and removes a hard dependency on the data plane for CPM-only test runs.
+**Why `memory` still exists:** handler tests (signed policy persist, wallet challenge, policy references, etc.) exercise owner-scoped routes against an in-memory `PolicyStore` without Postgres, Redis, or HTTP to cafe-persistence. That keeps CI fast and removes a hard dependency on the data plane for CPM-only test runs.
 
 **What `memory` is not:** not a rollback path, not a dev-stack shortcut, not a supported runtime mode in Docker images. If cafe-persistence is down, CPM returns **503** on durable CP operations (ADR §5.5) — restore persistence; do not set `CPM_STORE=memory`.
 

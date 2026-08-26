@@ -1,3 +1,5 @@
+//go:build dev
+
 package app
 
 import (
@@ -10,16 +12,17 @@ import (
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/persistence"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/walletauth"
 )
 
 func TestGETPoliciesByScanIDReturnsOpenAPIPolicyRecordShape(t *testing.T) {
-	h := newAuthedTestHandlerWithScanAuthz(t)
+	h := newPolicyPersistTestHandler(t)
 	token := mustToken(t, "u-shape")
-	scanID := "550e8400-e29b-41d4-a716-446655440000"
+	payloadJSON, digest := policyPersistHashedPayload(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	body := buildSignedPolicyPersistBody(t, payloadJSON, digest, now, now.Add(walletauth.MaxValidityWindow))
 
-	create := httptest.NewRequest(http.MethodPost, cpmroutes.Policies, strings.NewReader(
-		`{"id":"pol-shape-1","scan_id":"`+scanID+`","binding":"discovery","payload":{"mode":"strict"}}`,
-	))
+	create := httptest.NewRequest(http.MethodPost, cpmroutes.Policies, strings.NewReader(body))
 	create.Header.Set("Authorization", "Bearer "+token)
 	create.Header.Set("Content-Type", "application/json")
 	createRes := httptest.NewRecorder()
@@ -27,8 +30,12 @@ func TestGETPoliciesByScanIDReturnsOpenAPIPolicyRecordShape(t *testing.T) {
 	if createRes.Code != http.StatusOK {
 		t.Fatalf("create policy: want 200, got %d body=%s", createRes.Code, createRes.Body.String())
 	}
+	var created policyPersistResponse
+	if err := json.Unmarshal(createRes.Body.Bytes(), &created); err != nil {
+		t.Fatal(err)
+	}
 
-	req := httptest.NewRequest(http.MethodGet, cpmroutes.Policies+"?scan_id="+scanID, nil)
+	req := httptest.NewRequest(http.MethodGet, cpmroutes.Policies+"?scan_id="+policyPersistTestScanID, nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
@@ -36,39 +43,37 @@ func TestGETPoliciesByScanIDReturnsOpenAPIPolicyRecordShape(t *testing.T) {
 		t.Fatalf("GET policies by scan_id: want 200, got %d body=%s", res.Code, res.Body.String())
 	}
 
-	var body struct {
+	var list struct {
 		Items []map[string]any `json:"items"`
 	}
-	if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
+	if err := json.Unmarshal(res.Body.Bytes(), &list); err != nil {
 		t.Fatalf("decode list: %v", err)
 	}
-	if len(body.Items) != 1 {
-		t.Fatalf("want 1 item, got %d", len(body.Items))
+	if len(list.Items) != 1 {
+		t.Fatalf("want 1 item, got %d", len(list.Items))
 	}
-	row := body.Items[0]
-	for _, key := range []string{"id", "payload", "created_at", "updated_at"} {
+	row := list.Items[0]
+	for _, key := range []string{"id", "payload", "created_at", "updated_at", "payload_sha256"} {
 		if _, ok := row[key]; !ok {
 			t.Fatalf("expected %q in policy row, got %#v", key, row)
 		}
 	}
-	if row["id"] != "pol-shape-1" {
-		t.Fatalf("id: got %#v", row["id"])
+	if row["id"] != created.PolicyID {
+		t.Fatalf("id: got %#v want %s", row["id"], created.PolicyID)
 	}
-	if row["scan_id"] != scanID {
-		t.Fatalf("scan_id: got %#v", row["scan_id"])
-	}
-	if _, hasPascal := row["ID"]; hasPascal {
-		t.Fatalf("unexpected PascalCase ID field: %#v", row)
+	if row["payload_sha256"] != digest {
+		t.Fatalf("payload_sha256: got %#v", row["payload_sha256"])
 	}
 }
 
 func TestGETPolicyByIDReturnsPolicyRecordNotItemWrapper(t *testing.T) {
-	h := newAuthedTestHandler(t)
+	h := newPolicyPersistTestHandler(t)
 	token := mustToken(t, "u-get")
+	payloadJSON, digest := policyPersistHashedPayload(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	body := buildSignedPolicyPersistBody(t, payloadJSON, digest, now, now.Add(walletauth.MaxValidityWindow))
 
-	create := httptest.NewRequest(http.MethodPost, cpmroutes.Policies, strings.NewReader(
-		`{"id":"pol-get-1","binding":"fixture","payload":{"k":1}}`,
-	))
+	create := httptest.NewRequest(http.MethodPost, cpmroutes.Policies, strings.NewReader(body))
 	create.Header.Set("Authorization", "Bearer "+token)
 	create.Header.Set("Content-Type", "application/json")
 	createRes := httptest.NewRecorder()
@@ -76,8 +81,12 @@ func TestGETPolicyByIDReturnsPolicyRecordNotItemWrapper(t *testing.T) {
 	if createRes.Code != http.StatusOK {
 		t.Fatalf("create policy: want 200, got %d body=%s", createRes.Code, createRes.Body.String())
 	}
+	var created policyPersistResponse
+	if err := json.Unmarshal(createRes.Body.Bytes(), &created); err != nil {
+		t.Fatal(err)
+	}
 
-	req := httptest.NewRequest(http.MethodGet, cpmroutes.Policies+"?id=pol-get-1", nil)
+	req := httptest.NewRequest(http.MethodGet, cpmroutes.Policies+"?id="+created.PolicyID, nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
@@ -92,22 +101,23 @@ func TestGETPolicyByIDReturnsPolicyRecordNotItemWrapper(t *testing.T) {
 	if _, wrapped := row["item"]; wrapped {
 		t.Fatalf("expected bare PolicyRecord, got item wrapper: %#v", row)
 	}
-	if row["id"] != "pol-get-1" {
+	if row["id"] != created.PolicyID {
 		t.Fatalf("id: got %#v", row["id"])
 	}
 }
 
-func TestPOSTPolicyReturnsPolicyRecordNotItemWrapper(t *testing.T) {
-	h := newAuthedTestHandler(t)
+func TestPOSTPolicyReturnsPersistAckNotItemWrapper(t *testing.T) {
+	h := newPolicyPersistTestHandler(t)
 	token := mustToken(t, "u-post")
+	payloadJSON, digest := policyPersistHashedPayload(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	body := buildSignedPolicyPersistBody(t, payloadJSON, digest, now, now.Add(walletauth.MaxValidityWindow))
 
-	create := httptest.NewRequest(http.MethodPost, cpmroutes.Policies, strings.NewReader(
-		`{"id":"pol-post-1","binding":"fixture","payload":{"k":1}}`,
-	))
-	create.Header.Set("Authorization", "Bearer "+token)
-	create.Header.Set("Content-Type", "application/json")
 	res := httptest.NewRecorder()
-	h.ServeHTTP(res, create)
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.Policies, strings.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	h.ServeHTTP(res, req)
 	if res.Code != http.StatusOK {
 		t.Fatalf("POST policy: want 200, got %d body=%s", res.Code, res.Body.String())
 	}
@@ -117,10 +127,10 @@ func TestPOSTPolicyReturnsPolicyRecordNotItemWrapper(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 	if _, wrapped := row["item"]; wrapped {
-		t.Fatalf("expected bare PolicyRecord, got item wrapper: %#v", row)
+		t.Fatalf("expected bare persist ack, got item wrapper: %#v", row)
 	}
-	if row["id"] != "pol-post-1" {
-		t.Fatalf("id: got %#v", row["id"])
+	if row["policy_id"] == nil || row["payload_sha256"] != digest {
+		t.Fatalf("unexpected ack: %#v", row)
 	}
 }
 

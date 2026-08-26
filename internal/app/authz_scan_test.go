@@ -76,16 +76,16 @@ func assertExtractScanIDsForAuthorization(t *testing.T, tc extractScanIDsCase) {
 	}
 }
 
-func TestExtractScanIDsForAuthorizationDraftPostSkipsMalformedScanID(t *testing.T) {
-	req := httptest.NewRequest(http.MethodPost, cpmroutes.Drafts, strings.NewReader(
-		`{"id":"draft-1","scan_id":"not-a-uuid","payload":{}}`,
+func TestExtractScanIDsForAuthorizationPoliciesPostUsesScanID(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.Policies, strings.NewReader(
+		`{"wallet_address":"0xee387b44819eb54d7fff026a18229421738a8a24","chain_id":1,"scan_id":"550e8400-e29b-41d4-a716-446655440000","payload":{}}`,
 	))
 	scanIDs, authErr, status := extractScanIDsForAuthorization(req)
 	if authErr.Code != "" || status != http.StatusOK {
 		t.Fatalf("expected no scan auth error, got code=%q status=%d", authErr.Code, status)
 	}
-	if len(scanIDs) != 0 {
-		t.Fatalf("expected no scan ids for AUTH-02, got %#v", scanIDs)
+	if len(scanIDs) != 1 {
+		t.Fatalf("expected scan id from persist body, got %#v", scanIDs)
 	}
 }
 
@@ -328,7 +328,7 @@ func TestWithAuthentication_IMM10_W2RejectsHistoricalScanID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("make token: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodPost, cpmroutes.Policies, strings.NewReader(`{"id":"p1","scan_id":"705c9704-9428-45e0-882d-fae4cb9d2a0b","binding":"discovery","payload":{"mode":"strict"}}`))
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, strings.NewReader(`{"scan_id":"705c9704-9428-45e0-882d-fae4cb9d2a0b","policy_context":{"wallet_address":"0xabc","wallet_type":"eoa","chain_ids":[1]}}`))
 	req.Header.Set("Authorization", "Bearer "+token)
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, req)
@@ -430,7 +430,7 @@ func TestWithAuthentication_IMM10_PersistRejectsTLSScanIDAsNotFound(t *testing.T
 	if err != nil {
 		t.Fatalf("make token: %v", err)
 	}
-	req := httptest.NewRequest(http.MethodPost, cpmroutes.Policies, strings.NewReader(`{"id":"p1","scan_id":"705c9704-9428-45e0-882d-fae4cb9d2a0b","binding":"discovery","payload":{"mode":"strict"}}`))
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, strings.NewReader(`{"scan_id":"705c9704-9428-45e0-882d-fae4cb9d2a0b","policy_context":{"wallet_address":"0xabc","wallet_type":"eoa","chain_ids":[1]}}`))
 	req.Header.Set("Authorization", "Bearer "+token)
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, req)

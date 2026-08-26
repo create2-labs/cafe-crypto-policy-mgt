@@ -3,6 +3,7 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/provider"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/payloadhash"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/walletauth"
 )
 
 func setPersistObservabilityForTest(obs persistObservability) func() {
@@ -48,7 +51,7 @@ func TestPersistObservability_userConstraintsIncompatibleDistinctFromExplore(t *
 
 	req := httptest.NewRequest(http.MethodPost, "/x", nil)
 	req.Header.Set("X-Request-Id", "req-p11b")
-	recordPersistUserConstraintsIncompatible(req, "draft-1", "cpm_pq_account_validation_v1", provider.FindingCodeContinuity)
+	recordPersistUserConstraintsIncompatible(req, "", "cpm_pq_account_validation_v1", provider.FindingCodeContinuity)
 
 	if metrics.increments != 1 {
 		t.Fatalf("want 1 persist metric increment, got %d", metrics.increments)
@@ -71,23 +74,34 @@ func TestPersistObservability_userConstraintsIncompatibleDistinctFromExplore(t *
 	}
 }
 
-func TestDraftPersist_coucheBKOEmitsRuntimeSignal(t *testing.T) {
+func TestPolicyPersist_coucheBKOEmitsRuntimeSignal(t *testing.T) {
 	metrics := &testPersistMetrics{}
 	logger := &testPersistLogger{}
 	restore := setPersistObservabilityForTest(persistObservability{logger: logger, metrics: metrics})
 	defer restore()
 
-	h := newDraftPersistTestHandler(t)
-	token := mustToken(t, "draft-persist-p11b-signal")
-	draftID := "draft-persist-p11b-signal"
-	createDraftPersistBoundDraftWithPayload(t, h, token, draftID, draftPersistCoucheBKOPayloadJSON())
+	h := newPolicyPersistTestHandler(t)
+	token := mustToken(t, "policy-persist-p11b-signal")
+	payloadJSON, _ := policyPersistHashedPayload(t)
+	var payload map[string]any
+	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
+		t.Fatal(err)
+	}
+	uc := payload["user_constraints"].(map[string]any)
+	uc["address_continuity_required"] = true
+	uc["allow_new_wallet"] = false
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest, err := payloadhash.DigestJSON(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC().Truncate(time.Second)
+	body := buildSignedPolicyPersistBody(t, raw, digest, now, now.Add(walletauth.MaxValidityWindow))
 
-	issued := time.Now().UTC().Truncate(time.Second)
-	expires := issued.Add(10 * time.Minute)
-	message, signature := buildDraftPersistSignedRequest(t, draftID, issued, expires)
-	body := `{"wallet_address":"` + draftPersistTestWallet + `","chain_id":1,"scan_id":"` + draftPersistTestScanID + `","signed_message":` + jsonString(message) + `,"signature":"` + signature + `"}`
-
-	req := httptest.NewRequest(http.MethodPost, cpmroutes.DraftPersistPath(draftID), strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.Policies, strings.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Request-Id", "p11b-couche-b")
@@ -104,27 +118,36 @@ func TestDraftPersist_coucheBKOEmitsRuntimeSignal(t *testing.T) {
 	if len(logger.lines) != 1 || !strings.Contains(logger.lines[0], `adr_signal="runtime.no_provider_after_user_constraints"`) {
 		t.Fatalf("want couche B runtime log, got %v", logger.lines)
 	}
-	if !strings.Contains(logger.lines[0], `finding_code="`+provider.FindingCodeContinuity+`"`) {
-		t.Fatalf("want continuity finding_code, got %s", logger.lines[0])
-	}
 }
 
-func TestDraftPersist_unpinnedDoesNotEmitCoucheBSignal(t *testing.T) {
+func TestPolicyPersist_unpinnedDoesNotEmitCoucheBSignal(t *testing.T) {
 	metrics := &testPersistMetrics{}
 	restore := setPersistObservabilityForTest(persistObservability{metrics: metrics})
 	defer restore()
 
-	h := newDraftPersistTestHandler(t)
-	token := mustToken(t, "draft-persist-p11b-unpin")
-	draftID := "draft-persist-p11b-unpin"
-	createDraftPersistBoundDraftWithPayload(t, h, token, draftID, draftPersistUnpinnedPayloadJSON())
+	h := newPolicyPersistTestHandler(t)
+	token := mustToken(t, "policy-persist-p11b-unpin")
+	payloadJSON, _ := policyPersistHashedPayload(t)
+	var payload map[string]any
+	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
+		t.Fatal(err)
+	}
+	snap := payload["accepted_provider_snapshot"].(map[string]any)
+	snap["references"] = []any{
+		map[string]any{"kind": "source_repo", "url": "https://example.com", "commit": "unpinned_pending_fixture"},
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest, err := payloadhash.DigestJSON(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC().Truncate(time.Second)
+	body := buildSignedPolicyPersistBody(t, raw, digest, now, now.Add(walletauth.MaxValidityWindow))
 
-	issued := time.Now().UTC().Truncate(time.Second)
-	expires := issued.Add(10 * time.Minute)
-	message, signature := buildDraftPersistSignedRequest(t, draftID, issued, expires)
-	body := `{"wallet_address":"` + draftPersistTestWallet + `","chain_id":1,"scan_id":"` + draftPersistTestScanID + `","signed_message":` + jsonString(message) + `,"signature":"` + signature + `"}`
-
-	req := httptest.NewRequest(http.MethodPost, cpmroutes.DraftPersistPath(draftID), strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.Policies, strings.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()

@@ -1,14 +1,17 @@
 package policy
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/provider"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/vocabulary"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/payloadhash"
 )
 
 const CryptoPolicySchemaVersionV02 = "cafe.crypto_policy.v0.2"
@@ -20,9 +23,12 @@ var (
 	ErrProviderChainPlanned                = errors.New("provider chain_support_used status planned is not persistable")
 	ErrProviderScanCompatFailed            = errors.New("provider scan compatibility failed at persist")
 	ErrProviderUserConstraintsIncompatible = errors.New("provider user_constraints incompatible at persist")
+	ErrAcceptedFindingsDivergent           = errors.New("accepted_provider_snapshot.accepted_findings diverges from top-level accepted_findings")
 )
 
 // CryptoPolicyPersistPayload is the normative CP body required at persist (ADR §9 / CPM-P10).
+// Closed hashed form (RD-P5) carries top-level accepted_findings; legacy draft bodies may omit it
+// and rely on snapshot.accepted_findings until draft routes are fully retired.
 type CryptoPolicyPersistPayload struct {
 	SchemaVersion            string                      `json:"schema_version"`
 	PolicyKind               string                      `json:"policy_kind,omitempty"`
@@ -31,6 +37,7 @@ type CryptoPolicyPersistPayload struct {
 	UserConstraints          provider.UserConstraints    `json:"user_constraints"`
 	SolutionProfileRef       SolutionProfileRef          `json:"solution_profile_ref"`
 	AcceptedProviderSnapshot AcceptedProviderSnapshot    `json:"accepted_provider_snapshot"`
+	AcceptedFindings         []string                    `json:"accepted_findings,omitempty"`
 }
 
 // AcceptedProviderSnapshot freezes provider constraints accepted at persist time.
@@ -49,11 +56,57 @@ type AcceptedProviderSnapshot struct {
 }
 
 // SnapshotChainSupport is the chain entry that qualified compatibility for this CP.
+// ChainID accepts JSON number (legacy draft) or string (hashed closed set / JCS).
 type SnapshotChainSupport struct {
-	ChainID      int64                       `json:"chain_id"`
+	ChainID      FlexibleChainID             `json:"chain_id"`
 	Status       provider.ChainSupportStatus `json:"status"`
 	Capabilities []string                    `json:"capabilities,omitempty"`
 }
+
+// FlexibleChainID unmarshals chain_id from JSON number or decimal string.
+type FlexibleChainID int64
+
+func (c *FlexibleChainID) UnmarshalJSON(b []byte) error {
+	b = bytes.TrimSpace(b)
+	if len(b) == 0 || string(b) == "null" {
+		*c = 0
+		return nil
+	}
+	if b[0] == '"' {
+		var s string
+		if err := json.Unmarshal(b, &s); err != nil {
+			return err
+		}
+		s = strings.TrimSpace(s)
+		if s == "" {
+			*c = 0
+			return nil
+		}
+		n, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return fmt.Errorf("chain_id string %q: %w", s, err)
+		}
+		*c = FlexibleChainID(n)
+		return nil
+	}
+	var n json.Number
+	if err := json.Unmarshal(b, &n); err != nil {
+		var f float64
+		if err2 := json.Unmarshal(b, &f); err2 != nil {
+			return err
+		}
+		*c = FlexibleChainID(int64(f))
+		return nil
+	}
+	i, err := n.Int64()
+	if err != nil {
+		return err
+	}
+	*c = FlexibleChainID(i)
+	return nil
+}
+
+func (c FlexibleChainID) Int64() int64 { return int64(c) }
 
 // ValidateDraftPayloadForPersist decodes and gates a draft payload before PersistDraftOnce.
 // Replays couche A then couche B against the accepted snapshot (ADR §7 / §9 rule 7).
@@ -114,14 +167,18 @@ func (p *CryptoPolicyPersistPayload) ValidateForPersist(obs provider.HardObserva
 	if s.Signature.Scheme == "" || s.Signature.Family == "" {
 		return fmt.Errorf("%w: accepted_provider_snapshot.signature scheme/family required", ErrCryptoPolicyPayloadInvalid)
 	}
-	if s.ChainSupportUsed.ChainID <= 0 || s.ChainSupportUsed.Status == "" {
+	if s.ChainSupportUsed.ChainID.Int64() <= 0 || s.ChainSupportUsed.Status == "" {
 		return fmt.Errorf("%w: chain_support_used chain_id/status required", ErrCryptoPolicyPayloadInvalid)
 	}
 	if s.ChainSupportUsed.Status == provider.ChainStatusPlanned {
 		return ErrProviderChainPlanned
 	}
-	accepted := make(map[string]struct{}, len(s.AcceptedFindings))
-	for _, code := range s.AcceptedFindings {
+	softFindings, err := softFindingsForPersist(p)
+	if err != nil {
+		return err
+	}
+	accepted := make(map[string]struct{}, len(softFindings))
+	for _, code := range softFindings {
 		accepted[code] = struct{}{}
 	}
 	var missing []string
@@ -155,6 +212,21 @@ func (p *CryptoPolicyPersistPayload) ValidateForPersist(obs provider.HardObserva
 		return fmt.Errorf("%w: [%s] %s", ErrProviderUserConstraintsIncompatible, findings[0].Code, findings[0].Message)
 	}
 	return nil
+}
+
+// softFindingsForPersist prefers top-level accepted_findings (hashed authority).
+// When both top-level and snapshot copies are present, they must match after
+// lexico sort + dedupe (RD-P5). Legacy draft bodies with only snapshot findings remain valid.
+func softFindingsForPersist(p *CryptoPolicyPersistPayload) ([]string, error) {
+	top := payloadhash.NormalizeAcceptedFindings(p.AcceptedFindings)
+	snap := payloadhash.NormalizeAcceptedFindings(p.AcceptedProviderSnapshot.AcceptedFindings)
+	if len(top) > 0 && len(snap) > 0 && !slices.Equal(top, snap) {
+		return nil, ErrAcceptedFindingsDivergent
+	}
+	if len(top) > 0 {
+		return top, nil
+	}
+	return snap, nil
 }
 
 // UserConstraintsIncompatibleFindingCode extracts the hard finding code from a
@@ -217,8 +289,12 @@ func observationFromPersistRaw(raw map[string]any, chainUsed SnapshotChainSuppor
 		}
 		obs.ChainIDs = int64SliceFromAny(pc["chain_ids"])
 	}
-	if len(obs.ChainIDs) == 0 && chainUsed.ChainID > 0 {
-		obs.ChainIDs = []int64{chainUsed.ChainID}
+	if len(obs.ChainIDs) == 0 && chainUsed.ChainID.Int64() > 0 {
+		obs.ChainIDs = []int64{chainUsed.ChainID.Int64()}
+	}
+	if obs.AccountKind == "" {
+		// Closed hashed payloads have no policy_context; EIP-191 personal_sign is EOA-only.
+		obs.AccountKind = "EOA"
 	}
 	return obs
 }
@@ -235,7 +311,7 @@ func (p *CryptoPolicyPersistPayload) snapshotAsProfile() *provider.SolutionProfi
 		AccountModel:      s.AccountModel,
 		Constraints:       s.Constraints,
 		ChainSupport: []provider.ChainSupport{{
-			ChainID:      s.ChainSupportUsed.ChainID,
+			ChainID:      s.ChainSupportUsed.ChainID.Int64(),
 			Status:       s.ChainSupportUsed.Status,
 			Capabilities: s.ChainSupportUsed.Capabilities,
 		}},

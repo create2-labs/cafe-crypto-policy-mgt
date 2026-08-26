@@ -33,10 +33,8 @@ type walletChallengeResponse struct {
 }
 
 // registerWalletChallengeRoutes registers POST /wallet-challenges.
-// RD-P4: strictly stateless — hash payload via payloadhash, build canonical
-// message, store nothing. No draft/policy store reads and no Discovery W2
-// (W2 engagement gates land in RD-P5). Legacy /drafts* handlers may still
-// exist elsewhere until RD-P5/P7.
+// RD-P5: hash payload via payloadhash, build canonical message, store nothing.
+// W2 owner-scoped latest-completed is mandatory (fail-closed Discovery → 503).
 func registerWalletChallengeRoutes(mux *http.ServeMux, cfg authConfig, obs *authObservability) {
 	mux.HandleFunc("POST "+cpmroutes.WalletChallenges, func(w http.ResponseWriter, r *http.Request) {
 		handleWalletChallenge(w, r, cfg, obs)
@@ -66,6 +64,11 @@ func handleWalletChallenge(w http.ResponseWriter, r *http.Request, cfg authConfi
 	normScanID, scanNormErr := NormalizeDiscoveryScanID(req.ScanID)
 	if scanNormErr != nil {
 		writeWalletAuthorizationError(w, r, obs, http.StatusBadRequest, walletAuthCodeScanNotFound, errMsgScanNotFound)
+		return
+	}
+
+	if w2Err := ensureEngagementW2(r.Context(), r, cfg, requestID, normWallet, normScanID); w2Err != nil {
+		writeWalletAuthorizationError(w, r, obs, w2Err.status, w2Err.code, w2Err.message)
 		return
 	}
 
@@ -163,46 +166,6 @@ func cryptoPolicyPayloadInvalidMessage(err error) string {
 	return "crypto policy payload is invalid"
 }
 
-type walletScanLookupError struct {
-	code    string
-	message string
-	status  int
-}
-
-func ensureWalletScanExists(r *http.Request, cfg authConfig, requestID, scanID string) *walletScanLookupError {
-	if strings.TrimSpace(cfg.DiscoveryHTTPBaseURL) == "" {
-		return nil
-	}
-	authzHeader := ""
-	if r != nil {
-		authzHeader = r.Header.Get("Authorization")
-	}
-	_, st, err := fetchDiscoveryWalletScanDetail(r.Context(), cfg, authzHeader, requestID, scanID)
-	if err != nil {
-		return &walletScanLookupError{
-			code:    errCodeDiscoveryUpstreamUnavailable,
-			message: err.Error(),
-			status:  http.StatusServiceUnavailable,
-		}
-	}
-	switch st {
-	case http.StatusOK:
-		return nil
-	case http.StatusNotFound:
-		return &walletScanLookupError{
-			code:    walletAuthCodeScanNotFound,
-			message: errMsgScanNotFound,
-			status:  http.StatusNotFound,
-		}
-	default:
-		return &walletScanLookupError{
-			code:    errCodeDiscoveryUpstreamUnavailable,
-			message: "discovery wallet scan lookup failed",
-			status:  http.StatusServiceUnavailable,
-		}
-	}
-}
-
 func walletAuthDomain(r *http.Request, cfg authConfig) string {
 	if domain := strings.TrimSpace(cfg.WalletAuthDomain); domain != "" {
 		return domain
@@ -218,58 +181,3 @@ func walletAuthDomain(r *http.Request, cfg authConfig) string {
 	return "localhost"
 }
 
-func walletAddressFromDraftPayload(payload map[string]any) string {
-	if payload == nil {
-		return ""
-	}
-	if pc, ok := payload["policy_context"].(map[string]any); ok {
-		if addr := firstWalletAddressField(pc); addr != "" {
-			return addr
-		}
-	}
-	if swc, ok := payload["selected_wallet_policy_context"].(map[string]any); ok {
-		if addr := firstWalletAddressField(swc); addr != "" {
-			return addr
-		}
-	}
-	return firstWalletAddressField(payload)
-}
-
-func firstWalletAddressField(m map[string]any) string {
-	for _, key := range []string{"target_address", "wallet_address", "walletAddress"} {
-		if v, ok := m[key].(string); ok {
-			if norm, err := persistence.NormalizeWalletTargetAddress(v); err == nil {
-				return norm
-			}
-		}
-	}
-	if res, ok := m["result"].(map[string]any); ok {
-		if v, ok := res["target_address"].(string); ok {
-			if norm, err := persistence.NormalizeWalletTargetAddress(v); err == nil {
-				return norm
-			}
-		}
-	}
-	return ""
-}
-
-func draftWalletType(payload map[string]any) string {
-	if payload == nil {
-		return ""
-	}
-	if pc, ok := payload["policy_context"].(map[string]any); ok {
-		if wt, ok := pc["wallet_type"].(string); ok {
-			return strings.TrimSpace(wt)
-		}
-	}
-	return ""
-}
-
-func walletAddressesEqual(a, b string) bool {
-	na, errA := persistence.NormalizeWalletTargetAddress(a)
-	nb, errB := persistence.NormalizeWalletTargetAddress(b)
-	if errA != nil || errB != nil {
-		return strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
-	}
-	return na == nb
-}

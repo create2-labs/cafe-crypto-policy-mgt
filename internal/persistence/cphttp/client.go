@@ -151,6 +151,51 @@ func (c *Client) SavePolicy(principal authz.Principal, id string, scanID string,
 	return persistence.PolicyRecord{}, persistence.ErrUnsupportedStoreOperation
 }
 
+func (c *Client) CreatePolicy(principal authz.Principal, in persistence.CreatePolicyInput) (persistence.CreatePolicyResult, error) {
+	if err := principal.Validate(); err != nil {
+		return persistence.CreatePolicyResult{}, persistence.ErrPrincipalRequired
+	}
+	verifiedAt := in.WalletControlVerifiedAt.UTC()
+	if verifiedAt.IsZero() {
+		verifiedAt = time.Now().UTC()
+	}
+	body := map[string]any{
+		"scan_id":                     strings.TrimSpace(in.ScanID),
+		"wallet_address":              strings.TrimSpace(in.WalletAddress),
+		"chain_id":                    in.ChainID,
+		"payload":                     in.Payload,
+		"payload_sha256":              strings.TrimSpace(in.PayloadSHA256),
+		"signed_message_hash":         strings.TrimSpace(in.SignedMessageHash),
+		"wallet_control_method":       strings.TrimSpace(in.WalletControlMethod),
+		"wallet_control_verified_at":  verifiedAt.Format(time.RFC3339Nano),
+	}
+	if method := strings.TrimSpace(in.WalletControlMethod); method == "" {
+		body["wallet_control_method"] = "eoa_signature"
+	}
+	if in.ChallengeIssuedAt != nil && !in.ChallengeIssuedAt.IsZero() {
+		body["challenge_issued_at"] = in.ChallengeIssuedAt.UTC().Format(time.RFC3339Nano)
+	}
+	if in.ChallengeExpiresAt != nil && !in.ChallengeExpiresAt.IsZero() {
+		body["challenge_expires_at"] = in.ChallengeExpiresAt.UTC().Format(time.RFC3339Nano)
+	}
+	var wire createPolicyResponseWire
+	if err := c.doJSON(context.Background(), http.MethodPost, c.baseURL+V1Base+Policies, principal, body, false, &wire); err != nil {
+		return persistence.CreatePolicyResult{}, err
+	}
+	persistedAt, err := parseTime(wire.PersistedAt)
+	if err != nil {
+		return persistence.CreatePolicyResult{}, err
+	}
+	return persistence.CreatePolicyResult{
+		PolicyID:      strings.TrimSpace(wire.PolicyID),
+		ScanID:        strings.TrimSpace(wire.ScanID),
+		WalletAddress: strings.TrimSpace(wire.WalletAddress),
+		ChainID:       wire.ChainID,
+		PayloadSHA256: strings.TrimSpace(wire.PayloadSHA256),
+		PersistedAt:   persistedAt,
+	}, nil
+}
+
 func (c *Client) ListPersistedPoliciesForScan(principal authz.Principal, scanID string) ([]persistence.PolicyRecord, error) {
 	if err := principal.Validate(); err != nil {
 		return nil, persistence.ErrPrincipalRequired
@@ -323,8 +368,11 @@ func mapHTTPError(status int, raw []byte) error {
 	case http.StatusForbidden:
 		return persistence.ErrForbidden
 	case http.StatusConflict:
-		if code == "DRAFT_ALREADY_PERSISTED" {
+		switch code {
+		case "DRAFT_ALREADY_PERSISTED":
 			return persistence.ErrDraftAlreadyPersisted
+		case "POLICY_ALREADY_EXISTS":
+			return persistence.ErrPolicyAlreadyExists
 		}
 	case http.StatusServiceUnavailable:
 		return persistence.ErrPersistenceUnavailable
@@ -378,14 +426,17 @@ func (w draftRowWire) toRecord() (persistence.DraftRecord, error) {
 }
 
 type policyRowWire struct {
-	ID         string         `json:"id"`
-	UserID     string         `json:"user_id"`
-	TenantID   string         `json:"tenant_id"`
-	ScanID     string         `json:"scan_id"`
-	Payload    map[string]any `json:"payload"`
-	CreatedAt  string         `json:"created_at"`
-	UpdatedAt  string         `json:"updated_at"`
-	PersistedAt string        `json:"persisted_at"`
+	ID            string         `json:"id"`
+	UserID        string         `json:"user_id"`
+	TenantID      string         `json:"tenant_id"`
+	ScanID        string         `json:"scan_id"`
+	Payload       map[string]any `json:"payload"`
+	PayloadSHA256 string         `json:"payload_sha256"`
+	WalletAddress string         `json:"wallet_address"`
+	ChainID       int64          `json:"chain_id"`
+	CreatedAt     string         `json:"created_at"`
+	UpdatedAt     string         `json:"updated_at"`
+	PersistedAt   string         `json:"persisted_at"`
 }
 
 func (w policyRowWire) toRecord() (persistence.PolicyRecord, error) {
@@ -402,14 +453,26 @@ func (w policyRowWire) toRecord() (persistence.PolicyRecord, error) {
 		payload = map[string]any{}
 	}
 	return persistence.PolicyRecord{
-		ID:          strings.TrimSpace(w.ID),
-		OwnerUserID: strings.TrimSpace(w.UserID),
-		TenantID:    strings.TrimSpace(w.TenantID),
-		ScanID:      strings.TrimSpace(w.ScanID),
-		Payload:     payload,
-		CreatedAt:   createdAt,
-		UpdatedAt:   updatedAt,
+		ID:            strings.TrimSpace(w.ID),
+		OwnerUserID:   strings.TrimSpace(w.UserID),
+		TenantID:      strings.TrimSpace(w.TenantID),
+		ScanID:        strings.TrimSpace(w.ScanID),
+		Payload:       payload,
+		PayloadSHA256: strings.TrimSpace(w.PayloadSHA256),
+		WalletAddress: strings.TrimSpace(w.WalletAddress),
+		ChainID:       w.ChainID,
+		CreatedAt:     createdAt,
+		UpdatedAt:     updatedAt,
 	}, nil
+}
+
+type createPolicyResponseWire struct {
+	PolicyID      string `json:"policy_id"`
+	ScanID        string `json:"scan_id"`
+	WalletAddress string `json:"wallet_address"`
+	ChainID       int64  `json:"chain_id"`
+	PayloadSHA256 string `json:"payload_sha256"`
+	PersistedAt   string `json:"persisted_at"`
 }
 
 type persistDraftResponseWire struct {
