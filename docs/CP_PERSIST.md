@@ -128,7 +128,7 @@
 > **Supersedes** the draft-based CP-PERSIST V1 flow (`POST /drafts` → `POST /drafts/{id}/persist`).  
 > **Source of truth:** this section + [`openapi/cpm-v1.yaml`](../openapi/cpm-v1.yaml) + ADR §3.2.  
 > Historical Parts below (stories/PR breakdown with `draft_id`) remain for archaeology and are **not** the product contract.  
-> **Contract ahead of runtime:** OpenAPI + this section are normative. **RD-P4** wires `POST /wallet-challenges` (stateless hash + canonical message; **no W2** yet). **RD-P5** adds W2 on challenge/persist, `POST /policies` signed, and removes `/drafts*` handlers. Until then, legacy draft handlers may still exist in the binary — clients must follow this contract for new work.
+> **Contract / runtime:** OpenAPI + this section are normative. **RD-P4** wired `POST /wallet-challenges` (stateless hash + canonical message). **RD-P5** adds W2 on challenge/persist, signed `POST /policies`, and removes `/drafts*` handlers. Explore W2 harmonization → **RD-P6**. Store draft methods may remain until **RD-P7** dead-code sweep.
 
 ### Product flow (EOA)
 
@@ -178,13 +178,14 @@ Rules:
 - Before JCS: lexicographic sort + dedupe of `accepted_findings` (client should pre-normalize; server always normalizes).
 - Client-supplied `payload_sha256` on write is **ignored**.
 - Shared vectors: [`internal/contract/testdata/payload_sha256/`](../internal/contract/testdata/payload_sha256/).
-- **Go authority (RD-P2):** [`internal/payloadhash`](../internal/payloadhash/) — `Digest` / `DigestJSON` + `NormalizeAcceptedFindings`. **RD-P4** wires digest into `POST /wallet-challenges`. Persist write → RD-P5.
+- **Go authority (RD-P2):** [`internal/payloadhash`](../internal/payloadhash/) — `Digest` / `DigestCanonical` / `DigestJSON` + `NormalizeAcceptedFindings`. **RD-P4** wires digest into `POST /wallet-challenges`. **RD-P5** persists the canonical closed object + `payload_sha256`.
+- **Vectors:** [`internal/contract/testdata/payload_sha256/`](../internal/contract/testdata/payload_sha256/) — same fixtures as OpenAPI / FE RD-P9.
 
 ### W2 + Discovery fail-closed
 
 **Contract:** `POST /wallet-challenges` and `POST /policies` require `scan_id` = **latest completed** owner-scoped Discovery wallet scan for the address (**W2**). Non-latest → **422** `SCAN_NOT_LATEST`. Discovery unavailable → **503** `DISCOVERY_UNAVAILABLE`. Explore W2 wiring completes in RD-P6.
 
-**Runtime (RD-P4):** challenge handler is **strictly stateless** (hash + message only) — **no W2 / Discovery call** yet. W2 engagement gates on challenge + persist land in **RD-P5**.
+**Runtime (RD-P5):** `POST /wallet-challenges` and `POST /policies` enforce **W2** (latest completed owner-scoped scan). Discovery unset / timeout / 5xx → **503** `DISCOVERY_UNAVAILABLE`. Non-latest → **422** `SCAN_NOT_LATEST`. Explore W2 → **RD-P6**.
 
 ### Signature ≠ business bypass
 

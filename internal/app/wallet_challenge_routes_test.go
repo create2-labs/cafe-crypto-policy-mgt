@@ -50,7 +50,13 @@ func readWalletChallengeGoldenPayload(t *testing.T, name string) (raw []byte, wa
 
 func newWalletChallengeTestHandler(t *testing.T) http.Handler {
 	t.Helper()
-	// Auth only — RD-P4 challenge is stateless: no Discovery W2, no draft store reads.
+	return newWalletChallengeTestHandlerWithW2(t, walletChallengeTestWallet, walletChallengeTestScanID, true)
+}
+
+// newWalletChallengeTestHandlerWithW2 mocks Discovery latest=true for W2 engagement.
+// When discoveryUp is false, Discovery returns 503 (fail-closed).
+func newWalletChallengeTestHandlerWithW2(t *testing.T, wallet, latestScanID string, discoveryUp bool) http.Handler {
+	t.Helper()
 	introspect := newDiscoveryValidationServer(t, discoveryValidationTestConfig{status: http.StatusOK})
 	t.Cleanup(introspect.Close)
 	scanAuthz := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -58,6 +64,20 @@ func newWalletChallengeTestHandler(t *testing.T) http.Handler {
 		_, _ = w.Write([]byte(`{"allowed":true}`))
 	}))
 	t.Cleanup(scanAuthz.Close)
+	discovery := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !discoveryUp {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"error":"down"}`))
+			return
+		}
+		if r.URL.Path == "/discovery/v1/wallets/scans" && r.URL.Query().Get("latest") == "true" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"items":[{"scan_id":"` + latestScanID + `","status":"completed"}],"total":1,"limit":1,"offset":0}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	t.Cleanup(discovery.Close)
 
 	store, readStore := testReadStore(t)
 	handler, err := testHandler(readStore, store, authConfig{
@@ -67,6 +87,8 @@ func newWalletChallengeTestHandler(t *testing.T) http.Handler {
 		ScanAuthorizationURL:        scanAuthz.URL,
 		ScanAuthorizationTimeoutSec: 2,
 		ClockSkewSec:                30,
+		DiscoveryHTTPBaseURL:        discovery.URL,
+		DiscoveryHTTPTimeoutSec:     2,
 		WalletAuthDomain:            walletChallengeTestDomain,
 	})
 	if err != nil {
@@ -344,4 +366,49 @@ func TestWalletChallenge_messageStableAcrossCallsExceptTimestamps(t *testing.T) 
 	if rebuild != resp.Message {
 		t.Fatalf("message not stable for same bindings:\n got  %q\n want %q", resp.Message, rebuild)
 	}
+}
+
+func TestWalletChallenge_W2RejectsNonLatestScan(t *testing.T) {
+	historical := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+	h := newWalletChallengeTestHandlerWithW2(t, walletChallengeTestWallet, walletChallengeTestScanID, true)
+	token := mustToken(t, "wallet-challenge-w2-stale")
+	payloadJSON, _ := readWalletChallengeGoldenPayload(t, "hashed_payload_minimal")
+
+	var payload map[string]any
+	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
+		t.Fatal(err)
+	}
+	body, _ := json.Marshal(map[string]any{
+		"wallet_address": walletChallengeTestWallet,
+		"chain_id":       1,
+		"scan_id":        historical,
+		"action":         walletauth.ActionPersistCryptoPolicy,
+		"payload":        payload,
+	})
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.WalletChallenges, strings.NewReader(string(body)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("want 422, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	assertAuthErrorPayload(t, rec, walletAuthCodeScanNotLatest)
+}
+
+func TestWalletChallenge_DiscoveryDownFailClosed503(t *testing.T) {
+	h := newWalletChallengeTestHandlerWithW2(t, walletChallengeTestWallet, walletChallengeTestScanID, false)
+	token := mustToken(t, "wallet-challenge-w2-down")
+	payloadJSON, _ := readWalletChallengeGoldenPayload(t, "hashed_payload_minimal")
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.WalletChallenges, strings.NewReader(
+		walletChallengeBody(t, payloadJSON, nil),
+	))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("want 503, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	assertAuthErrorPayload(t, rec, walletAuthCodeDiscoveryUnavailable)
 }

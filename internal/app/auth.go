@@ -226,7 +226,9 @@ func isImmutabilityGuardRoute(r *http.Request) bool {
 	if r.Method != http.MethodPost {
 		return false
 	}
-	return r.URL.Path == cpmroutes.PoliciesDecisionsExplore || r.URL.Path == cpmroutes.Policies
+	// RD-P5: W2 on POST /policies + /wallet-challenges is handled in-route (SCAN_NOT_LATEST / DISCOVERY_UNAVAILABLE).
+	// Explore keeps the legacy IMM-10 guard until RD-P6 harmonizes codes.
+	return r.URL.Path == cpmroutes.PoliciesDecisionsExplore
 }
 
 type walletScanListItem struct {

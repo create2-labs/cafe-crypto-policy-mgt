@@ -263,6 +263,110 @@ func (s *OwnerScopedStore) SavePolicy(principal authz.Principal, id string, scan
 	return record, nil
 }
 
+// CreatePolicy inserts a signed, gated CP (RD-P5). Enforces W1: one active policy per owner+wallet.
+func (s *OwnerScopedStore) CreatePolicy(principal authz.Principal, in CreatePolicyInput) (CreatePolicyResult, error) {
+	if err := principal.Validate(); err != nil {
+		return CreatePolicyResult{}, ErrPrincipalRequired
+	}
+	scanID := strings.TrimSpace(in.ScanID)
+	if scanID == "" {
+		return CreatePolicyResult{}, errors.New("scan_id is required")
+	}
+	sha := strings.TrimSpace(in.PayloadSHA256)
+	if sha == "" {
+		return CreatePolicyResult{}, errors.New("payload_sha256 is required")
+	}
+	if in.Payload == nil {
+		return CreatePolicyResult{}, errors.New("payload is required")
+	}
+	if in.ChainID < 1 {
+		return CreatePolicyResult{}, errors.New("chain_id is required")
+	}
+	normWallet, err := NormalizeWalletTargetAddress(in.WalletAddress)
+	if err != nil {
+		return CreatePolicyResult{}, fmt.Errorf("wallet address is invalid: %w", err)
+	}
+	verifiedAt := in.WalletControlVerifiedAt.UTC()
+	if verifiedAt.IsZero() {
+		verifiedAt = time.Now().UTC()
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, rec := range s.policies {
+		if !sameOwner(rec.OwnerUserID, rec.TenantID, principal.UserID, principal.TenantID) {
+			continue
+		}
+		if walletAddressesEqual(rec.WalletAddress, normWallet) ||
+			walletAddressesEqual(walletFromPolicyPayload(rec.Payload), normWallet) {
+			return CreatePolicyResult{}, ErrPolicyAlreadyExists
+		}
+	}
+
+	policyID, err := newPolicyID()
+	if err != nil {
+		return CreatePolicyResult{}, err
+	}
+	payload := cloneMap(in.Payload)
+	if payload == nil {
+		payload = map[string]any{}
+	}
+	payload["scan_id"] = scanID
+	payload["wallet_address"] = normWallet
+	payload["chain_id"] = in.ChainID
+	payload["ownership_status"] = "verified"
+	payload["wallet_control_method"] = "eoa_signature"
+	payload["wallet_control_verified_at"] = verifiedAt.Format(time.RFC3339)
+	payload["persisted_at"] = verifiedAt.Format(time.RFC3339)
+	delete(payload, "signed_message")
+	delete(payload, "signature")
+	delete(payload, "payload_sha256")
+
+	record := PolicyRecord{
+		ID:            policyID,
+		OwnerUserID:   principal.UserID,
+		TenantID:      principal.TenantID,
+		ScanID:        scanID,
+		Payload:       payload,
+		PayloadSHA256: sha,
+		WalletAddress: normWallet,
+		ChainID:       in.ChainID,
+		CreatedAt:     verifiedAt,
+		UpdatedAt:     verifiedAt,
+	}
+	s.policies[policyID] = record
+	return CreatePolicyResult{
+		PolicyID:      policyID,
+		ScanID:        scanID,
+		WalletAddress: normWallet,
+		ChainID:       in.ChainID,
+		PayloadSHA256: sha,
+		PersistedAt:   verifiedAt,
+	}, nil
+}
+
+func walletFromPolicyPayload(payload map[string]any) string {
+	if payload == nil {
+		return ""
+	}
+	if v, ok := payload["wallet_address"].(string); ok {
+		if norm, err := NormalizeWalletTargetAddress(v); err == nil {
+			return norm
+		}
+	}
+	return ""
+}
+
+func walletAddressesEqual(a, b string) bool {
+	na, errA := NormalizeWalletTargetAddress(a)
+	nb, errB := NormalizeWalletTargetAddress(b)
+	if errA != nil || errB != nil {
+		return strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
+	}
+	return na == nb
+}
+
 // ListPersistedPoliciesForScan returns persisted policy instances for principal that
 // reference scanID (trimmed exact match on PolicyRecord.ScanID). Drafts are excluded.
 // Order is newest UpdatedAt first, then stable by id — at most one row is expected per

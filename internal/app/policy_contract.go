@@ -7,22 +7,23 @@ import (
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/persistence"
 )
 
-// policyRecordResponse is the public GET/POST /policies row (OpenAPI PolicyRecord).
-// Owner fields are omitted; shape mirrors draftRecordResponse.
+// policyRecordResponse is the public GET /policies row (OpenAPI PolicyRecord).
 type policyRecordResponse struct {
-	ID        string         `json:"id"`
-	ScanID    string         `json:"scan_id,omitempty"`
-	Payload   map[string]any `json:"payload"`
-	CreatedAt string         `json:"created_at"`
-	UpdatedAt string         `json:"updated_at"`
+	ID            string         `json:"id"`
+	ScanID        string         `json:"scan_id,omitempty"`
+	Payload       map[string]any `json:"payload"`
+	PayloadSHA256 string         `json:"payload_sha256,omitempty"`
+	CreatedAt     string         `json:"created_at"`
+	UpdatedAt     string         `json:"updated_at"`
 }
 
 func policyRecordResponseFromStore(record persistence.PolicyRecord) policyRecordResponse {
 	resp := policyRecordResponse{
-		ID:        record.ID,
-		Payload:   record.Payload,
-		CreatedAt: record.CreatedAt.UTC().Format(time.RFC3339Nano),
-		UpdatedAt: record.UpdatedAt.UTC().Format(time.RFC3339Nano),
+		ID:            record.ID,
+		Payload:       record.Payload,
+		PayloadSHA256: strings.TrimSpace(record.PayloadSHA256),
+		CreatedAt:     record.CreatedAt.UTC().Format(time.RFC3339Nano),
+		UpdatedAt:     record.UpdatedAt.UTC().Format(time.RFC3339Nano),
 	}
 	if scan := strings.TrimSpace(record.ScanID); scan != "" {
 		resp.ScanID = scan

@@ -24,12 +24,13 @@ func TestOptionAContract_persistBindingDiscoveryWithoutScanIDReturns400(t *testi
 	req.Header.Set("Content-Type", "application/json")
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
-	if res.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400 body=%s", res.Code, res.Body.String())
+	// RD-P5: unsigned legacy body is rejected (missing wallet_address / signature).
+	if res.Code != http.StatusBadRequest && res.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 400/403 body=%s", res.Code, res.Body.String())
 	}
 }
 
-func TestOptionAContract_persistBindingDiscoveryWithUUIDSetsScanID(t *testing.T) {
+func TestOptionAContract_unsignedLegacyPOSTPoliciesRejected(t *testing.T) {
 	h := newAuthedTestHandlerWithScanAuthz(t)
 	tok := mustToken(t, "user-discovery-persist-ok")
 	body := `{"id":"policy-with-scan","scan_id":"` + optionAContractScanID + `","binding":"discovery","payload":{"mode":"strict"}}`
@@ -38,18 +39,8 @@ func TestOptionAContract_persistBindingDiscoveryWithUUIDSetsScanID(t *testing.T)
 	req.Header.Set("Content-Type", "application/json")
 	res := httptest.NewRecorder()
 	h.ServeHTTP(res, req)
-	if res.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200 body=%s", res.Code, res.Body.String())
-	}
-	var out map[string]any
-	if err := json.Unmarshal(res.Body.Bytes(), &out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if got := out["scan_id"]; got != optionAContractScanID {
-		t.Fatalf("scan_id = %v, want %s", got, optionAContractScanID)
-	}
-	if out["id"] != "policy-with-scan" {
-		t.Fatalf("id = %v, want policy-with-scan", out["id"])
+	if res.Code == http.StatusOK {
+		t.Fatalf("legacy unsigned POST /policies must not succeed after RD-P5, body=%s", res.Body.String())
 	}
 }
 

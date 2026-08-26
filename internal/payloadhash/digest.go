@@ -32,39 +32,53 @@ var closedFieldSet = func() map[string]struct{} {
 // DigestJSON unmarshals raw JSON, validates the closed hashed set, normalizes
 // accepted_findings, and returns lowercase hex SHA-256 of RFC 8785 JCS bytes.
 func DigestJSON(raw []byte) (string, error) {
+	digest, _, err := DigestCanonicalJSON(raw)
+	return digest, err
+}
+
+// DigestCanonicalJSON is DigestJSON plus the canonical closed object to persist
+// (normalized accepted_findings). Client payload_sha256 must not be trusted.
+func DigestCanonicalJSON(raw []byte) (digest string, canonical map[string]any, err error) {
 	var root any
 	if err := json.Unmarshal(raw, &root); err != nil {
-		return "", reject(ReasonNotObject, "$", "invalid JSON: "+err.Error())
+		return "", nil, reject(ReasonNotObject, "$", "invalid JSON: "+err.Error())
 	}
-	return Digest(root)
+	return DigestCanonical(root)
 }
 
 // Digest validates a decoded JSON value as the closed hashed payload and
 // returns lowercase hex SHA-256 of RFC 8785 JCS bytes.
 func Digest(root any) (string, error) {
+	digest, _, err := DigestCanonical(root)
+	return digest, err
+}
+
+// DigestCanonical validates the closed hashed payload, normalizes findings, and
+// returns both the digest and the canonical object (for persist write + GET).
+func DigestCanonical(root any) (digest string, canonical map[string]any, err error) {
 	obj, ok := root.(map[string]any)
 	if !ok || obj == nil {
-		return "", reject(ReasonNotObject, "$", "hashed payload must be a JSON object")
+		return "", nil, reject(ReasonNotObject, "$", "hashed payload must be a JSON object")
 	}
 
 	for key := range obj {
 		if _, known := closedFieldSet[key]; !known {
-			return "", reject(ReasonUnknownField, "$."+key, "unknown top-level hashed field")
+			return "", nil, reject(ReasonUnknownField, "$."+key, "unknown top-level hashed field")
 		}
 	}
 	for _, field := range closedFields {
 		if _, present := obj[field]; !present {
-			return "", reject(ReasonMissingField, "$."+field, "required closed field missing")
+			return "", nil, reject(ReasonMissingField, "$."+field, "required closed field missing")
 		}
 	}
 
 	if err := assertAllowedSubtree(obj, "$"); err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	findings, err := findingsAsStrings(obj["accepted_findings"], "$.accepted_findings")
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	normalized := NormalizeAcceptedFindings(findings)
 
@@ -84,14 +98,14 @@ func Digest(root any) (string, error) {
 
 	marshaled, err := json.Marshal(closed)
 	if err != nil {
-		return "", fmt.Errorf("marshal closed hashed payload: %w", err)
+		return "", nil, fmt.Errorf("marshal closed hashed payload: %w", err)
 	}
 	canon, err := jcs.Transform(marshaled)
 	if err != nil {
-		return "", reject(ReasonCanonicalizeFailed, "$", err.Error())
+		return "", nil, reject(ReasonCanonicalizeFailed, "$", err.Error())
 	}
 	sum := sha256.Sum256(canon)
-	return hex.EncodeToString(sum[:]), nil
+	return hex.EncodeToString(sum[:]), closed, nil
 }
 
 func findingsAsStrings(v any, path string) ([]string, error) {

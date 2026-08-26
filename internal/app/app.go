@@ -98,7 +98,7 @@ func handlerWithOwnerStore(serviceName string, store *api.ReadStore, ownerStore 
 	registerPoliciesAssessmentRequestRoute(mux, authCfg)
 	registerOwnerScopedRoutes(mux, ownerStore, obs)
 	registerWalletChallengeRoutes(mux, authCfg, obs)
-	registerDraftPersistRoutes(mux, ownerStore, authCfg, obs)
+	registerPolicyPersistRoute(mux, ownerStore, authCfg, obs)
 	protected, err := withAuthentication(mux, authCfg)
 	if err != nil {
 		return nil, fmt.Errorf("wire auth middleware: %w", err)

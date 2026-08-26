@@ -25,8 +25,8 @@ info:
     and address. Non-latest completed → **422** `SCAN_NOT_LATEST`. Discovery unavailable → **503**
     `DISCOVERY_UNAVAILABLE` (fail-closed). Explore W2 harmonization lands with RD-P6.
 
-    **Contract ahead of runtime (RD-P1):** this OpenAPI / `CP_PERSIST.md` may lead handlers until
-    RD-P4/P5 wire the new routes. Legacy `/drafts*` handlers may still exist in code until removed.
+    **Contract / runtime (RD-P5):** OpenAPI matches signed `POST /policies` and
+    `POST /wallet-challenges` with W2 engagement. Explore W2 harmonization lands with RD-P6.
 
     **Public URL prefix:** `/api/cpm/v1`. Do **not** publish paths like `/api/cpm/v1/cpm/...` (no duplicated `cpm` segment).
 
