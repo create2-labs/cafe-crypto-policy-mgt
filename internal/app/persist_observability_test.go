@@ -51,7 +51,7 @@ func TestPersistObservability_userConstraintsIncompatibleDistinctFromExplore(t *
 
 	req := httptest.NewRequest(http.MethodPost, "/x", nil)
 	req.Header.Set("X-Request-Id", "req-p11b")
-	recordPersistUserConstraintsIncompatible(req, "", "cpm_pq_account_validation_v1", provider.FindingCodeContinuity)
+	recordPersistUserConstraintsIncompatible(req, "cpm_pq_account_validation_v1", provider.FindingCodeContinuity)
 
 	if metrics.increments != 1 {
 		t.Fatalf("want 1 persist metric increment, got %d", metrics.increments)

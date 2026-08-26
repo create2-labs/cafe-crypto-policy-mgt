@@ -128,7 +128,7 @@
 > **Supersedes** the draft-based CP-PERSIST V1 flow (`POST /drafts` → `POST /drafts/{id}/persist`).  
 > **Source of truth:** this section + [`openapi/cpm-v1.yaml`](../openapi/cpm-v1.yaml) + ADR §3.2.  
 > Historical Parts below (stories/PR breakdown with `draft_id`) remain for archaeology and are **not** the product contract.  
-> **Contract / runtime:** OpenAPI + this section are normative. **RD-P4** wired `POST /wallet-challenges` (stateless hash + canonical message). **RD-P5** adds W2 on challenge/persist, signed `POST /policies`, and removes `/drafts*` handlers. **RD-P6** harmonizes explore onto the same owner-scoped W2 helper (`SCAN_NOT_LATEST` / `DISCOVERY_UNAVAILABLE`). Store draft methods may remain until **RD-P7** dead-code sweep.
+> **Contract / runtime:** OpenAPI + this section are normative. **RD-P4** wired `POST /wallet-challenges` (stateless hash + canonical message). **RD-P5** adds W2 on challenge/persist, signed `POST /policies`, and removes `/drafts*` handlers. **RD-P6** harmonizes explore onto the same owner-scoped W2 helper (`SCAN_NOT_LATEST` / `DISCOVERY_UNAVAILABLE`). **RD-P7** removes leftover draft store/client/walletauth symbols (`PersistDraftOnce`, `Draft ID` message binding, `draft_count` on wallet-target).
 
 ### Product flow (EOA)
 

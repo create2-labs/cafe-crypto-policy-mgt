@@ -17,7 +17,7 @@ import (
 func TestDraftRoutesRemovedAfterRDP5(t *testing.T) {
 	h := newAuthedTestHandler(t)
 	token := mustToken(t, "user-a")
-	req := httptest.NewRequest(http.MethodPost, cpmroutes.Drafts, strings.NewReader(`{"id":"draft-1","payload":{"x":1}}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/cpm/v1/drafts", strings.NewReader(`{"id":"draft-1","payload":{"x":1}}`))
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 	res := httptest.NewRecorder()

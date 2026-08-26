@@ -3,19 +3,15 @@ package app
 import "net/http"
 
 const (
-	walletAuthCodeAddressRequired       = "WALLET_ADDRESS_REQUIRED"
-	walletAuthCodeInvalidAddress        = "INVALID_WALLET_ADDRESS"
-	walletAuthCodeChainIDRequired       = "CHAIN_ID_REQUIRED"
-	walletAuthCodeDraftNotFound         = "DRAFT_NOT_FOUND"
-	walletAuthCodeScanNotFound          = "SCAN_NOT_FOUND"
-	walletAuthCodeDraftScanMismatch     = "DRAFT_SCAN_MISMATCH"
-	walletAuthCodeDraftWalletMismatch   = "DRAFT_WALLET_MISMATCH"
-	walletAuthCodeUnsupportedWallet     = "UNSUPPORTED_WALLET_TYPE"
-	walletAuthCodeActionRequired        = "WALLET_AUTHORIZATION_ACTION_MISMATCH"
-	walletAuthCodeControlProofRequired  = "WALLET_CONTROL_PROOF_REQUIRED"
-	walletAuthCodeDraftAlreadyPersisted = "DRAFT_ALREADY_PERSISTED"
+	walletAuthCodeAddressRequired      = "WALLET_ADDRESS_REQUIRED"
+	walletAuthCodeInvalidAddress       = "INVALID_WALLET_ADDRESS"
+	walletAuthCodeChainIDRequired      = "CHAIN_ID_REQUIRED"
+	walletAuthCodeScanNotFound         = "SCAN_NOT_FOUND"
+	walletAuthCodeUnsupportedWallet    = "UNSUPPORTED_WALLET_TYPE"
+	walletAuthCodeActionRequired       = "WALLET_AUTHORIZATION_ACTION_MISMATCH"
+	walletAuthCodeControlProofRequired = "WALLET_CONTROL_PROOF_REQUIRED"
 
-	// CPM-P6/P10 provider snapshot gates (ADR §9) — returned on draft persist before store write.
+	// CPM-P6/P10 provider snapshot gates (ADR §9) — returned on signed POST /policies before store write.
 	persistCodeCryptoPolicyPayloadInvalid          = "CRYPTO_POLICY_PAYLOAD_INVALID"
 	persistCodeProviderRefsUnpinned                = "PROVIDER_REFS_UNPINNED"
 	persistCodeProviderSoftFindingsRequired        = "PROVIDER_SOFT_FINDINGS_REQUIRED"

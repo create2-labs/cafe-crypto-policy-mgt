@@ -70,7 +70,9 @@ func newWalletChallengeTestHandlerWithW2(t *testing.T, wallet, latestScanID stri
 			_, _ = w.Write([]byte(`{"error":"down"}`))
 			return
 		}
-		if r.URL.Path == "/discovery/v1/wallets/scans" && r.URL.Query().Get("latest") == "true" {
+		if r.URL.Path == "/discovery/v1/wallets/scans" &&
+			r.URL.Query().Get("latest") == "true" &&
+			strings.EqualFold(r.URL.Query().Get("address"), wallet) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"items":[{"scan_id":"` + latestScanID + `","status":"completed"}],"total":1,"limit":1,"offset":0}`))
 			return
@@ -192,8 +194,8 @@ func TestWalletChallenge_returnsCanonicalMessageWithPayloadSHA256(t *testing.T) 
 	if parsed.ScanID != walletChallengeTestScanID || parsed.PayloadSHA256 != wantDigest {
 		t.Fatalf("parsed bindings mismatch: %#v", parsed)
 	}
-	if parsed.DraftID != "" {
-		t.Fatalf("expected empty DraftID, got %q", parsed.DraftID)
+	if parsed.PayloadSHA256 == "" {
+		t.Fatalf("expected PayloadSHA256 in message, got empty")
 	}
 }
 

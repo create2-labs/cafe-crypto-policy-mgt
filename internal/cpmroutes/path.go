@@ -2,11 +2,6 @@ package cpmroutes
 
 import "strings"
 
-// DraftPersistPath returns the concrete persist path for a platform draft id.
-func DraftPersistPath(draftID string) string {
-	return V1Base + "/drafts/" + strings.TrimSpace(draftID) + "/persist"
-}
-
 // PathMatches reports whether actual matches pattern, including {param} segments.
 func PathMatches(pattern, actual string) bool {
 	if pattern == actual {

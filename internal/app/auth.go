@@ -618,14 +618,6 @@ func extractScanIDsForAuthorization(r *http.Request) ([]string, authz.APIError, 
 	if len(scanIDs) == 0 {
 		return nil, authz.APIError{}, http.StatusOK
 	}
-	// Platform draft POST: malformed scan_id is rejected by the handler (DRAFT_SCAN_ID_INVALID),
-	// not by upstream scan authorization (which would return 503 for non-UUID paths).
-	if r.Method == http.MethodPost && r.URL.Path == cpmroutes.Drafts {
-		scanIDs = filterScanIDsForDraftPostAuthorization(scanIDs)
-		if len(scanIDs) == 0 {
-			return nil, authz.APIError{}, http.StatusOK
-		}
-	}
 	base := scanIDs[0]
 	for _, scanID := range scanIDs[1:] {
 		if scanID != base {
@@ -637,17 +629,6 @@ func extractScanIDsForAuthorization(r *http.Request) ([]string, authz.APIError, 
 		}
 	}
 	return []string{base}, authz.APIError{}, http.StatusOK
-}
-
-// filterScanIDsForDraftPostAuthorization keeps only UUID-shaped scan_id values for AUTH-02.
-func filterScanIDsForDraftPostAuthorization(scanIDs []string) []string {
-	out := make([]string, 0, len(scanIDs))
-	for _, id := range scanIDs {
-		if norm, err := NormalizeDiscoveryScanID(id); err == nil {
-			out = append(out, norm)
-		}
-	}
-	return out
 }
 
 func scanIDsFromOwnerPoliciesGETQuery(r *http.Request) ([]string, authz.APIError, int) {
@@ -687,21 +668,15 @@ func collectScanIDs(payload map[string]any) ([]string, bool) {
 		}
 		value = strings.TrimSpace(value)
 		if value == "" {
-			// Explicit "" must match "no scan binding" (same as a missing key), e.g. owner
-			// draft POSTs that include scan_id for shape compatibility.
+			// Explicit "" must match "no scan binding" (same as a missing key).
 			return true
 		}
 		out = append(out, value)
 		return true
 	}
-	// Canonical JSON field for scan binding: `scan_id` (top-level and under `draft`).
+	// Canonical JSON field for scan binding: `scan_id` (top-level and under policy_context).
 	if !add(payload["scan_id"]) {
 		return nil, true
-	}
-	if draft, ok := payload["draft"].(map[string]any); ok {
-		if !add(draft["scan_id"]) {
-			return nil, true
-		}
 	}
 	if pc, ok := payload["policy_context"].(map[string]any); ok {
 		if !add(pc["scan_id"]) {

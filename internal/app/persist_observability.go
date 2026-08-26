@@ -38,13 +38,13 @@ var persistObs = persistObservability{
 	metrics: prometheusPersistMetrics{},
 }
 
-func recordPersistUserConstraintsIncompatible(r *http.Request, draftID, cryptoPolicyID, findingCode string) {
-	persistObs.recordUserConstraintsIncompatible(r, draftID, cryptoPolicyID, findingCode)
+func recordPersistUserConstraintsIncompatible(r *http.Request, cryptoPolicyID, findingCode string) {
+	persistObs.recordUserConstraintsIncompatible(r, cryptoPolicyID, findingCode)
 }
 
 func (o persistObservability) recordUserConstraintsIncompatible(
 	r *http.Request,
-	draftID, cryptoPolicyID, findingCode string,
+	cryptoPolicyID, findingCode string,
 ) {
 	o.metrics.IncPersistUserConstraintsIncompatible()
 	if o.logger == nil {
@@ -57,9 +57,6 @@ func (o persistObservability) recordUserConstraintsIncompatible(
 		"event=" + strconv.Quote(persistUserConstraintsIncompatibleEvent),
 		"adr_signal=" + strconv.Quote(adrSignalNoProviderAfterUserConstraints),
 		"finding_code=" + strconv.Quote(findingCode),
-	}
-	if draftID = strings.TrimSpace(draftID); draftID != "" {
-		fields = append(fields, "draft_id="+strconv.Quote(draftID))
 	}
 	if cryptoPolicyID = strings.TrimSpace(cryptoPolicyID); cryptoPolicyID != "" {
 		fields = append(fields, "crypto_policy_id="+strconv.Quote(cryptoPolicyID))

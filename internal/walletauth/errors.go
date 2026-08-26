@@ -10,7 +10,6 @@ const (
 	CodeWalletAuthorizationExpired        = "WALLET_AUTHORIZATION_EXPIRED"
 	CodeWalletAuthorizationNotYetValid    = "WALLET_AUTHORIZATION_NOT_YET_VALID"
 	CodeWalletAuthorizationValidityLong   = "WALLET_AUTHORIZATION_VALIDITY_TOO_LONG"
-	CodeWalletAuthorizationDraftMismatch  = "WALLET_AUTHORIZATION_DRAFT_MISMATCH"
 	CodePayloadSHA256Mismatch             = "PAYLOAD_SHA256_MISMATCH"
 	CodeWalletAuthorizationScanMismatch   = "WALLET_AUTHORIZATION_SCAN_MISMATCH"
 	CodeWalletAuthorizationWalletMismatch = "WALLET_AUTHORIZATION_WALLET_MISMATCH"

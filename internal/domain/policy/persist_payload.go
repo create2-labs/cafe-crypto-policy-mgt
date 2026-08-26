@@ -108,10 +108,10 @@ func (c *FlexibleChainID) UnmarshalJSON(b []byte) error {
 
 func (c FlexibleChainID) Int64() int64 { return int64(c) }
 
-// ValidateDraftPayloadForPersist decodes and gates a draft payload before PersistDraftOnce.
+// ValidatePayloadForPersist decodes and gates a hashed CP payload before CreatePolicy.
 // Replays couche A then couche B against the accepted snapshot (ADR §7 / §9 rule 7).
 // Does not re-resolve live manifests; cafe-persistence stays opaque to Nicetry logic.
-func ValidateDraftPayloadForPersist(raw map[string]any) error {
+func ValidatePayloadForPersist(raw map[string]any) error {
 	if raw == nil {
 		return fmt.Errorf("%w: payload is nil", ErrCryptoPolicyPayloadInvalid)
 	}
@@ -139,6 +139,22 @@ func (p *CryptoPolicyPersistPayload) ValidateForPersist(obs provider.HardObserva
 		return fmt.Errorf("%w: nil", ErrCryptoPolicyPayloadInvalid)
 	}
 	p.normalize()
+	if err := p.validatePersistIdentity(); err != nil {
+		return err
+	}
+	if err := p.validatePersistSnapshot(); err != nil {
+		return err
+	}
+	if err := p.requireAcceptedSoftFindings(); err != nil {
+		return err
+	}
+	if err := p.requirePinnedReferences(); err != nil {
+		return err
+	}
+	return p.replayCoucheAB(obs)
+}
+
+func (p *CryptoPolicyPersistPayload) validatePersistIdentity() error {
 	if p.SchemaVersion != CryptoPolicySchemaVersionV02 {
 		return fmt.Errorf("%w: schema_version %q", ErrCryptoPolicyPayloadInvalid, p.SchemaVersion)
 	}
@@ -154,6 +170,10 @@ func (p *CryptoPolicyPersistPayload) ValidateForPersist(obs provider.HardObserva
 	if err := p.SolutionProfileRef.Validate(); err != nil {
 		return fmt.Errorf("%w: solution_profile_ref: %v", ErrCryptoPolicyPayloadInvalid, err)
 	}
+	return nil
+}
+
+func (p *CryptoPolicyPersistPayload) validatePersistSnapshot() error {
 	s := &p.AcceptedProviderSnapshot
 	if s.Maturity == "" || s.ClaimStatus == "" || s.ResultingPosture == "" {
 		return fmt.Errorf("%w: accepted_provider_snapshot maturity/claim_status/resulting_posture required", ErrCryptoPolicyPayloadInvalid)
@@ -173,6 +193,11 @@ func (p *CryptoPolicyPersistPayload) ValidateForPersist(obs provider.HardObserva
 	if s.ChainSupportUsed.Status == provider.ChainStatusPlanned {
 		return ErrProviderChainPlanned
 	}
+	return nil
+}
+
+func (p *CryptoPolicyPersistPayload) requireAcceptedSoftFindings() error {
+	s := &p.AcceptedProviderSnapshot
 	softFindings, err := softFindingsForPersist(p)
 	if err != nil {
 		return err
@@ -195,15 +220,23 @@ func (p *CryptoPolicyPersistPayload) ValidateForPersist(obs provider.HardObserva
 	if len(missing) > 0 {
 		return fmt.Errorf("%w: missing %s", ErrProviderSoftFindingsRequired, strings.Join(missing, ", "))
 	}
-	if len(s.References) == 0 {
+	return nil
+}
+
+func (p *CryptoPolicyPersistPayload) requirePinnedReferences() error {
+	refs := p.AcceptedProviderSnapshot.References
+	if len(refs) == 0 {
 		return fmt.Errorf("%w: references required", ErrProviderRefsUnpinned)
 	}
-	for i, ref := range s.References {
+	for i, ref := range refs {
 		if ref.IsUnpinned() {
 			return fmt.Errorf("%w: references[%d] commit/version is %s or empty", ErrProviderRefsUnpinned, i, provider.UnpinnedPendingFixture)
 		}
 	}
+	return nil
+}
 
+func (p *CryptoPolicyPersistPayload) replayCoucheAB(obs provider.HardObservation) error {
 	profile := p.snapshotAsProfile()
 	if findings := provider.EvaluateScanCompatibility(obs, string(p.RequiredPosture), profile); len(findings) > 0 {
 		return fmt.Errorf("%w: %s", ErrProviderScanCompatFailed, findings[0].Message)

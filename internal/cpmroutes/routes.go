@@ -23,9 +23,6 @@ const (
 	// PoliciesAssessmentRequest is the async wallet-scan-only policy assessment trigger (WORKPLAN_API_PR PR13g).
 	PoliciesAssessmentRequest = PoliciesPrefix + "/assessment/request"
 
-	Drafts = V1Base + "/drafts"
-	// DraftPersist is retained as a constant only for path helpers / archaeology until RD-P7.
-	DraftPersist = Drafts + "/{draft_id}/persist"
 	// WalletChallenges is the mandatory stateless canonical message helper (CP-PERSIST / RD-P4+).
 	WalletChallenges = V1Base + "/wallet-challenges"
 	// WalletTargetContext is the owner-scoped IMM-9b lookup for proactive wallet scan UI (FE-IMM-2).

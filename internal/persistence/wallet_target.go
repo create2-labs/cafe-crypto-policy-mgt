@@ -10,10 +10,8 @@ const WalletSubjectPrefix = "wallet:"
 
 // WalletTargetContextCounts is the minimal IMM-9b lookup result for a normalized wallet target_address.
 type WalletTargetContextCounts struct {
-	Exists          bool
-	PolicyCount     int
-	DraftCount      int
-	PlatformDraftID string // set when DraftCount == 1 (owner GET /drafts?id= for W1 UI)
+	Exists      bool
+	PolicyCount int
 }
 
 // NormalizeWalletTargetAddress applies the same normalization as Discovery wallet scans (0x + lowercase).

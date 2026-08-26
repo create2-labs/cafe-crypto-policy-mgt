@@ -10,17 +10,14 @@ import (
 // Fields are the signed-message bindings for CP-PERSIST.
 // user_id and tenant_id are intentionally excluded.
 //
-// Normative (RD-P4+): PayloadSHA256 is embedded as "Payload SHA-256: …".
-// Legacy (until RD-P5 removes draft persist): DraftID may be embedded as
-// "Draft ID: …" when PayloadSHA256 is empty.
+// Normative (RD-P4+ / RD-P7): PayloadSHA256 is required as "Payload SHA-256: …".
 type Fields struct {
 	Domain        string
 	Action        string
 	WalletAddress string
 	ChainID       int64
 	ScanID        string
-	DraftID       string // legacy binding until RD-P5
-	PayloadSHA256 string // normative binding (hex)
+	PayloadSHA256 string
 	IssuedAt      time.Time
 	ExpiresAt     time.Time
 }
@@ -29,7 +26,6 @@ type Fields struct {
 func BuildMessage(fields Fields) string {
 	issued := fields.IssuedAt.UTC().Format(time.RFC3339)
 	expires := fields.ExpiresAt.UTC().Format(time.RFC3339)
-	binding := bindingLine(fields)
 	return strings.Join([]string{
 		messageTitle,
 		"",
@@ -38,19 +34,12 @@ func BuildMessage(fields Fields) string {
 		"Wallet: " + strings.TrimSpace(fields.WalletAddress),
 		"Chain ID: " + strconv.FormatInt(fields.ChainID, 10),
 		"Scan ID: " + strings.TrimSpace(fields.ScanID),
-		binding,
+		"Payload SHA-256: " + strings.TrimSpace(fields.PayloadSHA256),
 		"Issued At: " + issued,
 		"Expiration Time: " + expires,
 		"",
 		messageFooter,
 	}, "\n")
-}
-
-func bindingLine(fields Fields) string {
-	if sha := strings.TrimSpace(fields.PayloadSHA256); sha != "" {
-		return "Payload SHA-256: " + sha
-	}
-	return "Draft ID: " + strings.TrimSpace(fields.DraftID)
 }
 
 // ParseMessage extracts signed-message bindings from a canonical authorization message.
@@ -99,20 +88,16 @@ func ParseMessage(message string) (Fields, error) {
 	if err != nil {
 		return Fields{}, err
 	}
-
-	payloadSHA256, errSHA := readField("Payload SHA-256: ")
-	draftID, errDraft := readField("Draft ID: ")
-	if errSHA != nil && errDraft != nil {
-		return Fields{}, fmt.Errorf("missing Payload SHA-256 or Draft ID")
+	payloadSHA256, err := readField("Payload SHA-256: ")
+	if err != nil {
+		return Fields{}, err
 	}
-	if errSHA == nil && errDraft == nil {
-		return Fields{}, fmt.Errorf("canonical message must not include both Payload SHA-256 and Draft ID")
+	if strings.TrimSpace(payloadSHA256) == "" {
+		return Fields{}, fmt.Errorf("missing Payload SHA-256")
 	}
-	if errSHA != nil {
-		payloadSHA256 = ""
-	}
-	if errDraft != nil {
-		draftID = ""
+	// Reject legacy Draft ID messages (removed in RD-P7).
+	if _, errDraft := readField("Draft ID: "); errDraft == nil {
+		return Fields{}, fmt.Errorf("canonical message must not include Draft ID")
 	}
 
 	issuedRaw, err := readField("Issued At: ")
@@ -138,14 +123,13 @@ func ParseMessage(message string) (Fields, error) {
 		WalletAddress: wallet,
 		ChainID:       chainID,
 		ScanID:        scanID,
-		DraftID:       draftID,
 		PayloadSHA256: payloadSHA256,
 		IssuedAt:      issuedAt.UTC(),
 		ExpiresAt:     expiresAt.UTC(),
 	}, nil
 }
 
-// ExpectedMessageFromFields rebuilds the canonical message from Fields (payload or draft binding).
+// ExpectedMessageFromFields rebuilds the canonical message from Fields.
 func ExpectedMessageFromFields(fields Fields) string {
 	fields.Action = ActionPersistCryptoPolicy
 	return BuildMessage(fields)

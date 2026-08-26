@@ -130,7 +130,7 @@ func mapPersistenceError(w http.ResponseWriter, r *http.Request, obs *authObserv
 			TenantID:  principal.TenantID,
 		})
 		obs.writeAuthError(w, r, http.StatusForbidden, authCodeOwnerForbidden, "owner access denied", reasonDetails("owner_forbidden"))
-	case errors.Is(err, persistence.ErrDraftNotFound), errors.Is(err, persistence.ErrPolicyNotFound):
+	case errors.Is(err, persistence.ErrPolicyNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]any{jsonKeyError: errMsgNotFound})
 	case errors.Is(err, persistence.ErrPersistenceUnavailable):
 		writeJSON(w, http.StatusServiceUnavailable, apiErrorJSON(errCodePersistenceUnavailable, "persistence is temporarily unavailable"))

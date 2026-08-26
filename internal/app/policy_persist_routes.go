@@ -111,10 +111,10 @@ func handlePolicyPersist(w http.ResponseWriter, r *http.Request, store persisten
 	}
 
 	// Signature OK — still enforce business rejeu A+B (signature ≠ bypass).
-	if gateErr := policy.ValidateDraftPayloadForPersist(canonical); gateErr != nil {
+	if gateErr := policy.ValidatePayloadForPersist(canonical); gateErr != nil {
 		if errors.Is(gateErr, policy.ErrProviderUserConstraintsIncompatible) {
-			cpID := cryptoPolicyIDFromDraftPayload(canonical)
-			recordPersistUserConstraintsIncompatible(r, "", cpID, policy.UserConstraintsIncompatibleFindingCode(gateErr))
+			cpID := cryptoPolicyIDFromPayload(canonical)
+			recordPersistUserConstraintsIncompatible(r, cpID, policy.UserConstraintsIncompatibleFindingCode(gateErr))
 		}
 		status, code, message := mapPersistProviderGateError(gateErr)
 		writeWalletAuthorizationError(w, r, obs, status, code, message)
