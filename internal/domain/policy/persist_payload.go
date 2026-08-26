@@ -108,10 +108,10 @@ func (c *FlexibleChainID) UnmarshalJSON(b []byte) error {
 
 func (c FlexibleChainID) Int64() int64 { return int64(c) }
 
-// ValidateDraftPayloadForPersist decodes and gates a draft payload before PersistDraftOnce.
+// ValidatePayloadForPersist decodes and gates a hashed CP payload before CreatePolicy.
 // Replays couche A then couche B against the accepted snapshot (ADR §7 / §9 rule 7).
 // Does not re-resolve live manifests; cafe-persistence stays opaque to Nicetry logic.
-func ValidateDraftPayloadForPersist(raw map[string]any) error {
+func ValidatePayloadForPersist(raw map[string]any) error {
 	if raw == nil {
 		return fmt.Errorf("%w: payload is nil", ErrCryptoPolicyPayloadInvalid)
 	}

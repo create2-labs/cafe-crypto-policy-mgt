@@ -119,7 +119,7 @@ func TestValidateForPersist_rejectsCoucheAKO(t *testing.T) {
 	}
 }
 
-func TestValidateDraftPayloadForPersist_mapRoundTrip(t *testing.T) {
+func TestValidatePayloadForPersist_mapRoundTrip(t *testing.T) {
 	raw := map[string]any{
 		"schema_version":   CryptoPolicySchemaVersionV02,
 		"crypto_policy_id": "cpm_pq_account_validation_v1",
@@ -147,18 +147,18 @@ func TestValidateDraftPayloadForPersist_mapRoundTrip(t *testing.T) {
 		},
 		"policy_context": map[string]any{"wallet_type": "eoa", "chain_ids": []any{float64(11155111)}},
 	}
-	if err := ValidateDraftPayloadForPersist(raw); err != nil {
+	if err := ValidatePayloadForPersist(raw); err != nil {
 		t.Fatalf("ok: %v", err)
 	}
 	raw["accepted_provider_snapshot"].(map[string]any)["references"] = []any{
 		map[string]any{"kind": "source_repo", "url": "https://example.com/a", "commit": provider.UnpinnedPendingFixture},
 	}
-	if err := ValidateDraftPayloadForPersist(raw); !errors.Is(err, ErrProviderRefsUnpinned) {
+	if err := ValidatePayloadForPersist(raw); !errors.Is(err, ErrProviderRefsUnpinned) {
 		t.Fatalf("want unpinned, got %v", err)
 	}
 }
 
-func TestValidateDraftPayloadForPersist_rejectsLegacy(t *testing.T) {
+func TestValidatePayloadForPersist_rejectsLegacy(t *testing.T) {
 	base := func() map[string]any {
 		return map[string]any{
 			"schema_version":   CryptoPolicySchemaVersionV02,
@@ -191,25 +191,25 @@ func TestValidateDraftPayloadForPersist_rejectsLegacy(t *testing.T) {
 
 	withTemplate := base()
 	withTemplate["template_id"] = "tpl_legacy"
-	if err := ValidateDraftPayloadForPersist(withTemplate); !errors.Is(err, ErrCryptoPolicyPayloadInvalid) {
+	if err := ValidatePayloadForPersist(withTemplate); !errors.Is(err, ErrCryptoPolicyPayloadInvalid) {
 		t.Fatalf("template_id: %v", err)
 	}
 
 	missingUC := base()
 	delete(missingUC, "user_constraints")
-	if err := ValidateDraftPayloadForPersist(missingUC); !errors.Is(err, ErrCryptoPolicyPayloadInvalid) {
+	if err := ValidatePayloadForPersist(missingUC); !errors.Is(err, ErrCryptoPolicyPayloadInvalid) {
 		t.Fatalf("missing user_constraints: %v", err)
 	}
 
 	missingCP := base()
 	delete(missingCP, "crypto_policy_id")
-	if err := ValidateDraftPayloadForPersist(missingCP); !errors.Is(err, ErrCryptoPolicyPayloadInvalid) {
+	if err := ValidatePayloadForPersist(missingCP); !errors.Is(err, ErrCryptoPolicyPayloadInvalid) {
 		t.Fatalf("missing crypto_policy_id: %v", err)
 	}
 
 	withSelection := base()
 	withSelection["selection_request"] = map[string]any{"allow_new_wallet": true}
-	if err := ValidateDraftPayloadForPersist(withSelection); !errors.Is(err, ErrCryptoPolicyPayloadInvalid) {
+	if err := ValidatePayloadForPersist(withSelection); !errors.Is(err, ErrCryptoPolicyPayloadInvalid) {
 		t.Fatalf("selection_request: %v", err)
 	}
 }

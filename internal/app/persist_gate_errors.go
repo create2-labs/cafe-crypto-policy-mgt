@@ -23,7 +23,7 @@ func mapWalletAuthorizationVerificationError(err error) (status int, code string
 		return http.StatusUnauthorized, code, message
 	case walletauth.CodeWalletAuthorizationExpired:
 		return http.StatusGone, code, message
-	case walletauth.CodeWalletAuthorizationDraftMismatch, walletauth.CodeWalletAuthorizationScanMismatch,
+	case walletauth.CodeWalletAuthorizationScanMismatch,
 		walletauth.CodeWalletAuthorizationWalletMismatch, walletauth.CodeWalletAuthorizationChainMismatch,
 		walletauth.CodeWalletAuthorizationActionMismatch:
 		return http.StatusConflict, code, message
@@ -54,7 +54,7 @@ func mapPersistProviderGateError(err error) (status int, code string, message st
 	}
 }
 
-func cryptoPolicyIDFromDraftPayload(payload map[string]any) string {
+func cryptoPolicyIDFromPayload(payload map[string]any) string {
 	if payload == nil {
 		return ""
 	}

@@ -15,195 +15,15 @@ import (
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/authz"
 )
 
-type draftPersistState struct {
-	PolicyID    string
-	OwnerUserID string
-	TenantID    string
-	Completed   bool
-	PersistedAt time.Time
-}
-
 type OwnerScopedStore struct {
-	mu             sync.RWMutex
-	drafts         map[string]DraftRecord
-	policies       map[string]PolicyRecord
-	draftPersisted map[string]draftPersistState
+	mu       sync.RWMutex
+	policies map[string]PolicyRecord
 }
 
 func NewOwnerScopedStore() *OwnerScopedStore {
 	return &OwnerScopedStore{
-		drafts:         make(map[string]DraftRecord),
-		policies:       make(map[string]PolicyRecord),
-		draftPersisted: make(map[string]draftPersistState),
+		policies: make(map[string]PolicyRecord),
 	}
-}
-
-func (s *OwnerScopedStore) SaveDraft(principal authz.Principal, id string, scanID string, payload map[string]any) (DraftRecord, error) {
-	if err := principal.Validate(); err != nil {
-		return DraftRecord{}, ErrPrincipalRequired
-	}
-	now := time.Now().UTC()
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	existing, hasExisting := s.drafts[id]
-	if hasExisting && !sameOwner(existing.OwnerUserID, existing.TenantID, principal.UserID, principal.TenantID) {
-		return DraftRecord{}, ErrForbidden
-	}
-	createdAt := now
-	if hasExisting {
-		createdAt = existing.CreatedAt
-	}
-	record := DraftRecord{
-		ID:          id,
-		OwnerUserID: principal.UserID,
-		TenantID:    principal.TenantID,
-		ScanID:      scanID,
-		Payload:     cloneMap(payload),
-		CreatedAt:   createdAt,
-		UpdatedAt:   now,
-	}
-	s.drafts[id] = record
-	return record, nil
-}
-
-func (s *OwnerScopedStore) GetDraft(principal authz.Principal, id string) (DraftRecord, error) {
-	if err := principal.Validate(); err != nil {
-		return DraftRecord{}, ErrPrincipalRequired
-	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	record, ok := s.drafts[id]
-	if !ok {
-		return DraftRecord{}, ErrDraftNotFound
-	}
-	if !sameOwner(record.OwnerUserID, record.TenantID, principal.UserID, principal.TenantID) {
-		return DraftRecord{}, ErrForbidden
-	}
-	record.Payload = cloneMap(record.Payload)
-	return record, nil
-}
-
-// DeleteDraft removes a platform draft by id for principal. ErrDraftNotFound if missing;
-// ErrForbidden if owned by another principal (callers may map to 404).
-func (s *OwnerScopedStore) DeleteDraft(principal authz.Principal, id string) error {
-	if err := principal.Validate(); err != nil {
-		return ErrPrincipalRequired
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	record, ok := s.drafts[id]
-	if !ok {
-		return ErrDraftNotFound
-	}
-	if !sameOwner(record.OwnerUserID, record.TenantID, principal.UserID, principal.TenantID) {
-		return ErrForbidden
-	}
-	delete(s.drafts, id)
-	return nil
-}
-
-// PersistDraftOnce transitions an owner-scoped draft to a persisted policy exactly once.
-// If policy creation fails before completion, the same draft may be retried with the same policy id.
-func (s *OwnerScopedStore) PersistDraftOnce(principal authz.Principal, draftID string, in PersistDraftInput) (PersistDraftResult, error) {
-	if err := principal.Validate(); err != nil {
-		return PersistDraftResult{}, ErrPrincipalRequired
-	}
-	draftID = strings.TrimSpace(draftID)
-	if draftID == "" {
-		return PersistDraftResult{}, ErrDraftNotFound
-	}
-	verifiedAt := in.VerifiedAt.UTC()
-	if verifiedAt.IsZero() {
-		verifiedAt = time.Now().UTC()
-	}
-	normWallet, err := NormalizeWalletTargetAddress(in.WalletAddress)
-	if err != nil {
-		return PersistDraftResult{}, fmt.Errorf("wallet address is invalid: %w", err)
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if state, ok := s.draftPersisted[draftID]; ok && state.Completed {
-		if !sameOwner(state.OwnerUserID, state.TenantID, principal.UserID, principal.TenantID) {
-			return PersistDraftResult{}, ErrDraftNotFound
-		}
-		return PersistDraftResult{}, ErrDraftAlreadyPersisted
-	}
-
-	draft, ok := s.drafts[draftID]
-	if !ok {
-		return PersistDraftResult{}, ErrDraftNotFound
-	}
-	if !sameOwner(draft.OwnerUserID, draft.TenantID, principal.UserID, principal.TenantID) {
-		return PersistDraftResult{}, ErrForbidden
-	}
-
-	state := s.draftPersisted[draftID]
-	state.OwnerUserID = principal.UserID
-	state.TenantID = principal.TenantID
-	policyID := state.PolicyID
-	if policyID == "" {
-		policyID, err = newPolicyID()
-		if err != nil {
-			return PersistDraftResult{}, err
-		}
-		state.PolicyID = policyID
-	}
-
-	s.removeOtherPoliciesForScanLocked(
-		principal.UserID,
-		principal.TenantID,
-		draft.ScanID,
-		policyID,
-	)
-
-	persistedAt := verifiedAt
-	payload := policyPayloadFromDraft(draft.Payload, draftID, draft.ScanID, normWallet, in.ChainID, persistedAt)
-	record := PolicyRecord{
-		ID:          policyID,
-		OwnerUserID: principal.UserID,
-		TenantID:    principal.TenantID,
-		ScanID:      draft.ScanID,
-		Payload:     payload,
-		CreatedAt:   persistedAt,
-		UpdatedAt:   persistedAt,
-	}
-	if existing, hasExisting := s.policies[policyID]; hasExisting {
-		record.CreatedAt = existing.CreatedAt
-	}
-	s.policies[policyID] = record
-	state.Completed = true
-	state.PersistedAt = persistedAt
-	s.draftPersisted[draftID] = state
-	delete(s.drafts, draftID)
-
-	return PersistDraftResult{
-		PolicyID:      policyID,
-		DraftID:       draftID,
-		ScanID:        strings.TrimSpace(draft.ScanID),
-		WalletAddress: normWallet,
-		ChainID:       in.ChainID,
-		PersistedAt:   persistedAt,
-	}, nil
-}
-
-func policyPayloadFromDraft(draftPayload map[string]any, draftID, scanID, wallet string, chainID int64, verifiedAt time.Time) map[string]any {
-	out := cloneMap(draftPayload)
-	if out == nil {
-		out = make(map[string]any)
-	}
-	out["draft_id"] = draftID
-	out["scan_id"] = strings.TrimSpace(scanID)
-	out["wallet_address"] = wallet
-	out["chain_id"] = chainID
-	out["ownership_status"] = "verified"
-	out["wallet_control_method"] = "eoa_signature"
-	out["wallet_control_verified_at"] = verifiedAt.Format(time.RFC3339)
-	out["persisted_at"] = verifiedAt.Format(time.RFC3339)
-	delete(out, "signed_message")
-	delete(out, "signature")
-	return out
 }
 
 func newPolicyID() (string, error) {
@@ -212,27 +32,6 @@ func newPolicyID() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(b[:]), nil
-}
-
-// DraftPersistStatus reports whether a draft was already persisted for principal.
-func (s *OwnerScopedStore) DraftPersistStatus(principal authz.Principal, draftID string) error {
-	if err := principal.Validate(); err != nil {
-		return ErrPrincipalRequired
-	}
-	draftID = strings.TrimSpace(draftID)
-	if draftID == "" {
-		return ErrDraftNotFound
-	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	state, ok := s.draftPersisted[draftID]
-	if !ok || !state.Completed {
-		return nil
-	}
-	if !sameOwner(state.OwnerUserID, state.TenantID, principal.UserID, principal.TenantID) {
-		return ErrDraftNotFound
-	}
-	return ErrDraftAlreadyPersisted
 }
 
 func (s *OwnerScopedStore) SavePolicy(principal authz.Principal, id string, scanID string, payload map[string]any) (PolicyRecord, error) {
@@ -368,9 +167,8 @@ func walletAddressesEqual(a, b string) bool {
 }
 
 // ListPersistedPoliciesForScan returns persisted policy instances for principal that
-// reference scanID (trimmed exact match on PolicyRecord.ScanID). Drafts are excluded.
-// Order is newest UpdatedAt first, then stable by id — at most one row is expected per
-// scan after CP-PERSIST replacement (PersistDraftOnce supersedes prior policies).
+// reference scanID (trimmed exact match on PolicyRecord.ScanID).
+// Order is newest UpdatedAt first, then stable by id.
 func (s *OwnerScopedStore) ListPersistedPoliciesForScan(principal authz.Principal, scanID string) ([]PolicyRecord, error) {
 	if err := principal.Validate(); err != nil {
 		return nil, ErrPrincipalRequired
@@ -400,27 +198,6 @@ func (s *OwnerScopedStore) ListPersistedPoliciesForScan(principal authz.Principa
 		return out[i].UpdatedAt.After(out[j].UpdatedAt)
 	})
 	return out, nil
-}
-
-// removeOtherPoliciesForScanLocked drops prior persisted CP rows for the same scan so
-// replacement persist enforces at most one recommended policy per scan (CPM V1).
-func (s *OwnerScopedStore) removeOtherPoliciesForScanLocked(userID, tenantID, scanID, keepPolicyID string) {
-	needle := strings.TrimSpace(scanID)
-	if needle == "" {
-		return
-	}
-	keep := strings.TrimSpace(keepPolicyID)
-	for id, rec := range s.policies {
-		if keep != "" && id == keep {
-			continue
-		}
-		if !sameOwner(rec.OwnerUserID, rec.TenantID, userID, tenantID) {
-			continue
-		}
-		if strings.EqualFold(strings.TrimSpace(rec.ScanID), needle) {
-			delete(s.policies, id)
-		}
-	}
 }
 
 // DeletePolicy removes a persisted policy instance by id for principal. ErrPolicyNotFound if

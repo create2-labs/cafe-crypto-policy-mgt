@@ -47,14 +47,9 @@ func handleOwnerGETWalletTargetContext(w http.ResponseWriter, r *http.Request, s
 		writeJSON(w, http.StatusInternalServerError, map[string]any{jsonKeyError: errMsgInternalServerError})
 		return
 	}
-	body := map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"exists":         counts.Exists,
 		"policy_count":   counts.PolicyCount,
-		"draft_count":    counts.DraftCount,
 		"target_address": norm,
-	}
-	if counts.PlatformDraftID != "" {
-		body["platform_draft_id"] = counts.PlatformDraftID
-	}
-	writeJSON(w, http.StatusOK, body)
+	})
 }

@@ -192,8 +192,8 @@ func TestWalletChallenge_returnsCanonicalMessageWithPayloadSHA256(t *testing.T) 
 	if parsed.ScanID != walletChallengeTestScanID || parsed.PayloadSHA256 != wantDigest {
 		t.Fatalf("parsed bindings mismatch: %#v", parsed)
 	}
-	if parsed.DraftID != "" {
-		t.Fatalf("expected empty DraftID, got %q", parsed.DraftID)
+	if parsed.PayloadSHA256 == "" {
+		t.Fatalf("expected PayloadSHA256 in message, got empty")
 	}
 }
 

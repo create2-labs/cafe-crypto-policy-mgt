@@ -20,7 +20,7 @@ func TestVerifyAuthorization_bindingAndFreshnessFailures(t *testing.T) {
 		WalletAddress: vectorWalletAddress,
 		ChainID:       1,
 		ScanID:        vectorScanID,
-		DraftID:       vectorDraftID,
+		PayloadSHA256: vectorPayloadSHA256,
 		SignedMessage: message,
 		Signature:     signature,
 		Now:           now,
@@ -47,11 +47,11 @@ func TestVerifyAuthorization_bindingAndFreshnessFailures(t *testing.T) {
 			wantCode: walletauth.CodeWalletAuthorizationChainMismatch,
 		},
 		{
-			name: "wrong draft",
+			name: "wrong payload sha",
 			mutate: func(in *walletauth.VerifyInput) {
-				in.DraftID = "00000000-0000-0000-0000-000000000099"
+				in.PayloadSHA256 = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
 			},
-			wantCode: walletauth.CodeWalletAuthorizationDraftMismatch,
+			wantCode: walletauth.CodePayloadSHA256Mismatch,
 		},
 		{
 			name: "wrong scan",
@@ -95,7 +95,7 @@ func TestVerifyAuthorization_bindingAndFreshnessFailures(t *testing.T) {
 			mutate: func(in *walletauth.VerifyInput) {
 				in.SignedMessage = strings.Replace(message, "Action: persist_crypto_policy", "Action: evil_action", 1)
 				in.Signature = signPersonalMessage(t, in.SignedMessage)
-				in.DraftID = vectorDraftID
+				in.PayloadSHA256 = vectorPayloadSHA256
 				in.ScanID = vectorScanID
 			},
 			wantCode: walletauth.CodeWalletAuthorizationActionMismatch,
@@ -128,7 +128,7 @@ func TestRecoverSignerAddress_mismatch(t *testing.T) {
 		WalletAddress: "0x0000000000000000000000000000000000000001",
 		ChainID:       1,
 		ScanID:        vectorScanID,
-		DraftID:       vectorDraftID,
+		PayloadSHA256: vectorPayloadSHA256,
 		SignedMessage: message,
 		Signature:     signature,
 		Now:           issued.Add(time.Minute),

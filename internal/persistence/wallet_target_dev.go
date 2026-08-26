@@ -8,7 +8,7 @@ import (
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/authz"
 )
 
-// CountActiveWalletCPMContext returns how many persisted policies and platform drafts for principal
+// CountActiveWalletCPMContext returns how many persisted policies for principal
 // reference the given normalized wallet target_address (WORKPLAN §2.2 W1, IMM-9b).
 func (s *OwnerScopedStore) CountActiveWalletCPMContext(principal authz.Principal, normalizedTargetAddress string) (WalletTargetContextCounts, error) {
 	return s.lookupActiveWalletCPMContext(principal, normalizedTargetAddress)
@@ -24,8 +24,7 @@ func (s *OwnerScopedStore) lookupActiveWalletCPMContext(principal authz.Principa
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	var policyCount, draftCount int
-	var soleDraftID string
+	var policyCount int
 	for _, rec := range s.policies {
 		if !sameOwner(rec.OwnerUserID, rec.TenantID, principal.UserID, principal.TenantID) {
 			continue
@@ -34,29 +33,10 @@ func (s *OwnerScopedStore) lookupActiveWalletCPMContext(principal authz.Principa
 			policyCount++
 		}
 	}
-	for _, rec := range s.drafts {
-		if !sameOwner(rec.OwnerUserID, rec.TenantID, principal.UserID, principal.TenantID) {
-			continue
-		}
-		if walletTargetFromPayload(rec.Payload) == needle {
-			draftCount++
-			if draftCount == 1 {
-				soleDraftID = strings.TrimSpace(rec.ID)
-			} else {
-				soleDraftID = ""
-			}
-		}
-	}
-	total := policyCount + draftCount
-	out := WalletTargetContextCounts{
-		Exists:      total > 0,
+	return WalletTargetContextCounts{
+		Exists:      policyCount > 0,
 		PolicyCount: policyCount,
-		DraftCount:  draftCount,
-	}
-	if draftCount == 1 {
-		out.PlatformDraftID = soleDraftID
-	}
-	return out, nil
+	}, nil
 }
 
 func walletTargetFromPayload(payload map[string]any) string {
@@ -80,11 +60,6 @@ func extractWalletTargetAddress(payload map[string]any) string {
 	}
 	if swc, ok := payload["selected_wallet_policy_context"].(map[string]any); ok {
 		if addr := walletTargetFromScanContext(swc); addr != "" {
-			return addr
-		}
-	}
-	if draft, ok := payload["draft"].(map[string]any); ok {
-		if addr := extractWalletTargetAddress(draft); addr != "" {
 			return addr
 		}
 	}

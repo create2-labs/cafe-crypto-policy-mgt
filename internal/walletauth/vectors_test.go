@@ -16,7 +16,7 @@ const (
 	vectorWalletAddress = "0xee387b44819eb54d7fff026a18229421738a8a24"
 	vectorDomain        = "api.example.com"
 	vectorScanID        = "550e8400-e29b-41d4-a716-446655440000"
-	vectorDraftID       = "550e8400-e29b-41d4-a716-446655440001"
+	vectorPayloadSHA256 = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 )
 
 func signPersonalMessage(t *testing.T, message string) string {
@@ -44,7 +44,7 @@ func vectorMessage(t *testing.T, issued, expires time.Time) string {
 		WalletAddress: vectorWalletAddress,
 		ChainID:       1,
 		ScanID:        vectorScanID,
-		DraftID:       vectorDraftID,
+		PayloadSHA256: vectorPayloadSHA256,
 		IssuedAt:      issued,
 		ExpiresAt:     expires,
 	})
@@ -70,7 +70,7 @@ func TestDeterministicSignatureVector(t *testing.T) {
 		WalletAddress: vectorWalletAddress,
 		ChainID:       1,
 		ScanID:        vectorScanID,
-		DraftID:       vectorDraftID,
+		PayloadSHA256: vectorPayloadSHA256,
 		SignedMessage: message,
 		Signature:     signature,
 		Now:           issued.Add(30 * time.Second),

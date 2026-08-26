@@ -10,7 +10,7 @@ See [ADR](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260803_cp_pro
 
 ---
 
-## Remove CP drafts (ADR 2026-08-24) — **Validé** / RD-P6 in progress
+## Remove CP drafts (ADR 2026-08-24) — **Validé** / RD-P7 (this PR)
 
 Suppression des drafts CP (produit + API + tables). Exécution : [ADR](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260824_remove_cp_drafts.md) / [PR plan RD-P*](https://github.com/create2-labs/cafe-adr/blob/main/ADR_20260824_remove_cp_drafts_PR_PLAN.md).
 
@@ -20,8 +20,9 @@ Suppression des drafts CP (produit + API + tables). Exécution : [ADR](https://g
 - **RD-P3** ✅ ([cafe-persistence #9](https://github.com/create2-labs/cafe-persistence/pull/9)) : drop draft tables / W1 / audit
 - **RD-P4** ✅ ([#83](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/83)) : `POST /wallet-challenges` stateless
 - **RD-P5** ✅ ([#84](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/84) + deploy [#42](https://github.com/create2-labs/cafe-deploy/pull/42)) : signed `POST /policies` + W2 engagement + retrait `/drafts*`
-- **RD-P6** (cette PR) : harmoniser W2 explore + helper partagé `ensureOwnerScopedW2` + smoke W2
-- **Next :** **RD-P7** (dead code sweep draft)
+- **RD-P6** ✅ ([#85](https://github.com/create2-labs/cafe-crypto-policy-mgt/pull/85) + deploy [#43](https://github.com/create2-labs/cafe-deploy/pull/43)) : W2 explore harmonisé + helper partagé
+- **RD-P7** (cette PR) : dead code sweep draft (`PolicyStore` / cphttp / walletauth Draft ID / wallet-target)
+- **Next :** **RD-P8** (smokes backend verts — gate FE)
 - FE après smokes backend (**RD-P8**). Détail IMM/TODO frontend → **RD-P14**.
 ---
 ## Open — Retirer entièrement le mode CPM mock (frontend)
@@ -142,11 +143,11 @@ Mettre à jour les passages « preserve mock mode » / placeholder V1 :
 
 ## W1 / IMM-9b — Lookup by `target_address` in payload only (not `scan_id`)
 
-**Context:** Internal lookup `POST /internal/policies/references/wallet-target` and `CountActiveWalletCPMContext` match owner policies/drafts by extracting a wallet address from **stored payload** (`policy_context`, `selected_wallet_policy_context`, `wallet_address`, etc.). This is intentional: Discovery must not resolve address via `policy.scan_id → Discovery detail` before allocating a new `scan_id` (**IMM-9b**).
+**Context:** Internal lookup `POST /internal/policies/references/wallet-target` and `CountActiveWalletCPMContext` match owner **policies** by extracting a wallet address from **stored payload** (`policy_context`, `selected_wallet_policy_context`, `wallet_address`, etc.). This is intentional: Discovery must not resolve address via `policy.scan_id → Discovery detail` before allocating a new `scan_id` (**IMM-9b**).
 
 **Implication:** Records with payload that has **no** denormalized address (e.g. PR5-style `{ "x": 1 }` with only `PolicyRecord.ScanID` set) do **not** participate in W1 for any address — rescan is not blocked. Real flows (explore/persist, UI, deploy scripts) must persist `target_address` (or equivalent) in the payload.
 
-**Not a bug:** Do not “fix” by joining on `scan_id` and calling Discovery from CPM for W1. If product requires blocking in legacy shapes, migrate payloads or enforce address fields on `POST …/policies` / `POST …/drafts` at write time.
+**Not a bug:** Do not “fix” by joining on `scan_id` and calling Discovery from CPM for W1. If product requires blocking in legacy shapes, migrate payloads or enforce address fields on `POST …/policies` at write time.
 
 **Repos:** Document in `workplans/IMMUTABILITE_PR.md` / optional persist validation if product wants stricter guarantees.
 

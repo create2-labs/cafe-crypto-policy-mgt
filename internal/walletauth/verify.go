@@ -12,14 +12,12 @@ import (
 )
 
 // VerifyInput is the expected binding set for persist-time authorization checks.
-// Set PayloadSHA256 for the normative (RD-P4+) message binding, or DraftID for
-// legacy draft-persist until RD-P5 removes it.
+// PayloadSHA256 is required (normative RD-P4+ message binding).
 type VerifyInput struct {
 	Domain        string
 	WalletAddress string
 	ChainID       int64
 	ScanID        string
-	DraftID       string
 	PayloadSHA256 string
 	SignedMessage string
 	Signature     string
@@ -61,7 +59,6 @@ func VerifyAuthorization(in VerifyInput) error {
 		WalletAddress: normalizedWalletForMessage(in.WalletAddress),
 		ChainID:       in.ChainID,
 		ScanID:        strings.TrimSpace(in.ScanID),
-		DraftID:       strings.TrimSpace(in.DraftID),
 		PayloadSHA256: strings.TrimSpace(in.PayloadSHA256),
 		IssuedAt:      parsed.IssuedAt,
 		ExpiresAt:     parsed.ExpiresAt,
@@ -103,12 +100,8 @@ func compareBindings(parsed Fields, in VerifyInput) error {
 	}
 	wantSHA := strings.TrimSpace(in.PayloadSHA256)
 	gotSHA := strings.TrimSpace(parsed.PayloadSHA256)
-	if wantSHA != "" || gotSHA != "" {
-		if wantSHA == "" || gotSHA == "" || !strings.EqualFold(wantSHA, gotSHA) {
-			return verificationError(CodePayloadSHA256Mismatch, "signed authorization payload_sha256 mismatch")
-		}
-	} else if strings.TrimSpace(parsed.DraftID) != strings.TrimSpace(in.DraftID) {
-		return verificationError(CodeWalletAuthorizationDraftMismatch, "signed authorization draft mismatch")
+	if wantSHA == "" || gotSHA == "" || !strings.EqualFold(wantSHA, gotSHA) {
+		return verificationError(CodePayloadSHA256Mismatch, "signed authorization payload_sha256 mismatch")
 	}
 	if strings.TrimSpace(parsed.ScanID) != strings.TrimSpace(in.ScanID) {
 		return verificationError(CodeWalletAuthorizationScanMismatch, "signed authorization scan mismatch")
