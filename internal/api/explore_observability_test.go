@@ -12,6 +12,7 @@ import (
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/policy"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/provider"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/persistence"
 )
 
@@ -107,10 +108,9 @@ func TestExploreObservability_emitsMetricAndLogForNoCandidate(t *testing.T) {
 			TargetChainIDs: []int64{1, 2, 5},
 		},
 		RejectedCandidates: []policy.RejectedPolicy{{
-			CryptoPolicyInstanceID: "cpx_pq_account_validation_v1",
-			TemplateID:             "tpl_pq_account_validation_v1",
+			CandidateID: "nicetry/nicetry.fors_c.erc4337.v0_1",
 			RejectionReasons: []policy.AssessmentFinding{{
-				Code:     rejectionCodeChainScope,
+				Code:     provider.FindingCodeChain,
 				Severity: policy.AssessmentFindingSeverityBlocking,
 			}},
 		}},
@@ -124,17 +124,16 @@ func TestExploreObservability_emitsMetricAndLogForNoCandidate(t *testing.T) {
 			ChainIDs:      []int64{1, 2, 5},
 		},
 	}
-	scopes := map[string][]int64{"cpx_pq_account_validation_v1": {1, 3, 5}}
 	httpReq := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, nil)
 	httpReq.Header.Set("X-Request-Id", "req-ops-1")
 
-	exploreObs.recordNoDeployableCandidate(httpReq, req, decision, scopes)
+	exploreObs.recordNoDeployableCandidate(httpReq, req, decision)
 
 	if len(metrics.increments) != 1 {
 		t.Fatalf("metric increments: got %d want 1", len(metrics.increments))
 	}
 	inc := metrics.increments[0]
-	if inc.RejectionCode != rejectionCodeChainScope {
+	if inc.RejectionCode != provider.FindingCodeChain {
 		t.Fatalf("rejection_code label: got %q", inc.RejectionCode)
 	}
 	if inc.WalletType != "eoa" {
@@ -143,8 +142,8 @@ func TestExploreObservability_emitsMetricAndLogForNoCandidate(t *testing.T) {
 	if inc.Binding != exploreBindingDiscovery {
 		t.Fatalf("binding label: got %q want discovery", inc.Binding)
 	}
-	if inc.MissingChainCount != "1" {
-		t.Fatalf("missing_chain_count label: got %q want 1", inc.MissingChainCount)
+	if inc.MissingChainCount != exploreLabelUnknown {
+		t.Fatalf("missing_chain_count label: got %q want unknown (P9b has no instance scope map)", inc.MissingChainCount)
 	}
 	if len(logger.lines) != 1 {
 		t.Fatalf("log lines: got %d want 1", len(logger.lines))
@@ -197,7 +196,7 @@ func TestExploreObservability_skipsWhenCandidateSelected(t *testing.T) {
 			}},
 		}},
 	}
-	exploreObs.recordNoDeployableCandidate(nil, nil, decision, nil)
+	exploreObs.recordNoDeployableCandidate(nil, nil, decision)
 	if len(metrics.increments) != 0 {
 		t.Fatalf("expected no metric increment, got %d", len(metrics.increments))
 	}
@@ -209,7 +208,7 @@ func TestExploreObservability_skipsWhenRejectedEmpty(t *testing.T) {
 	defer restore()
 
 	decision := policy.PolicyDecision{}
-	exploreObs.recordNoDeployableCandidate(nil, nil, decision, nil)
+	exploreObs.recordNoDeployableCandidate(nil, nil, decision)
 	if len(metrics.increments) != 0 {
 		t.Fatalf("expected no metric increment, got %d", len(metrics.increments))
 	}

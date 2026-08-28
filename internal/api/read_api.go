@@ -20,19 +20,15 @@ var (
 )
 
 // ReadStoreOptions configures catalogue loading for Crypto Policies and providers.
-// InstancePaths is optional and transitional for explore until CPM-P9 (not a public catalogue).
 type ReadStoreOptions struct {
 	CryptoPolicyPaths     []string
 	ProviderManifestPaths []string
-	InstancePaths         []string
 }
 
-// ReadStore holds catalogue Crypto Policies, provider manifests, and optional
-// explore-only instances (removed from public catalogue in CPM-P8).
+// ReadStore holds catalogue Crypto Policies and provider manifests for read/explore APIs.
 type ReadStore struct {
 	cryptoPolicies   []*policy.CryptoPolicy
 	cryptoPolicyByID map[string]*policy.CryptoPolicy
-	instances        []*policy.CryptoPolicyInstance
 	providers        *provider.Registry
 }
 
@@ -63,24 +59,9 @@ func LoadReadStore(opts ReadStoreOptions) (*ReadStore, error) {
 		return nil, fmt.Errorf("load provider manifests: %w", err)
 	}
 
-	instances := make([]*policy.CryptoPolicyInstance, 0, len(opts.InstancePaths))
-	instanceIDs := make(map[string]struct{}, len(opts.InstancePaths))
-	for _, path := range opts.InstancePaths {
-		inst, loadErr := policy.LoadCryptoPolicyInstanceFromFile(path)
-		if loadErr != nil {
-			return nil, fmt.Errorf("load instance %q: %w", path, loadErr)
-		}
-		if _, exists := instanceIDs[inst.ID]; exists {
-			return nil, fmt.Errorf("duplicate instance id %q", inst.ID)
-		}
-		instanceIDs[inst.ID] = struct{}{}
-		instances = append(instances, inst)
-	}
-
 	store := &ReadStore{
 		cryptoPolicies:   policies,
 		cryptoPolicyByID: byID,
-		instances:        instances,
 		providers:        providers,
 	}
 	emitCatalogueLoadSignals(store, log.Default())
@@ -168,7 +149,7 @@ func registerExploreRoute(mux *http.ServeMux, store *ReadStore) {
 			return
 		}
 
-		recordExploreNoDeployableCandidate(r, req, decision, instanceScopeByID(store.instances))
+		recordExploreNoDeployableCandidate(r, req, decision)
 
 		respondJSON(w, http.StatusOK, map[string]any{"decision": decision})
 	})

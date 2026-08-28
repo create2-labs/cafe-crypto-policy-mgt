@@ -265,9 +265,6 @@ func mustAuthHandler(t *testing.T, cfg authConfig) http.Handler {
 		CryptoPolicyPaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
 		},
-		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
-		},
 		ProviderManifestPaths: []string{
 			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
 		},

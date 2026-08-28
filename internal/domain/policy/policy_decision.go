@@ -16,8 +16,7 @@ var (
 	ErrPolicyDecisionRequestNil = errors.New("policy decision: policy selection request is nil")
 )
 
-// PolicyDecisionCandidate groups one candidate policy instance and its crypto policy.
-// Instance remains transitional for explore until CPM-P9.
+// PolicyDecisionCandidate groups one legacy policy instance and its crypto policy.
 type PolicyDecisionCandidate struct {
 	Instance     *CryptoPolicyInstance
 	CryptoPolicy *CryptoPolicy

@@ -2,8 +2,7 @@
 //
 // PolicySelectionRequest is the stable input contract for policy selection.
 // CryptoPolicy is the catalogue intention (required_posture + allowed_providers).
-// CryptoPolicyInstance remains an internal explore/persist transitional type until
-// CPM-P9/P10; it is not part of the public catalogue.
+// CryptoPolicyInstance remains for legacy domain unit tests only (PolicyCompatibilityEvaluator).
 // AssessmentStatus and AssessmentFinding model compatibility/deployability signals.
 // PolicyCompatibilityEvaluator and PolicyCompatibilityResult implement
 // observation+request+instance compatibility classification (PR12) before
