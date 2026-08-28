@@ -52,16 +52,14 @@ func recordExploreNoDeployableCandidate(
 	r *http.Request,
 	req *decisionExploreRequest,
 	decision policy.PolicyDecision,
-	instanceScopes map[string][]int64,
 ) {
-	exploreObs.recordNoDeployableCandidate(r, req, decision, instanceScopes)
+	exploreObs.recordNoDeployableCandidate(r, req, decision)
 }
 
 func (o exploreObservability) recordNoDeployableCandidate(
 	r *http.Request,
 	req *decisionExploreRequest,
 	decision policy.PolicyDecision,
-	instanceScopes map[string][]int64,
 ) {
 	if len(decision.RankedCandidates) > 0 || len(decision.RejectedCandidates) == 0 {
 		return
@@ -69,13 +67,13 @@ func (o exploreObservability) recordNoDeployableCandidate(
 
 	targetChainIDs := decision.RequestSummary.TargetChainIDs
 	dominantCode := dominantExploreRejectionCode(decision.RejectedCandidates)
-	missingCountLabel := bucketMissingChainCount(targetChainIDs, decision.RejectedCandidates, instanceScopes, dominantCode)
+	missingCountLabel := bucketMissingChainCount(targetChainIDs, decision.RejectedCandidates, nil, dominantCode)
 	walletType := exploreWalletTypeLabel(req)
 	binding := exploreBindingLabel(req)
 
 	o.metrics.IncExploreNoDeployableCandidate(dominantCode, walletType, binding, missingCountLabel)
 	if logger := o.logger; logger != nil {
-		o.logNoDeployableCandidate(logger, r, req, decision, instanceScopes, dominantCode, missingCountLabel, walletType, binding)
+		o.logNoDeployableCandidate(logger, r, req, decision, dominantCode, missingCountLabel, walletType, binding)
 	}
 }
 
@@ -303,7 +301,6 @@ func (o exploreObservability) logNoDeployableCandidate(
 	r *http.Request,
 	req *decisionExploreRequest,
 	decision policy.PolicyDecision,
-	instanceScopes map[string][]int64,
 	dominantCode string,
 	missingCountLabel string,
 	walletType string,
@@ -311,7 +308,7 @@ func (o exploreObservability) logNoDeployableCandidate(
 ) {
 	targetChainIDs := decision.RequestSummary.TargetChainIDs
 	observedChainIDs := decision.ObservedWalletSummary.ChainIDs
-	missingChainIDs, candidateChainIDs := closestChainScopeMissingChains(targetChainIDs, decision.RejectedCandidates, instanceScopes)
+	missingChainIDs, candidateChainIDs := closestChainScopeMissingChains(targetChainIDs, decision.RejectedCandidates, nil)
 
 	fields := []string{
 		"event=" + strconv.Quote(exploreNoDeployableEventName),
@@ -348,11 +345,8 @@ func (o exploreObservability) logNoDeployableCandidate(
 		fields = append(fields, "rejection_codes="+strconv.Quote(strings.Join(codes, ",")))
 	}
 	for _, rejected := range decision.RejectedCandidates {
-		if rejected.CryptoPolicyInstanceID != "" {
-			fields = append(fields, "candidate_instance_id="+strconv.Quote(rejected.CryptoPolicyInstanceID))
-		}
-		if rejected.TemplateID != "" {
-			fields = append(fields, "candidate_template_id="+strconv.Quote(rejected.TemplateID))
+		if rejected.CandidateID != "" {
+			fields = append(fields, "candidate_id="+strconv.Quote(rejected.CandidateID))
 		}
 	}
 	if r != nil {
@@ -415,17 +409,6 @@ func sanitizeExploreRequestID(raw string) (string, bool) {
 		return "", false
 	}
 	return value, true
-}
-
-func instanceScopeByID(instances []*policy.CryptoPolicyInstance) map[string][]int64 {
-	scopes := make(map[string][]int64, len(instances))
-	for _, inst := range instances {
-		if inst == nil {
-			continue
-		}
-		scopes[inst.ID] = append([]int64(nil), inst.Scope.ChainIDs...)
-	}
-	return scopes
 }
 
 // setExploreObservabilityForTest swaps the package-level explore observability sink (tests only).

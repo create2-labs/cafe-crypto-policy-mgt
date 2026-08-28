@@ -13,20 +13,14 @@ import (
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/vocabulary"
 )
 
-func testReadStore(t *testing.T, withInstances bool) *ReadStore {
+func testReadStore(t *testing.T) *ReadStore {
 	t.Helper()
-	opts := ReadStoreOptions{
+	store, err := LoadReadStore(ReadStoreOptions{
 		CryptoPolicyPaths: []string{
 			fixturePath("crypto_policy_pq_account_validation_v1.json"),
 		},
 		ProviderManifestPaths: []string{providerManifestFixturePath()},
-	}
-	if withInstances {
-		opts.InstancePaths = []string{
-			fixturePath("crypto_policy_instance_pq_account_validation_v1.json"),
-		}
-	}
-	store, err := LoadReadStore(opts)
+	})
 	if err != nil {
 		t.Fatalf("LoadReadStore: %v", err)
 	}
@@ -34,7 +28,7 @@ func testReadStore(t *testing.T, withInstances bool) *ReadStore {
 }
 
 func TestLoadReadStoreAndRoutes(t *testing.T) {
-	store := testReadStore(t, false)
+	store := testReadStore(t)
 
 	mux := http.NewServeMux()
 	if err := RegisterReadRoutes(mux, store); err != nil {
@@ -73,7 +67,7 @@ func TestLoadReadStoreAndRoutes(t *testing.T) {
 }
 
 func TestLoadReadStore_CatalogueIntentionOnly(t *testing.T) {
-	store := testReadStore(t, false)
+	store := testReadStore(t)
 	if len(store.cryptoPolicies) != 1 {
 		t.Fatalf("cryptoPolicies: got %d want 1", len(store.cryptoPolicies))
 	}
@@ -84,9 +78,6 @@ func TestLoadReadStore_CatalogueIntentionOnly(t *testing.T) {
 	if len(cp.AllowedProviders) != 1 || cp.AllowedProviders[0] != "nicetry" {
 		t.Fatalf("allowed_providers: %#v", cp.AllowedProviders)
 	}
-	if len(store.instances) != 0 {
-		t.Fatalf("instances must not load for catalogue-only store: got %d", len(store.instances))
-	}
 	items := store.providers.List()
 	if len(items) != 1 || items[0].ProviderID != "nicetry" {
 		t.Fatalf("providers: %#v", items)
@@ -94,7 +85,7 @@ func TestLoadReadStore_CatalogueIntentionOnly(t *testing.T) {
 }
 
 func TestDecisionExplore_v02_sepoliaScanCompatibleProviders(t *testing.T) {
-	store := testReadStore(t, false)
+	store := testReadStore(t)
 
 	mux := http.NewServeMux()
 	if err := RegisterReadRoutes(mux, store); err != nil {
@@ -166,7 +157,7 @@ func TestDecisionExplore_v02_sepoliaScanCompatibleProviders(t *testing.T) {
 }
 
 func TestDecisionExplore_legacySelectionRequestRejected(t *testing.T) {
-	store := testReadStore(t, false)
+	store := testReadStore(t)
 	mux := http.NewServeMux()
 	if err := RegisterReadRoutes(mux, store); err != nil {
 		t.Fatalf("RegisterReadRoutes: %v", err)
@@ -198,7 +189,7 @@ func TestDecisionExplore_legacySelectionRequestRejected(t *testing.T) {
 }
 
 func TestDecisionExplore_optionA_policy_context(t *testing.T) {
-	store := testReadStore(t, false)
+	store := testReadStore(t)
 
 	mux := http.NewServeMux()
 	if err := RegisterReadRoutes(mux, store); err != nil {
@@ -231,7 +222,7 @@ func TestDecisionExplore_optionA_policy_context(t *testing.T) {
 }
 
 func TestDecisionExplore_discoveryV1WalletScanDetailEnvelope(t *testing.T) {
-	store := testReadStore(t, false)
+	store := testReadStore(t)
 
 	mux := http.NewServeMux()
 	if err := RegisterReadRoutes(mux, store); err != nil {
@@ -268,7 +259,7 @@ func TestDecisionExplore_discoveryV1WalletScanDetailEnvelope(t *testing.T) {
 }
 
 func TestDecisionExplore_targetAddressFlatPolicyContext(t *testing.T) {
-	store := testReadStore(t, false)
+	store := testReadStore(t)
 
 	mux := http.NewServeMux()
 	if err := RegisterReadRoutes(mux, store); err != nil {
@@ -300,7 +291,7 @@ func TestDecisionExplore_targetAddressFlatPolicyContext(t *testing.T) {
 }
 
 func TestDecisionExplore_unknownCryptoPolicyID(t *testing.T) {
-	store := testReadStore(t, false)
+	store := testReadStore(t)
 	mux := http.NewServeMux()
 	if err := RegisterReadRoutes(mux, store); err != nil {
 		t.Fatalf("RegisterReadRoutes: %v", err)

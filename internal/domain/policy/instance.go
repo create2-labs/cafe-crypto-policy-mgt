@@ -45,9 +45,9 @@ var (
 	ErrSolutionProfileRefManifestVersionRequired = errors.New("solution_profile_ref manifest_version is required")
 )
 
-// CryptoPolicyInstance is an internal, scope-bound policy document used by the
-// transitional explore/compatibility path until CPM-P9. It is not part of the
-// public catalogue (ADR §5 / CPM-P8).
+// CryptoPolicyInstance is an internal document used by legacy compatibility/ranking
+// unit tests (pre-P9b PolicyCompatibilityEvaluator). It is not loaded at runtime
+// and is not part of the public catalogue (ADR §5 / CPM-P8).
 type CryptoPolicyInstance struct {
 	ID                 string                 `json:"id"`
 	Name               string                 `json:"name"`

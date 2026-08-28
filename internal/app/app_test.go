@@ -20,9 +20,6 @@ func TestHandlerHealthz(t *testing.T) {
 		CryptoPolicyPaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
 		},
-		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
-		},
 		ProviderManifestPaths: []string{
 			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
 		},
@@ -61,9 +58,6 @@ func TestHandlerHealthPathNotRegistered(t *testing.T) {
 		CryptoPolicyPaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
 		},
-		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
-		},
 		ProviderManifestPaths: []string{
 			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
 		},
@@ -98,9 +92,6 @@ func TestHandlerRequiresAuthForBusinessRoutes(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
 		CryptoPolicyPaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
-		},
-		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 		ProviderManifestPaths: []string{
 			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
@@ -141,9 +132,6 @@ func TestHandlerRejectsMalformedBearerHeader(t *testing.T) {
 		CryptoPolicyPaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
 		},
-		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
-		},
 		ProviderManifestPaths: []string{
 			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
 		},
@@ -176,9 +164,6 @@ func TestHandlerAcceptsValidBearerToken(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
 		CryptoPolicyPaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
-		},
-		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 		ProviderManifestPaths: []string{
 			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
@@ -221,9 +206,6 @@ func TestHandlerRejectsExpiredDiscoveryToken(t *testing.T) {
 		CryptoPolicyPaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
 		},
-		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
-		},
 		ProviderManifestPaths: []string{
 			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
 		},
@@ -264,9 +246,6 @@ func TestHandlerRejectsDiscoveryDeniedToken(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
 		CryptoPolicyPaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
-		},
-		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 		ProviderManifestPaths: []string{
 			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
@@ -317,9 +296,6 @@ func TestHandlerReturns503OnValidationTimeout(t *testing.T) {
 		CryptoPolicyPaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
 		},
-		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
-		},
 		ProviderManifestPaths: []string{
 			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
 		},
@@ -364,9 +340,6 @@ func TestHandlerReturns503OnValidation5xx(t *testing.T) {
 		CryptoPolicyPaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
 		},
-		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
-		},
 		ProviderManifestPaths: []string{
 			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
 		},
@@ -407,9 +380,6 @@ func TestHandlerRejectsValidationSuccessButMissingUserID(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
 		CryptoPolicyPaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
-		},
-		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 		ProviderManifestPaths: []string{
 			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
@@ -454,9 +424,6 @@ func TestHandlerPropagatesRequestIDToDiscoveryValidation(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
 		CryptoPolicyPaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
-		},
-		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 		ProviderManifestPaths: []string{
 			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
@@ -508,9 +475,6 @@ func TestHandlerFailsClosedWhenScanIDPresentButAuthzNotConfigured(t *testing.T) 
 		CryptoPolicyPaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
 		},
-		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
-		},
 		ProviderManifestPaths: []string{
 			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
 		},
@@ -556,9 +520,6 @@ func TestHandlerContinuesWhenAuthzNotConfiguredAndNoScanID(t *testing.T) {
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
 		CryptoPolicyPaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
-		},
-		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 		ProviderManifestPaths: []string{
 			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
@@ -642,9 +603,6 @@ func assertTokenRejected(t *testing.T, algorithms []string, expectedStatus int) 
 	store, err := api.LoadReadStore(api.ReadStoreOptions{
 		CryptoPolicyPaths: []string{
 			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_pq_account_validation_v1.json"),
-		},
-		InstancePaths: []string{
-			filepath.Join("..", "domain", "policy", "testdata", "crypto_policy_instance_pq_account_validation_v1.json"),
 		},
 		ProviderManifestPaths: []string{
 			filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
