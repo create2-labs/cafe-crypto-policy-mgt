@@ -2,6 +2,8 @@
 //
 // PolicySelectionRequest is the stable input contract for policy selection.
 // CryptoPolicy is the catalogue intention (required_posture + allowed_providers).
+// CryptoPolicyCatalogItem / CompatibleNetwork expose derived catalogue facts
+// (compatible_networks from registry chain_support, status ≠ planned).
 // CryptoPolicyInstance remains for legacy domain unit tests only (PolicyCompatibilityEvaluator).
 // AssessmentStatus and AssessmentFinding model compatibility/deployability signals.
 // PolicyCompatibilityEvaluator and PolicyCompatibilityResult implement
