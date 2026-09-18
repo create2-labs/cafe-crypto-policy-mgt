@@ -96,7 +96,11 @@ func RegisterReadRoutes(mux *http.ServeMux, store *ReadStore) error {
 
 func registerCatalogRoutes(mux *http.ServeMux, store *ReadStore) {
 	mux.HandleFunc("GET "+cpmroutes.CryptoPolicies, func(w http.ResponseWriter, _ *http.Request) {
-		respondJSON(w, http.StatusOK, map[string]any{"items": store.cryptoPolicies})
+		items := make([]policy.CryptoPolicyCatalogItem, 0, len(store.cryptoPolicies))
+		for _, cp := range store.cryptoPolicies {
+			items = append(items, policy.CatalogItemFromCryptoPolicy(cp, store.providers))
+		}
+		respondJSON(w, http.StatusOK, map[string]any{"items": items})
 	})
 	mux.HandleFunc("GET "+cpmroutes.CryptoPolicyByID, func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("crypto_policy_id")
@@ -105,7 +109,7 @@ func registerCatalogRoutes(mux *http.ServeMux, store *ReadStore) {
 			respondJSON(w, http.StatusNotFound, map[string]any{"error": "crypto policy not found"})
 			return
 		}
-		respondJSON(w, http.StatusOK, cp)
+		respondJSON(w, http.StatusOK, policy.CatalogItemFromCryptoPolicy(cp, store.providers))
 	})
 	mux.HandleFunc("GET "+cpmroutes.Providers, func(w http.ResponseWriter, _ *http.Request) {
 		respondJSON(w, http.StatusOK, map[string]any{"items": store.providers.List()})

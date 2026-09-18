@@ -73,12 +73,13 @@ paths:
       operationId: listCryptoPolicies
       responses:
         "200":
-          description: Catalogue Crypto Policies (intention only — required_posture + allowed_providers).
+          description: |
+            Catalogue Crypto Policies with derived `compatible_networks`
+            (deployable union of allowed providers' chain_support; status ≠ planned).
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: true
+                $ref: "#/components/schemas/CryptoPolicyListResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
 
@@ -95,12 +96,12 @@ paths:
             type: string
       responses:
         "200":
-          description: Crypto Policy document.
+          description: |
+            Crypto Policy catalogue item including derived `compatible_networks`.
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: true
+                $ref: "#/components/schemas/CryptoPolicyCatalogItem"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -639,6 +640,65 @@ components:
           type: string
         message:
           type: string
+
+    CompatibleNetwork:
+      type: object
+      description: |
+        Deployable catalogue network fact derived by CPM from loaded provider
+        manifests (`chain_support` with status ≠ planned). Frontend must not
+        re-derive this from provider knowledge.
+      required: [chain_id, network, status]
+      properties:
+        chain_id:
+          type: integer
+          format: int64
+          minimum: 1
+        network:
+          type: string
+          description: Network label from the provider manifest chain_support entry.
+        status:
+          type: string
+          description: Manifest chain status (planned is never included here).
+          enum: [testnet_supported, production_supported]
+        capabilities:
+          type: array
+          items:
+            type: string
+
+    CryptoPolicyCatalogItem:
+      type: object
+      description: |
+        Catalogue Crypto Policy plus derived compatible_networks (CFB-P1 / ADR
+        catalogue facts). Existing intention fields remain; enrichment is additive.
+      required: [id, name, version, required_posture, allowed_providers, compatible_networks]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        version:
+          type: string
+        description:
+          type: string
+        required_posture:
+          type: string
+        allowed_providers:
+          type: array
+          items:
+            type: string
+        compatible_networks:
+          type: array
+          items:
+            $ref: "#/components/schemas/CompatibleNetwork"
+
+    CryptoPolicyListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CryptoPolicyCatalogItem"
 
     PolicyRecord:
       type: object

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -81,6 +82,162 @@ func TestLoadReadStore_CatalogueIntentionOnly(t *testing.T) {
 	items := store.providers.List()
 	if len(items) != 1 || items[0].ProviderID != "nicetry" {
 		t.Fatalf("providers: %#v", items)
+	}
+}
+
+func TestCryptoPolicies_CompatibleNetworks_ListAndGet(t *testing.T) {
+	store := testReadStore(t)
+	mux := http.NewServeMux()
+	if err := RegisterReadRoutes(mux, store); err != nil {
+		t.Fatalf("RegisterReadRoutes: %v", err)
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies, nil)
+	listRec := httptest.NewRecorder()
+	mux.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("list status: got %d body=%s", listRec.Code, listRec.Body.String())
+	}
+
+	var listResp struct {
+		Items []struct {
+			ID                 string `json:"id"`
+			CompatibleNetworks []struct {
+				ChainID int64  `json:"chain_id"`
+				Network string `json:"network"`
+				Status  string `json:"status"`
+			} `json:"compatible_networks"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(listRec.Body.Bytes(), &listResp); err != nil {
+		t.Fatalf("decode list: %v", err)
+	}
+	if len(listResp.Items) != 1 {
+		t.Fatalf("list items: got %d", len(listResp.Items))
+	}
+	assertCompatibleNetworksMultichain(t, listResp.Items[0].CompatibleNetworks)
+
+	getReq := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies+"/cpm_pq_account_validation_v1", nil)
+	getRec := httptest.NewRecorder()
+	mux.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("get status: got %d body=%s", getRec.Code, getRec.Body.String())
+	}
+	var getResp struct {
+		ID                 string `json:"id"`
+		CompatibleNetworks []struct {
+			ChainID int64  `json:"chain_id"`
+			Network string `json:"network"`
+			Status  string `json:"status"`
+		} `json:"compatible_networks"`
+	}
+	if err := json.Unmarshal(getRec.Body.Bytes(), &getResp); err != nil {
+		t.Fatalf("decode get: %v", err)
+	}
+	if getResp.ID != "cpm_pq_account_validation_v1" {
+		t.Fatalf("get id: %q", getResp.ID)
+	}
+	assertCompatibleNetworksMultichain(t, getResp.CompatibleNetworks)
+}
+
+func TestCryptoPolicies_CompatibleNetworks_SepoliaOnlyHistorical(t *testing.T) {
+	dir := t.TempDir()
+	manifestPath := filepath.Join(dir, "nicetry_sepolia_only.json")
+	const sepoliaOnly = `{
+  "schema_version": "cafe.provider_manifest.v0.1",
+  "provider_id": "nicetry",
+  "provider_name": "NiceTry",
+  "provider_version": "2026-08",
+  "provider_maturity": "research",
+  "solution_profiles": [{
+    "solution_profile_id": "nicetry.fors_c.erc4337.v0_1",
+    "display_name": "NiceTry FORS+C ERC-4337 Smart Account",
+    "maturity": "research",
+    "claim_status": "declared",
+    "resulting_posture": "hybrid",
+    "input_requirements": { "wallet_types": ["EOA"], "requires_wallet_control_proof": true },
+    "signature": { "scheme": "FORS+C", "family": "hash_based", "key_rotation_model": "per_userop" },
+    "account_model": {
+      "standard": "ERC-4337",
+      "execution_model": "erc4337_bundler",
+      "requires_bundler": true,
+      "requires_entrypoint": true,
+      "entrypoint_versions": ["0.7"]
+    },
+    "constraints": {
+      "requires_new_account": true,
+      "address_continuity_supported": false,
+      "requires_local_signer_state": true
+    },
+    "chain_support": [
+      { "chain_id": 11155111, "network": "sepolia", "status": "testnet_supported", "capabilities": ["deploy"] },
+      { "chain_id": 1, "network": "ethereum-mainnet", "status": "planned", "capabilities": [] }
+    ]
+  }]
+}`
+	if err := os.WriteFile(manifestPath, []byte(sepoliaOnly), 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+
+	store, err := LoadReadStore(ReadStoreOptions{
+		CryptoPolicyPaths:     []string{fixturePath("crypto_policy_pq_account_validation_v1.json")},
+		ProviderManifestPaths: []string{manifestPath},
+	})
+	if err != nil {
+		t.Fatalf("LoadReadStore: %v", err)
+	}
+	mux := http.NewServeMux()
+	if err := RegisterReadRoutes(mux, store); err != nil {
+		t.Fatalf("RegisterReadRoutes: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies+"/cpm_pq_account_validation_v1", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: got %d body=%s", rec.Code, rec.Body.String())
+	}
+	var resp struct {
+		CompatibleNetworks []struct {
+			ChainID int64  `json:"chain_id"`
+			Status  string `json:"status"`
+		} `json:"compatible_networks"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.CompatibleNetworks) != 1 || resp.CompatibleNetworks[0].ChainID != 11155111 {
+		t.Fatalf("want Sepolia-only, got %+v", resp.CompatibleNetworks)
+	}
+	if resp.CompatibleNetworks[0].Status == "planned" {
+		t.Fatal("planned must not appear")
+	}
+}
+
+func assertCompatibleNetworksMultichain(t *testing.T, networks []struct {
+	ChainID int64  `json:"chain_id"`
+	Network string `json:"network"`
+	Status  string `json:"status"`
+}) {
+	t.Helper()
+	if len(networks) < 2 {
+		t.Fatalf("want multichain networks, got %+v", networks)
+	}
+	seen := map[int64]struct{}{}
+	for _, n := range networks {
+		if n.Status == "planned" {
+			t.Fatalf("planned present: %+v", n)
+		}
+		if n.ChainID <= 0 || n.Network == "" {
+			t.Fatalf("incomplete: %+v", n)
+		}
+		if _, ok := seen[n.ChainID]; ok {
+			t.Fatalf("duplicate chain_id %d", n.ChainID)
+		}
+		seen[n.ChainID] = struct{}{}
+	}
+	if _, ok := seen[11155111]; !ok {
+		t.Fatalf("missing sepolia: %+v", networks)
 	}
 }
 
