@@ -285,6 +285,21 @@ func TestDecisionExplore_v02_sepoliaScanCompatibleProviders(t *testing.T) {
 				SolutionProfileRef struct {
 					ProviderID string `json:"provider_id"`
 				} `json:"solution_profile_ref"`
+				Composition *struct {
+					AccountModel struct {
+						Standard        string   `json:"standard"`
+						RequiresBundler bool     `json:"requires_bundler"`
+						EntrypointVers  []string `json:"entrypoint_versions"`
+					} `json:"account_model"`
+					Signature struct {
+						Scheme           string `json:"scheme"`
+						KeyRotationModel string `json:"key_rotation_model"`
+					} `json:"signature"`
+					Constraints struct {
+						RequiresNewAccount       bool `json:"requires_new_account"`
+						RequiresLocalSignerState bool `json:"requires_local_signer_state"`
+					} `json:"constraints"`
+				} `json:"composition"`
 			} `json:"scan_compatible_providers"`
 			RejectedCandidates []any    `json:"rejected_candidates"`
 			Warnings           []string `json:"warnings"`
@@ -305,6 +320,18 @@ func TestDecisionExplore_v02_sepoliaScanCompatibleProviders(t *testing.T) {
 	}
 	if got.SuggestedUserConstraints == nil || !got.SuggestedUserConstraints.AllowNewWallet {
 		t.Fatalf("suggested_user_constraints: %+v", got.SuggestedUserConstraints)
+	}
+	if got.Composition == nil {
+		t.Fatal("CFB-P3: composition must be present on scan_compatible_providers")
+	}
+	if got.Composition.AccountModel.Standard != "ERC-4337" || !got.Composition.AccountModel.RequiresBundler {
+		t.Fatalf("composition.account_model: %+v", got.Composition.AccountModel)
+	}
+	if got.Composition.Signature.Scheme != "FORS+C" || got.Composition.Signature.KeyRotationModel != "per_userop" {
+		t.Fatalf("composition.signature: %+v", got.Composition.Signature)
+	}
+	if !got.Composition.Constraints.RequiresNewAccount || !got.Composition.Constraints.RequiresLocalSignerState {
+		t.Fatalf("composition.constraints: %+v", got.Composition.Constraints)
 	}
 	for _, w := range response.Decision.Warnings {
 		if strings.Contains(w, "degraded") {

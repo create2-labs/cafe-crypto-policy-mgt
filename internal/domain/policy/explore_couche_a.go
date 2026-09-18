@@ -123,6 +123,7 @@ func (e ExploreCoucheAEvaluator) EvaluateExploreCoucheA(
 				continue
 			}
 
+			composition := DeriveCompositionView(&resolved.Profile)
 			ranked := RankedPolicy{
 				CandidateID:              entry.CandidateID,
 				PolicyID:                 entry.PolicyID,
@@ -134,6 +135,7 @@ func (e ExploreCoucheAEvaluator) EvaluateExploreCoucheA(
 				CompatibilityStatus:      AssessmentStatusCompatibleAndDeployable,
 				CompatibilityFindings:    softFindingsForProfile(&resolved.Profile),
 				SuggestedUserConstraints: cloneSuggested(resolved.Profile.SuggestedUserConstraints),
+				Composition:              &composition,
 			}
 			decision.RankedCandidates = append(decision.RankedCandidates, ranked)
 		}

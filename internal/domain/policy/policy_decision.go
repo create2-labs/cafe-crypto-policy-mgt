@@ -36,6 +36,9 @@ type RankedPolicy struct {
 	CompatibilityStatus      AssessmentStatus                   `json:"compatibility_status"`
 	CompatibilityFindings    []AssessmentFinding                `json:"compatibility_findings"`
 	SuggestedUserConstraints *provider.SuggestedUserConstraints `json:"suggested_user_constraints,omitempty"`
+	// Composition is the explore product view for Expected result (CFB-P3).
+	// Present on catalogue-driven explore v0.2 scan_compatible_providers.
+	Composition *CompositionView `json:"composition,omitempty"`
 }
 
 // RejectedPolicy stores one incompatible candidate and explainable reasons.
