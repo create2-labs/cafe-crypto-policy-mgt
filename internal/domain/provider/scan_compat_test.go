@@ -33,8 +33,20 @@ func TestEvaluateScanCompatibility_table(t *testing.T) {
 			wantCode:        "",
 		},
 		{
-			name:            "mainnet_planned_reject",
+			name:            "mainnet_ok",
 			obs:             HardObservation{AccountKind: "eoa", ChainIDs: []int64{1}},
+			requiredPosture: "hybrid",
+			wantCode:        "",
+		},
+		{
+			name:            "base_ok",
+			obs:             HardObservation{AccountKind: "eoa", ChainIDs: []int64{8453}},
+			requiredPosture: "hybrid",
+			wantCode:        "",
+		},
+		{
+			name:            "unknown_chain_reject",
+			obs:             HardObservation{AccountKind: "eoa", ChainIDs: []int64{56}},
 			requiredPosture: "hybrid",
 			wantCode:        FindingCodeChain,
 		},

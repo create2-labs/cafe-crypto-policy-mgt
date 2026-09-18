@@ -37,7 +37,14 @@
       },
       "chain_support": [
         { "chain_id": 11155111, "network": "sepolia", "status": "testnet_supported", "capabilities": ["deploy", "sign_userop", "rotate_signer"] },
-        { "chain_id": 1, "network": "ethereum-mainnet", "status": "planned", "capabilities": [] }
+        { "chain_id": 84532, "network": "base-sepolia", "status": "testnet_supported", "capabilities": ["deploy", "sign_userop", "rotate_signer"] },
+        { "chain_id": 421614, "network": "arbitrum-sepolia", "status": "testnet_supported", "capabilities": ["deploy", "sign_userop", "rotate_signer"] },
+        { "chain_id": 11155420, "network": "optimism-sepolia", "status": "testnet_supported", "capabilities": ["deploy", "sign_userop", "rotate_signer"] },
+        { "chain_id": 1, "network": "ethereum-mainnet", "status": "production_supported", "capabilities": ["deploy", "sign_userop", "rotate_signer"] },
+        { "chain_id": 8453, "network": "base", "status": "production_supported", "capabilities": ["deploy", "sign_userop", "rotate_signer"] },
+        { "chain_id": 42161, "network": "arbitrum-one", "status": "production_supported", "capabilities": ["deploy", "sign_userop", "rotate_signer"] },
+        { "chain_id": 10, "network": "optimism", "status": "production_supported", "capabilities": ["deploy", "sign_userop", "rotate_signer"] },
+        { "chain_id": 137, "network": "polygon", "status": "production_supported", "capabilities": ["deploy", "sign_userop", "rotate_signer"] }
       ],
       "references": [
         { "kind": "source_repo", "url": "https://github.com/RivaLabs-Core/NiceTry", "commit": "40a1286d18dee2a92631da82a52e484fa9a3628c" },
@@ -46,7 +53,8 @@
       "risk_notes": [
         "FORS+C parameters are still presented as tunable by upstream documentation.",
         "Signer state management and bounded reuse semantics are part of the security model.",
-        "EIP-1271 direct view validation is not supported by the current protocol notes for FORS+C/WOTS+C rotation."
+        "EIP-1271 direct view validation is not supported by the current protocol notes for FORS+C/WOTS+C rotation.",
+        "Multichain chain_support is declared from NiceTry public docs (nicetry.xyz multichain / install); CAFE has not independently verified on-chain deployability per network."
       ]
     }
   ]
