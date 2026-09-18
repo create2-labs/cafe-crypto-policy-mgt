@@ -61,7 +61,7 @@ func TestEvaluateHardCompatibility_table(t *testing.T) {
 	}{
 		{name: "sepolia_ok", obs: baseObs, req: baseReq, wantCode: ""},
 		{
-			name: "mainnet_planned_reject",
+			name: "mainnet_ok",
 			obs:  HardObservation{AccountKind: "eoa", ChainIDs: []int64{1}},
 			req: HardSelectionRequest{
 				RequiredPosture:  "hybrid",
@@ -69,7 +69,18 @@ func TestEvaluateHardCompatibility_table(t *testing.T) {
 				AllowNewWallet:   true,
 				KeyRotationModel: string(KeyRotationPerUserOp),
 			},
-			wantCode: FindingCodeChain,
+			wantCode: "",
+		},
+		{
+			name: "base_ok",
+			obs:  HardObservation{AccountKind: "eoa", ChainIDs: []int64{8453}},
+			req: HardSelectionRequest{
+				RequiredPosture:  "hybrid",
+				TargetChainIDs:   []int64{8453},
+				AllowNewWallet:   true,
+				KeyRotationModel: string(KeyRotationPerUserOp),
+			},
+			wantCode: "",
 		},
 		{
 			name: "continuity_reject",
@@ -113,10 +124,10 @@ func TestEvaluateHardCompatibility_table(t *testing.T) {
 		},
 		{
 			name: "unknown_chain_reject",
-			obs:  HardObservation{AccountKind: "eoa", ChainIDs: []int64{8453}},
+			obs:  HardObservation{AccountKind: "eoa", ChainIDs: []int64{56}},
 			req: HardSelectionRequest{
 				RequiredPosture:  "hybrid",
-				TargetChainIDs:   []int64{8453},
+				TargetChainIDs:   []int64{56},
 				AllowNewWallet:   true,
 				KeyRotationModel: string(KeyRotationPerUserOp),
 			},

@@ -48,7 +48,7 @@ func TestEvaluateExploreCoucheA_sepoliaScanCompatible(t *testing.T) {
 	}
 }
 
-func TestEvaluateExploreCoucheA_mainnetPlannedRejected(t *testing.T) {
+func TestEvaluateExploreCoucheA_mainnetAccepted(t *testing.T) {
 	reg := mustLoadExploreProviderRegistry(t)
 	cp := &CryptoPolicy{
 		ID:               "cpm_pq_account_validation_v1",
@@ -56,6 +56,27 @@ func TestEvaluateExploreCoucheA_mainnetPlannedRejected(t *testing.T) {
 		AllowedProviders: []string{"nicetry"},
 	}
 	obs := walletobserved.Payload{AccountKind: "eoa", ChainIDs: []int64{1}}
+
+	decision, err := (ExploreCoucheAEvaluator{Providers: reg}).EvaluateExploreCoucheA(obs, cp)
+	if err != nil {
+		t.Fatalf("EvaluateExploreCoucheA: %v", err)
+	}
+	if len(decision.RankedCandidates) != 1 {
+		t.Fatalf("want scan_compatible mainnet, got %d", len(decision.RankedCandidates))
+	}
+	if len(decision.RejectedCandidates) != 0 {
+		t.Fatalf("rejected: %d", len(decision.RejectedCandidates))
+	}
+}
+
+func TestEvaluateExploreCoucheA_unsupportedChainRejected(t *testing.T) {
+	reg := mustLoadExploreProviderRegistry(t)
+	cp := &CryptoPolicy{
+		ID:               "cpm_pq_account_validation_v1",
+		RequiredPosture:  vocabulary.PQPostureHybrid,
+		AllowedProviders: []string{"nicetry"},
+	}
+	obs := walletobserved.Payload{AccountKind: "eoa", ChainIDs: []int64{56}}
 
 	decision, err := (ExploreCoucheAEvaluator{Providers: reg}).EvaluateExploreCoucheA(obs, cp)
 	if err != nil {
