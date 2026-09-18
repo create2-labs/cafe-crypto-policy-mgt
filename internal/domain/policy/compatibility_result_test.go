@@ -21,7 +21,7 @@ func mustLoadFixtures(t *testing.T) (*CryptoPolicy, *CryptoPolicyInstance) {
 	if err != nil {
 		t.Fatalf("crypto policy: %v", err)
 	}
-	inst, err := LoadCryptoPolicyInstanceFromFile(testdataPath(t, "crypto_policy_instance_pq_account_validation_v1.json"))
+	inst, err := LoadCryptoPolicyInstanceFromFile(testdataPath(t, "test_crypto_policy_instance_pq_account_validation_v1.json"))
 	if err != nil {
 		t.Fatalf("instance: %v", err)
 	}

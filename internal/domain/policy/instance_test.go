@@ -10,7 +10,7 @@ import (
 )
 
 func TestLoadCryptoPolicyInstanceFromFile_Valid(t *testing.T) {
-	instance, err := LoadCryptoPolicyInstanceFromFile(filepath.Join("testdata", "crypto_policy_instance_pq_account_validation_v1.json"))
+	instance, err := LoadCryptoPolicyInstanceFromFile(filepath.Join("testdata", "test_crypto_policy_instance_pq_account_validation_v1.json"))
 	if err != nil {
 		t.Fatalf("LoadCryptoPolicyInstanceFromFile: %v", err)
 	}
