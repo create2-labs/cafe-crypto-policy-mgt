@@ -244,6 +244,16 @@ func (p *CryptoPolicyPersistPayload) replayCoucheAB(obs provider.HardObservation
 	if findings := provider.EvaluateUserConstraints(p.UserConstraints, profile); len(findings) > 0 {
 		return fmt.Errorf("%w: [%s] %s", ErrProviderUserConstraintsIncompatible, findings[0].Code, findings[0].Message)
 	}
+	// Combined ADR §7 hard gate (same inputs) — keeps EvaluateHardCompatibility on the persist path.
+	if findings := provider.EvaluateHardCompatibility(obs, provider.HardSelectionRequest{
+		RequiredPosture:           string(p.RequiredPosture),
+		TargetChainIDs:            obs.ChainIDs,
+		AllowNewWallet:            p.UserConstraints.AllowNewWallet,
+		AddressContinuityRequired: p.UserConstraints.AddressContinuityRequired,
+		KeyRotationModel:          string(p.UserConstraints.KeyRotationModel),
+	}, profile); len(findings) > 0 {
+		return fmt.Errorf("%w: [%s] %s", ErrProviderUserConstraintsIncompatible, findings[0].Code, findings[0].Message)
+	}
 	return nil
 }
 

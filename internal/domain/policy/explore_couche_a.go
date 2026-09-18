@@ -90,6 +90,31 @@ func (e ExploreCoucheAEvaluator) EvaluateExploreCoucheA(
 			if resolved == nil {
 				continue
 			}
+			// Re-resolve via Lookup so manifest_version pins stay authoritative (registry API).
+			if _, ok := reg.Lookup(provider.ProfileRef{
+				ProviderID:        resolved.ProviderID,
+				SolutionProfileID: resolved.Profile.SolutionProfileID,
+				ManifestVersion:   resolved.ProviderVersion,
+			}); !ok {
+				decision.RejectedCandidates = append(decision.RejectedCandidates, RejectedPolicy{
+					CandidateID:         resolved.ProviderID + "/" + resolved.Profile.SolutionProfileID,
+					PolicyID:            normalizeASCIIUpper(cp.ID),
+					RequiredPosture:     cp.RequiredPosture,
+					SolutionProfileRef: SolutionProfileRef{
+						ProviderID:        resolved.ProviderID,
+						SolutionProfileID: resolved.Profile.SolutionProfileID,
+						ManifestVersion:   resolved.ProviderVersion,
+					},
+					CompatibilityStatus: AssessmentStatusIncompatible,
+					CompatibilityFindings: findingsOrEmpty([]AssessmentFinding{
+						fieldFinding(provider.FindingCodeUnresolved, "solution profile lookup failed after registry list", "solution_profile_ref"),
+					}),
+					RejectionReasons: []AssessmentFinding{
+						fieldFinding(provider.FindingCodeUnresolved, "solution profile lookup failed after registry list", "solution_profile_ref"),
+					},
+				})
+				continue
+			}
 			entry := buildExploreCandidate(cp, resolved)
 
 			if err := provider.ValidateSuggestedUserConstraints(&resolved.Profile); err != nil {

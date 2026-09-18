@@ -64,7 +64,7 @@ func TestDigest_FindingsOrderAndDedupeInvariant(t *testing.T) {
 		"requires_bundler",
 		"requires_local_signer_state",
 	}
-	got, err := Digest(obj)
+	got, _, err := DigestCanonical(obj)
 	if err != nil {
 		t.Fatalf("Digest: %v", err)
 	}
@@ -159,7 +159,7 @@ func TestDigest_RejectCases(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			obj := clone()
 			tc.mutate(obj)
-			_, err := Digest(obj)
+			_, _, err := DigestCanonical(obj)
 			if err == nil {
 				t.Fatal("expected error")
 			}

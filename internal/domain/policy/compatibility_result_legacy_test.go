@@ -296,15 +296,6 @@ func (e PolicyCompatibilityEvaluator) providerSoftFindings(inst *CryptoPolicyIns
 	return findings
 }
 
-func blockingFinding(code, message string) AssessmentFinding {
-	return AssessmentFinding{Code: code, Message: message, Severity: AssessmentFindingSeverityBlocking}
-}
-
-func fieldFinding(code, message, field string) AssessmentFinding {
-	finding := blockingFinding(code, message)
-	finding.Field = field
-	return finding
-}
 
 func incompatibleResult(findings ...AssessmentFinding) *PolicyCompatibilityResult {
 	return &PolicyCompatibilityResult{Status: AssessmentStatusIncompatible, Findings: findings}

@@ -31,10 +31,6 @@ var (
 )
 
 // Publisher is the minimal broker abstraction for outbound event publication.
-type Publisher interface {
-	Publish(ctx context.Context, subject string, payload []byte) error
-}
-
 // OutboundDedupStore tracks published event ids and payload hash for replay safety.
 type OutboundDedupStore interface {
 	Get(ctx context.Context, key string) (payloadHash string, found bool, err error)

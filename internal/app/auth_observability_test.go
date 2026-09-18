@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -322,4 +323,26 @@ func assertAuthErrorPayloadWithRequestID(t *testing.T, rec *httptest.ResponseRec
 	if payload["request_id"] != requestID {
 		t.Fatalf("expected request_id %q got %v", requestID, payload["request_id"])
 	}
+}
+
+type authDecisionCounter struct {
+	mu     sync.Mutex
+	counts map[string]int
+}
+
+func newAuthDecisionCounter() *authDecisionCounter {
+	return &authDecisionCounter{counts: map[string]int{}}
+}
+
+func (c *authDecisionCounter) IncDecision(category string, outcome string, code string, route string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	key := strings.Join([]string{category, outcome, code, route}, "|")
+	c.counts[key]++
+}
+
+func (c *authDecisionCounter) Count(category string, outcome string, code string, route string) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.counts[strings.Join([]string{category, outcome, code, route}, "|")]
 }

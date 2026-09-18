@@ -46,12 +46,6 @@ func DigestCanonicalJSON(raw []byte) (digest string, canonical map[string]any, e
 	return DigestCanonical(root)
 }
 
-// Digest validates a decoded JSON value as the closed hashed payload and
-// returns lowercase hex SHA-256 of RFC 8785 JCS bytes.
-func Digest(root any) (string, error) {
-	digest, _, err := DigestCanonical(root)
-	return digest, err
-}
 
 // DigestCanonical validates the closed hashed payload, normalizes findings, and
 // returns both the digest and the canonical object (for persist write + GET).

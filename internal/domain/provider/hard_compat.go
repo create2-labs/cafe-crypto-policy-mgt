@@ -32,12 +32,6 @@ type HardSelectionRequest struct {
 	KeyRotationModel          string // "none" | "per_userop"
 }
 
-// HardObservation is the subset of wallet observation needed for ADR §7 hard checks.
-type HardObservation struct {
-	AccountKind string // wire account_kind, e.g. "eoa"
-	ChainIDs    []int64
-}
-
 // EvaluateHardCompatibility applies ADR §7 hard constraints against a solution profile.
 // An empty findings slice means hard pass (soft findings still attach on ranked candidates).
 func EvaluateHardCompatibility(obs HardObservation, req HardSelectionRequest, profile *SolutionProfile) []HardFinding {
@@ -136,6 +130,13 @@ func EvaluateHardCompatibility(obs HardObservation, req HardSelectionRequest, pr
 	}
 
 	return findings
+}
+
+
+// HardObservation is the subset of wallet observation needed for ADR §7 hard checks.
+type HardObservation struct {
+	AccountKind string // wire account_kind, e.g. "eoa"
+	ChainIDs    []int64
 }
 
 func walletTypeAccepted(accountKind string, accepted []string) bool {

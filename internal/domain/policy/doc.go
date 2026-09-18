@@ -4,13 +4,10 @@
 // CryptoPolicy is the catalogue intention (required_posture + allowed_providers).
 // CryptoPolicyCatalogItem / CompatibleNetwork expose derived catalogue facts
 // (compatible_networks from registry chain_support, status ≠ planned).
-// CryptoPolicyInstance remains for legacy domain unit tests only (PolicyCompatibilityEvaluator).
+// CryptoPolicyInstance / PolicySelectionRequest / PolicyCompatibilityEvaluator /
+// PolicyDecisionEvaluator remain as legacy unit-test helpers (*_legacy_test.go)
+// for pre-P9b ranking semantics; explore HTTP uses ExploreCoucheAEvaluator.
 // AssessmentStatus and AssessmentFinding model compatibility/deployability signals.
-// PolicyCompatibilityEvaluator and PolicyCompatibilityResult implement
-// observation+request+instance compatibility classification (PR12) before
-// ranking (PR13).
-// PolicyDecisionEvaluator builds deterministic ranked/rejected candidate output
-// and selected policy decision from compatibility results (PR13).
 // CryptoPolicyPersistPayload / ValidatePayloadForPersist enforce ADR §9
 // persist gates (schema v0.2, crypto_policy_id, user_constraints, couche A+B
 // replay against accepted snapshot, soft findings listed, pinned provider refs).
