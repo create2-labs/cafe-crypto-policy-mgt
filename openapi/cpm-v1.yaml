@@ -167,8 +167,10 @@ paths:
         Legacy **`selection_request`** / couche-B fields → **400**. Public output key is
         **`scan_compatible_providers`** with ADR couche A match (CPM-P9b): posture, wallet type,
         deployable chain + capabilities (`deploy`, `sign_userop`, + `rotate_signer` if `per_userop`),
-        soft findings, and indicative **`suggested_user_constraints`**. Couche B does not filter
-        explore membership. Contradictory suggestions → candidate `compatibility_status=erroneous`.
+        soft findings, indicative **`suggested_user_constraints`**, and a derived **`composition`**
+        view (account_model / signature / constraints) for Expected result (CFB-P3) — not the
+        admin ProviderManifest. Couche B does not filter explore membership. Contradictory
+        suggestions → candidate `compatibility_status=erroneous`.
       operationId: postPoliciesDecisionsExplore
       requestBody:
         required: true
@@ -890,6 +892,65 @@ components:
             $ref: "#/components/schemas/CompatibilityFinding"
         suggested_user_constraints:
           $ref: "#/components/schemas/SuggestedUserConstraints"
+        composition:
+          $ref: "#/components/schemas/ExploreCompositionView"
+
+    ExploreCompositionView:
+      type: object
+      description: |
+        Derived composition facts for Expected result (ADR CFB-P3 / US-COMPOSE-VIEW).
+        Always present on catalogue-driven explore v0.2 `scan_compatible_providers`.
+        Product projection of account_model / signature / constraints — not the admin
+        ProviderManifest (no chain_support, references, risk_notes, or input_requirements).
+      required: [account_model, signature, constraints]
+      additionalProperties: false
+      properties:
+        account_model:
+          $ref: "#/components/schemas/ExploreCompositionAccountModel"
+        signature:
+          $ref: "#/components/schemas/ExploreCompositionSignature"
+        constraints:
+          $ref: "#/components/schemas/ExploreCompositionConstraints"
+
+    ExploreCompositionAccountModel:
+      type: object
+      additionalProperties: false
+      properties:
+        standard:
+          type: string
+        execution_model:
+          type: string
+        requires_bundler:
+          type: boolean
+        requires_entrypoint:
+          type: boolean
+        entrypoint_versions:
+          type: array
+          items:
+            type: string
+
+    ExploreCompositionSignature:
+      type: object
+      additionalProperties: false
+      properties:
+        scheme:
+          type: string
+        family:
+          type: string
+        key_rotation_model:
+          type: string
+          enum: [none, per_userop]
+
+    ExploreCompositionConstraints:
+      type: object
+      additionalProperties: false
+      properties:
+        requires_new_account:
+          type: boolean
+        address_continuity_supported:
+          type: boolean
+        requires_local_signer_state:
+          type: boolean
 
     SuggestedUserConstraints:
       type: object

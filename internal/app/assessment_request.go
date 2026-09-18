@@ -247,6 +247,7 @@ func parseWalletScanAssessmentSource(w http.ResponseWriter, detailJSON []byte) (
 		writeJSON(w, http.StatusBadRequest, apiErrorJSON("wallet_scan_detail_invalid", serr.Error()))
 		return walletScanAssessmentSource{}, false
 	}
+	subjectID = persistence.NormalizeWalletSubjectID(subjectID)
 	return walletScanAssessmentSource{
 		payload:         pl,
 		walletSubjectID: subjectID,

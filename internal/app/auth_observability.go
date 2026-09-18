@@ -7,7 +7,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -58,28 +57,6 @@ type authMetrics interface {
 type noopAuthMetrics struct{}
 
 func (noopAuthMetrics) IncDecision(string, string, string, string) {}
-
-type authDecisionCounter struct {
-	mu     sync.Mutex
-	counts map[string]int
-}
-
-func newAuthDecisionCounter() *authDecisionCounter {
-	return &authDecisionCounter{counts: map[string]int{}}
-}
-
-func (c *authDecisionCounter) IncDecision(category string, outcome string, code string, route string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	key := strings.Join([]string{category, outcome, code, route}, "|")
-	c.counts[key]++
-}
-
-func (c *authDecisionCounter) Count(category string, outcome string, code string, route string) int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.counts[strings.Join([]string{category, outcome, code, route}, "|")]
-}
 
 type authObservability struct {
 	logger       *log.Logger

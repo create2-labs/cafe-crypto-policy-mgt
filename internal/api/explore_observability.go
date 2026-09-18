@@ -3,7 +3,6 @@ package api
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"log"
 	"net/http"
 	"sort"
@@ -409,42 +408,4 @@ func sanitizeExploreRequestID(raw string) (string, bool) {
 		return "", false
 	}
 	return value, true
-}
-
-// setExploreObservabilityForTest swaps the package-level explore observability sink (tests only).
-func setExploreObservabilityForTest(obs exploreObservability) func() {
-	prev := exploreObs
-	exploreObs = obs
-	return func() { exploreObs = prev }
-}
-
-type testExploreMetrics struct {
-	increments []testExploreMetricIncrement
-}
-
-type testExploreMetricIncrement struct {
-	RejectionCode      string
-	WalletType         string
-	Binding            string
-	MissingChainCount  string
-}
-
-func (m *testExploreMetrics) IncExploreNoDeployableCandidate(rejectionCode, walletType, binding, missingChainCount string) {
-	m.increments = append(m.increments, testExploreMetricIncrement{
-		RejectionCode:     rejectionCode,
-		WalletType:        walletType,
-		Binding:           binding,
-		MissingChainCount: missingChainCount,
-	})
-}
-
-type testExploreLogger struct {
-	lines []string
-}
-
-func (l *testExploreLogger) Println(v ...any) {
-	if len(v) == 0 {
-		return
-	}
-	l.lines = append(l.lines, fmt.Sprint(v...))
 }
