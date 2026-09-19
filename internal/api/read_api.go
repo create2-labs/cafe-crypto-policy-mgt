@@ -91,6 +91,7 @@ func RegisterReadRoutes(mux *http.ServeMux, store *ReadStore) error {
 	}
 	registerCatalogRoutes(mux, store)
 	registerExploreRoute(mux, store)
+	registerAcceptedProviderSnapshotRoute(mux, store)
 	return nil
 }
 

@@ -108,6 +108,11 @@ func (c *FlexibleChainID) UnmarshalJSON(b []byte) error {
 
 func (c FlexibleChainID) Int64() int64 { return int64(c) }
 
+// MarshalJSON emits chain_id as a decimal string (hashed closed set / CFB-P5 assist).
+func (c FlexibleChainID) MarshalJSON() ([]byte, error) {
+	return json.Marshal(strconv.FormatInt(int64(c), 10))
+}
+
 // ValidatePayloadForPersist decodes and gates a hashed CP payload before CreatePolicy.
 // Replays couche A then couche B against the accepted snapshot (ADR §7 / §9 rule 7).
 // Does not re-resolve live manifests; cafe-persistence stays opaque to Nicetry logic.
