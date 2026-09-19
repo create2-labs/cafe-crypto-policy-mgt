@@ -25,6 +25,8 @@ const (
 
 	// WalletChallenges is the mandatory stateless canonical message helper (CP-PERSIST / RD-P4+).
 	WalletChallenges = V1Base + "/wallet-challenges"
+	// AcceptedProviderSnapshots builds accepted_provider_snapshot from registry facts (CFB-P5 Option B).
+	AcceptedProviderSnapshots = V1Base + "/accepted-provider-snapshots"
 	// WalletTargetContext is the owner-scoped IMM-9b lookup for proactive wallet scan UI (FE-IMM-2).
 	WalletTargetContext = V1Base + "/wallet-target-context"
 
@@ -53,6 +55,7 @@ func AuthenticatedRoutes() []AuthenticatedRoute {
 		{Method: http.MethodPost, Path: PoliciesDecisionsExplore},
 		{Method: http.MethodPost, Path: PoliciesAssessmentRequest},
 		{Method: http.MethodPost, Path: WalletChallenges},
+		{Method: http.MethodPost, Path: AcceptedProviderSnapshots},
 		{Method: http.MethodGet, Path: WalletTargetContext},
 		{Method: http.MethodPost, Path: Policies},
 		{Method: http.MethodGet, Path: Policies},

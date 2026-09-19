@@ -20,6 +20,12 @@ info:
     **`POST /policies`** (signed body). Maximum signed message validity: **10 minutes**. **EOA-only**.
     **`POST /wallet-challenges/verify` is not a security requirement.**
 
+    **Persist snapshot assist (CFB-P5 Option B):** clients may call
+    **`POST /accepted-provider-snapshots`** to obtain a registry-authoritative
+    `accepted_provider_snapshot` (CP + solution_profile_ref + chain + soft findings) before
+    hashing/signing. This replaces FE assembly from a provider fixture or `GET /providers`.
+    Persist gates (pins, soft findings, couche A+B) remain unchanged.
+
     **W2 (owner-scoped latest completed scan):** `POST /policies/decisions/explore`,
     `POST /wallet-challenges`, and `POST /policies` require `scan_id` to be the latest completed
     Discovery wallet scan for the authenticated user and address. Non-latest completed → **422**
@@ -60,6 +66,7 @@ tags:
     description: |
       Stateless EOA wallet signed authorization for CP persistence.
       Mandatory canonical message helper (`POST /wallet-challenges`); normative persist is `POST /policies`.
+      Optional registry snapshot assist (`POST /accepted-provider-snapshots`) so clients need no provider fixture.
       UI, CLI and direct API share the same contract.
 
 security:
@@ -454,6 +461,72 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+
+  /accepted-provider-snapshots:
+    post:
+      tags: [wallet-authorization]
+      summary: Build accepted_provider_snapshot from registry (CFB-P5 Option B)
+      description: |
+        **Read-only construction helper.** Given a catalogue Crypto Policy, a
+        `solution_profile_ref`, a target `chain_id`, and optional soft findings, CPM derives the
+        canonical `accepted_provider_snapshot` from the loaded provider registry.
+
+        Clients (Web UI / CLI) use this before assembling the closed hashed payload for
+        `POST /wallet-challenges` — they must **not** assemble the snapshot from a local provider
+        fixture or from `GET /providers`.
+
+        Soft findings required by the profile (`requires_bundler`, `requires_local_signer_state`)
+        are always merged into the snapshot. `chain_support_used.chain_id` is emitted as a
+        **decimal string**. `status: planned` chains are rejected (**422**).
+
+        Persist gates at `POST /policies` are unchanged (pins, soft findings, couche A+B).
+        This route does **not** require W2 / wallet address (construction only; no sign).
+      operationId: postAcceptedProviderSnapshots
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AcceptedProviderSnapshotRequest"
+            examples:
+              nicetrySepolia:
+                value:
+                  crypto_policy_id: cpm_pq_account_validation_v1
+                  solution_profile_ref:
+                    provider_id: nicetry
+                    solution_profile_id: nicetry.fors_c.erc4337.v0_1
+                    manifest_version: "2026-08"
+                  chain_id: "11155111"
+                  accepted_findings: [requires_bundler, requires_local_signer_state]
+      responses:
+        "200":
+          description: Registry-authoritative snapshot ready to embed in the hashed persist payload.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptedProviderSnapshotResponse"
+        "400":
+          description: Invalid input (missing fields, unknown crypto_policy_id, unknown finding codes).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error: {type: string}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          description: |
+            Profile/chain/provider incompatible with the CP or registry
+            (provider not allowed, profile not found, chain missing/planned).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error: {type: string}
 
   /wallet-challenges:
     post:
@@ -1341,6 +1414,56 @@ components:
           enum: [persist_crypto_policy]
         payload:
           $ref: "#/components/schemas/CryptoPolicyPersistPayload"
+
+    AcceptedProviderSnapshotRequest:
+      type: object
+      required: [crypto_policy_id, solution_profile_ref, chain_id]
+      additionalProperties: false
+      description: |
+        CFB-P5 Option B — build `accepted_provider_snapshot` from registry facts.
+        `chain_id` may be a JSON number or decimal string; response always uses string.
+      properties:
+        crypto_policy_id:
+          type: string
+          description: Catalogue Crypto Policy id (provider must be in allowed_providers).
+        solution_profile_ref:
+          $ref: "#/components/schemas/SolutionProfileRef"
+        chain_id:
+          oneOf:
+            - type: string
+              description: Decimal string chain id (preferred for hashed payload symmetry).
+              example: "11155111"
+            - type: integer
+              format: int64
+              minimum: 1
+        accepted_findings:
+          type: array
+          items:
+            type: string
+            enum: [requires_bundler, requires_local_signer_state]
+          description: |
+            Optional client soft findings. Required profile soft findings are always merged.
+
+    AcceptedProviderSnapshotResponse:
+      type: object
+      required:
+        - crypto_policy_id
+        - required_posture
+        - solution_profile_ref
+        - accepted_provider_snapshot
+      additionalProperties: false
+      description: |
+        Registry-authoritative snapshot plus echoed CP posture / normalized solution_profile_ref.
+      properties:
+        crypto_policy_id:
+          type: string
+        required_posture:
+          type: string
+          enum: [classical_only, hybrid, full_pq]
+        solution_profile_ref:
+          $ref: "#/components/schemas/SolutionProfileRef"
+        accepted_provider_snapshot:
+          $ref: "#/components/schemas/AcceptedProviderSnapshot"
 
     WalletChallengeResponse:
       type: object
