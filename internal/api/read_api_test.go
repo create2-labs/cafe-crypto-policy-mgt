@@ -150,6 +150,92 @@ func TestCryptoPolicies_CompatibleNetworks_ListAndGet(t *testing.T) {
 	assertCompatibleNetworksMultichain(t, getResp.CompatibleNetworks)
 }
 
+func TestCryptoPolicies_AllowedProviderSummaries_ListAndGet(t *testing.T) {
+	store := testReadStore(t)
+	mux := http.NewServeMux()
+	if err := RegisterReadRoutes(mux, store); err != nil {
+		t.Fatalf("RegisterReadRoutes: %v", err)
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies, nil)
+	listRec := httptest.NewRecorder()
+	mux.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("list status: got %d body=%s", listRec.Code, listRec.Body.String())
+	}
+
+	var listResp struct {
+		Items []struct {
+			ID                       string                      `json:"id"`
+			AllowedProviderSummaries []allowedProviderSummaryDTO `json:"allowed_provider_summaries"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(listRec.Body.Bytes(), &listResp); err != nil {
+		t.Fatalf("decode list: %v", err)
+	}
+	if len(listResp.Items) != 1 {
+		t.Fatalf("list items: got %d", len(listResp.Items))
+	}
+	assertAllowedProviderSummariesNicetryPair(t, listResp.Items[0].AllowedProviderSummaries)
+
+	getReq := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies+"/cpm_pq_account_validation_v1", nil)
+	getRec := httptest.NewRecorder()
+	mux.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("get status: got %d body=%s", getRec.Code, getRec.Body.String())
+	}
+	var getResp struct {
+		ID                       string                      `json:"id"`
+		AllowedProviderSummaries []allowedProviderSummaryDTO `json:"allowed_provider_summaries"`
+	}
+	if err := json.Unmarshal(getRec.Body.Bytes(), &getResp); err != nil {
+		t.Fatalf("decode get: %v", err)
+	}
+	if getResp.ID != "cpm_pq_account_validation_v1" {
+		t.Fatalf("get id: %q", getResp.ID)
+	}
+	assertAllowedProviderSummariesNicetryPair(t, getResp.AllowedProviderSummaries)
+}
+
+type allowedProviderSummaryDTO struct {
+	ProviderID string `json:"provider_id"`
+	Signature  struct {
+		Scheme string `json:"scheme"`
+		Family string `json:"family"`
+	} `json:"signature"`
+	Networks []struct {
+		ChainID int64  `json:"chain_id"`
+		Network string `json:"network"`
+		Status  string `json:"status"`
+	} `json:"networks"`
+}
+
+func assertAllowedProviderSummariesNicetryPair(t *testing.T, rows []allowedProviderSummaryDTO) {
+	t.Helper()
+	if len(rows) != 2 {
+		t.Fatalf("want nicetry + nicetry2, got %+v", rows)
+	}
+	if rows[0].ProviderID != "nicetry" || rows[0].Signature.Scheme != "FORS+C" {
+		t.Fatalf("nicetry row: %+v", rows[0])
+	}
+	if rows[1].ProviderID != "nicetry2" || rows[1].Signature.Scheme != "MLDSA" {
+		t.Fatalf("nicetry2 row: %+v", rows[1])
+	}
+	for _, row := range rows {
+		if row.Signature.Family == "" {
+			t.Fatalf("%s: empty family", row.ProviderID)
+		}
+		if len(row.Networks) == 0 {
+			t.Fatalf("%s: empty networks", row.ProviderID)
+		}
+		for _, n := range row.Networks {
+			if n.Status == "planned" {
+				t.Fatalf("%s: planned present: %+v", row.ProviderID, n)
+			}
+		}
+	}
+}
+
 func TestCryptoPolicies_CompatibleNetworks_SepoliaOnlyHistorical(t *testing.T) {
 	dir := t.TempDir()
 	manifestPath := filepath.Join(dir, "nicetry_sepolia_only.json")

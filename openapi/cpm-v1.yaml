@@ -82,7 +82,8 @@ paths:
         "200":
           description: |
             Catalogue Crypto Policies with derived `compatible_networks`
-            (deployable union of allowed providers' chain_support; status ≠ planned).
+            (deployable union of allowed providers' chain_support; status ≠ planned)
+            and `allowed_provider_summaries` (per-provider signature + networks).
           content:
             application/json:
               schema:
@@ -104,7 +105,8 @@ paths:
       responses:
         "200":
           description: |
-            Crypto Policy catalogue item including derived `compatible_networks`.
+            Crypto Policy catalogue item including derived `compatible_networks`
+            and `allowed_provider_summaries`.
           content:
             application/json:
               schema:
@@ -740,12 +742,54 @@ components:
           items:
             type: string
 
+    ProviderSignatureSummary:
+      type: object
+      description: |
+        Catalogue signature summary for one allowed provider (scheme / family).
+        Not the admin SignatureProfile (no key_rotation_model).
+      required: [scheme, family]
+      properties:
+        scheme:
+          type: string
+          description: Signature scheme from the selected solution profile (e.g. FORS+C, MLDSA).
+        family:
+          type: string
+          description: Signature family from the selected solution profile (e.g. hash_based).
+
+    AllowedProviderSummary:
+      type: object
+      description: |
+        One catalogue table row for an allowed_providers entry (CFB-P10 /
+        US-CAT-PROVIDERS). Derived from the registry: posture-compatible solution
+        profile preferred when several exist. Networks are deployable only
+        (status ≠ planned) for that provider — not an anonymous union.
+      required: [provider_id, signature, networks]
+      properties:
+        provider_id:
+          type: string
+        signature:
+          $ref: "#/components/schemas/ProviderSignatureSummary"
+        networks:
+          type: array
+          items:
+            $ref: "#/components/schemas/CompatibleNetwork"
+
     CryptoPolicyCatalogItem:
       type: object
       description: |
-        Catalogue Crypto Policy plus derived compatible_networks (CFB-P1 / ADR
-        catalogue facts). Existing intention fields remain; enrichment is additive.
-      required: [id, name, version, required_posture, allowed_providers, compatible_networks]
+        Catalogue Crypto Policy plus derived compatible_networks (CFB-P1) and
+        allowed_provider_summaries (CFB-P10 / ADR catalogue facts). Existing
+        intention fields remain; enrichment is additive.
+      required:
+        [
+          id,
+          name,
+          version,
+          required_posture,
+          allowed_providers,
+          compatible_networks,
+          allowed_provider_summaries,
+        ]
       properties:
         id:
           type: string
@@ -765,6 +809,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CompatibleNetwork"
+        allowed_provider_summaries:
+          type: array
+          description: |
+            Per-provider catalogue rows (provider_id, signature, deployable networks).
+            Order follows allowed_providers. compatible_networks remains the union.
+          items:
+            $ref: "#/components/schemas/AllowedProviderSummary"
 
     CryptoPolicyListResponse:
       type: object

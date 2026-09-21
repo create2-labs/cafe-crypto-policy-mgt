@@ -17,30 +17,36 @@ type CompatibleNetwork struct {
 }
 
 // CryptoPolicyCatalogItem is the GET /crypto-policies* response shape: catalogue
-// Crypto Policy fields plus derived compatible_networks (ADR CFB-P1).
+// Crypto Policy fields plus derived compatible_networks (ADR CFB-P1) and
+// allowed_provider_summaries (ADR CFB-P10).
 type CryptoPolicyCatalogItem struct {
-	ID                 string                      `json:"id"`
-	Name               string                      `json:"name"`
-	Version            string                      `json:"version"`
-	Description        string                      `json:"description,omitempty"`
-	RequiredPosture    vocabulary.CurrentPQPosture `json:"required_posture"`
-	AllowedProviders   []string                    `json:"allowed_providers"`
-	CompatibleNetworks []CompatibleNetwork         `json:"compatible_networks"`
+	ID                       string                      `json:"id"`
+	Name                     string                      `json:"name"`
+	Version                  string                      `json:"version"`
+	Description              string                      `json:"description,omitempty"`
+	RequiredPosture          vocabulary.CurrentPQPosture `json:"required_posture"`
+	AllowedProviders         []string                    `json:"allowed_providers"`
+	CompatibleNetworks       []CompatibleNetwork         `json:"compatible_networks"`
+	AllowedProviderSummaries []AllowedProviderSummary    `json:"allowed_provider_summaries"`
 }
 
-// CatalogItemFromCryptoPolicy builds a catalogue response item with derived networks.
+// CatalogItemFromCryptoPolicy builds a catalogue response item with derived facts.
 func CatalogItemFromCryptoPolicy(cp *CryptoPolicy, reg *provider.Registry) CryptoPolicyCatalogItem {
 	if cp == nil {
-		return CryptoPolicyCatalogItem{CompatibleNetworks: []CompatibleNetwork{}}
+		return CryptoPolicyCatalogItem{
+			CompatibleNetworks:       []CompatibleNetwork{},
+			AllowedProviderSummaries: []AllowedProviderSummary{},
+		}
 	}
 	item := CryptoPolicyCatalogItem{
-		ID:                 cp.ID,
-		Name:               cp.Name,
-		Version:            cp.Version,
-		Description:        cp.Description,
-		RequiredPosture:    cp.RequiredPosture,
-		AllowedProviders:   append([]string(nil), cp.AllowedProviders...),
-		CompatibleNetworks: DeriveCompatibleNetworks(cp, reg),
+		ID:                       cp.ID,
+		Name:                     cp.Name,
+		Version:                  cp.Version,
+		Description:              cp.Description,
+		RequiredPosture:          cp.RequiredPosture,
+		AllowedProviders:         append([]string(nil), cp.AllowedProviders...),
+		CompatibleNetworks:       DeriveCompatibleNetworks(cp, reg),
+		AllowedProviderSummaries: DeriveAllowedProviderSummaries(cp, reg),
 	}
 	return item
 }

@@ -279,7 +279,7 @@ Environment variables:
 
 - `CPM_CATALOGUE_DIR` (default: `/app/policy`) — directory of `*.json` files. At boot CPM classifies each file as a **Crypto Policy** (`required_posture` + `allowed_providers`) or a **ProviderManifest** (`schema_version: cafe.provider_manifest.v0.1`). Incompatible / unrelated JSON (e.g. instance fixtures, garbage) is **skipped with a log line**; boot fails only if zero policies or zero providers remain. Image build copies `internal/domain/policy/testdata/*.json` and `internal/domain/provider/testdata/*.json` into `/app/policy/`. **Adding a CP or provider = drop a JSON into the matching testdata folder + rebuild image** — no `config.go` / path-list edits.
 
-Catalogue responses are posture + `allowed_providers` / provider-manifest oriented; they do **not** return templates, instances, or a business policy graph.
+Catalogue responses include intention fields (`required_posture`, `allowed_providers`) plus derived catalogue facts (`compatible_networks`, `allowed_provider_summaries`). They do **not** return templates, instances, or a business policy graph.
 
 **Catalogue startup signals (ADR §7.2.1 family 1 / CPM-P11a):** after loading Crypto Policies and provider manifests, CPM emits structured logs (no `/admin` endpoint):
 
