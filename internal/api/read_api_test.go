@@ -20,7 +20,10 @@ func testReadStore(t *testing.T) *ReadStore {
 		CryptoPolicyPaths: []string{
 			fixturePath("crypto_policy_pq_account_validation_v1.json"),
 		},
-		ProviderManifestPaths: []string{providerManifestFixturePath()},
+		ProviderManifestPaths: []string{
+			providerManifestFixturePath(),
+			providerManifestNicetry2FixturePath(),
+		},
 	})
 	if err != nil {
 		t.Fatalf("LoadReadStore: %v", err)
@@ -76,12 +79,19 @@ func TestLoadReadStore_CatalogueIntentionOnly(t *testing.T) {
 	if cp.ID != "cpm_pq_account_validation_v1" {
 		t.Fatalf("crypto policy id: got %q", cp.ID)
 	}
-	if len(cp.AllowedProviders) != 1 || cp.AllowedProviders[0] != "nicetry" {
+	if len(cp.AllowedProviders) != 2 || cp.AllowedProviders[0] != "nicetry" || cp.AllowedProviders[1] != "nicetry2" {
 		t.Fatalf("allowed_providers: %#v", cp.AllowedProviders)
 	}
 	items := store.providers.List()
-	if len(items) != 1 || items[0].ProviderID != "nicetry" {
+	if len(items) != 2 {
 		t.Fatalf("providers: %#v", items)
+	}
+	ids := map[string]bool{}
+	for _, item := range items {
+		ids[item.ProviderID] = true
+	}
+	if !ids["nicetry"] || !ids["nicetry2"] {
+		t.Fatalf("providers missing nicetry/nicetry2: %#v", items)
 	}
 }
 
@@ -311,13 +321,43 @@ func TestDecisionExplore_v02_sepoliaScanCompatibleProviders(t *testing.T) {
 	if response.Decision.RequestSummary.CryptoPolicyID != "cpm_pq_account_validation_v1" {
 		t.Fatalf("crypto_policy_id: got %q", response.Decision.RequestSummary.CryptoPolicyID)
 	}
-	if len(response.Decision.ScanCompatibleProviders) != 1 {
-		t.Fatalf("P9b: want 1 scan_compatible_providers, got %d body=%s", len(response.Decision.ScanCompatibleProviders), rec.Body.String())
+	if len(response.Decision.ScanCompatibleProviders) != 2 {
+		t.Fatalf("P9b: want 2 scan_compatible_providers, got %d body=%s", len(response.Decision.ScanCompatibleProviders), rec.Body.String())
 	}
-	got := response.Decision.ScanCompatibleProviders[0]
-	if got.SolutionProfileRef.ProviderID != "nicetry" {
-		t.Fatalf("provider: %+v", got.SolutionProfileRef)
+	byProvider := map[string]struct {
+		CandidateID              string `json:"candidate_id"`
+		SuggestedUserConstraints *struct {
+			AllowNewWallet bool `json:"allow_new_wallet"`
+		} `json:"suggested_user_constraints"`
+		SolutionProfileRef struct {
+			ProviderID string `json:"provider_id"`
+		} `json:"solution_profile_ref"`
+		Composition *struct {
+			AccountModel struct {
+				Standard        string   `json:"standard"`
+				RequiresBundler bool     `json:"requires_bundler"`
+				EntrypointVers  []string `json:"entrypoint_versions"`
+			} `json:"account_model"`
+			Signature struct {
+				Scheme           string `json:"scheme"`
+				KeyRotationModel string `json:"key_rotation_model"`
+			} `json:"signature"`
+			Constraints struct {
+				RequiresNewAccount       bool `json:"requires_new_account"`
+				RequiresLocalSignerState bool `json:"requires_local_signer_state"`
+			} `json:"constraints"`
+		} `json:"composition"`
+	}{}
+	for _, c := range response.Decision.ScanCompatibleProviders {
+		byProvider[c.SolutionProfileRef.ProviderID] = c
 	}
+	if _, ok := byProvider["nicetry"]; !ok {
+		t.Fatal("missing nicetry candidate")
+	}
+	if _, ok := byProvider["nicetry2"]; !ok {
+		t.Fatal("missing nicetry2 candidate")
+	}
+	got := byProvider["nicetry"]
 	if got.SuggestedUserConstraints == nil || !got.SuggestedUserConstraints.AllowNewWallet {
 		t.Fatalf("suggested_user_constraints: %+v", got.SuggestedUserConstraints)
 	}
@@ -332,6 +372,10 @@ func TestDecisionExplore_v02_sepoliaScanCompatibleProviders(t *testing.T) {
 	}
 	if !got.Composition.Constraints.RequiresNewAccount || !got.Composition.Constraints.RequiresLocalSignerState {
 		t.Fatalf("composition.constraints: %+v", got.Composition.Constraints)
+	}
+	nicetry2 := byProvider["nicetry2"]
+	if nicetry2.Composition == nil || nicetry2.Composition.Signature.Scheme != "MLDSA" {
+		t.Fatalf("nicetry2 composition.signature: %+v", nicetry2.Composition)
 	}
 	for _, w := range response.Decision.Warnings {
 		if strings.Contains(w, "degraded") {
@@ -504,4 +548,8 @@ func fixturePath(name string) string {
 
 func providerManifestFixturePath() string {
 	return filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry_v0_1.json")
+}
+
+func providerManifestNicetry2FixturePath() string {
+	return filepath.Join("..", "domain", "provider", "testdata", "provider_manifest_nicetry2_v0_1.json")
 }

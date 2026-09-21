@@ -44,9 +44,14 @@ func LoadCryptoPolicyFromFile(path string) (*CryptoPolicy, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read crypto policy file: %w", err)
 	}
+	return LoadCryptoPolicyFromBytes(raw)
+}
+
+// LoadCryptoPolicyFromBytes decodes, normalizes, and validates a crypto policy JSON blob.
+func LoadCryptoPolicyFromBytes(raw []byte) (*CryptoPolicy, error) {
 	var cp CryptoPolicy
 	if err := json.Unmarshal(raw, &cp); err != nil {
-		return nil, fmt.Errorf("decode crypto policy file: %w", err)
+		return nil, fmt.Errorf("decode crypto policy: %w", err)
 	}
 	if err := cp.NormalizeAndValidate(); err != nil {
 		return nil, err

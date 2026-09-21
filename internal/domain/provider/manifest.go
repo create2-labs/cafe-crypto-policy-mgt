@@ -136,9 +136,14 @@ func LoadProviderManifestFromFile(path string) (*ProviderManifest, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read provider manifest file: %w", err)
 	}
+	return LoadProviderManifestFromBytes(raw)
+}
+
+// LoadProviderManifestFromBytes decodes, normalizes, and validates a ProviderManifest JSON blob.
+func LoadProviderManifestFromBytes(raw []byte) (*ProviderManifest, error) {
 	var m ProviderManifest
 	if err := json.Unmarshal(raw, &m); err != nil {
-		return nil, fmt.Errorf("decode provider manifest file: %w", err)
+		return nil, fmt.Errorf("decode provider manifest: %w", err)
 	}
 	if err := m.NormalizeAndValidate(); err != nil {
 		return nil, err

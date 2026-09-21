@@ -4,5 +4,5 @@
   "version": "v0.1",
   "description": "CAFE intention: reach post-quantum account validation for an EVM wallet.",
   "required_posture": "hybrid",
-  "allowed_providers": ["nicetry"]
+  "allowed_providers": ["nicetry","nicetry2"]
 }

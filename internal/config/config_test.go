@@ -6,6 +6,7 @@ func TestLoadFromEnvDefaults(t *testing.T) {
 	t.Setenv("CPM_SERVICE_NAME", "")
 	t.Setenv("CPM_HTTP_ADDR", "")
 	t.Setenv("CPM_LOG_LEVEL", "")
+	t.Setenv("CPM_CATALOGUE_DIR", "")
 
 	cfg := LoadFromEnv()
 
@@ -42,14 +43,8 @@ func TestLoadFromEnvDefaults(t *testing.T) {
 	if cfg.ScanAuthorizationServiceToken != "" {
 		t.Fatalf("expected empty scan authorization service token default, got %q", cfg.ScanAuthorizationServiceToken)
 	}
-	if len(cfg.CryptoPolicyPaths) != 1 {
-		t.Fatalf("expected 1 default crypto policy path, got %#v", cfg.CryptoPolicyPaths)
-	}
-	if cfg.CryptoPolicyPaths[0] != "/app/policy/crypto_policy_pq_account_validation_v1.json" {
-		t.Fatalf("unexpected default crypto policy paths: %#v", cfg.CryptoPolicyPaths)
-	}
-	if len(cfg.ProviderManifestPaths) != 1 || cfg.ProviderManifestPaths[0] != "/app/policy/provider_manifest_nicetry_v0_1.json" {
-		t.Fatalf("unexpected default provider manifest paths: %#v", cfg.ProviderManifestPaths)
+	if cfg.CatalogueDir != defaultCatalogueDir {
+		t.Fatalf("unexpected default catalogue dir: got %q want %q", cfg.CatalogueDir, defaultCatalogueDir)
 	}
 	if cfg.DiscoveryHTTPBaseURL != "" {
 		t.Fatalf("expected empty discovery HTTP base default, got %q", cfg.DiscoveryHTTPBaseURL)
@@ -86,8 +81,7 @@ func TestLoadFromEnvOverrides(t *testing.T) {
 	t.Setenv("CAFE_SCAN_AUTHORIZATION_TIMEOUT_SEC", "9")
 	t.Setenv("CAFE_SCAN_AUTHORIZATION_SERVICE_TOKEN", "scan-authz-service-token")
 	t.Setenv("CPM_AUTH_CLOCK_SKEW_SEC", "45")
-	t.Setenv("CPM_CRYPTO_POLICY_PATHS", "cp-a.json, cp-b.json")
-	t.Setenv("CPM_PROVIDER_MANIFEST_PATHS", "provider-a.json, provider-b.json")
+	t.Setenv("CPM_CATALOGUE_DIR", "/data/catalogue")
 	t.Setenv("CAFE_DISCOVERY_HTTP_BASE", "http://discovery:8080")
 	t.Setenv("CAFE_DISCOVERY_HTTP_TIMEOUT_SEC", "11")
 	t.Setenv("CPM_NATS_URL", "nats://nats:4222")
@@ -131,11 +125,8 @@ func TestLoadFromEnvOverrides(t *testing.T) {
 	if cfg.AuthClockSkewSec != 45 {
 		t.Fatalf("expected auth clock skew override, got %d", cfg.AuthClockSkewSec)
 	}
-	if len(cfg.CryptoPolicyPaths) != 2 || cfg.CryptoPolicyPaths[0] != "cp-a.json" || cfg.CryptoPolicyPaths[1] != "cp-b.json" {
-		t.Fatalf("expected crypto policy paths override, got %#v", cfg.CryptoPolicyPaths)
-	}
-	if len(cfg.ProviderManifestPaths) != 2 || cfg.ProviderManifestPaths[0] != "provider-a.json" || cfg.ProviderManifestPaths[1] != "provider-b.json" {
-		t.Fatalf("expected provider manifest paths override, got %#v", cfg.ProviderManifestPaths)
+	if cfg.CatalogueDir != "/data/catalogue" {
+		t.Fatalf("expected catalogue dir override, got %q", cfg.CatalogueDir)
 	}
 	if cfg.DiscoveryHTTPBaseURL != "http://discovery:8080" {
 		t.Fatalf("expected discovery HTTP base override, got %q", cfg.DiscoveryHTTPBaseURL)

@@ -34,7 +34,8 @@ FROM gcr.io/distroless/base-debian12:nonroot
 ARG APP_VERSION
 LABEL org.opencontainers.image.version="${APP_VERSION}"
 COPY --from=build /out/cafe-cpm /usr/local/bin/cafe-cpm
-COPY --from=build /app/internal/domain/policy/testdata /app/policy
-COPY --from=build /app/internal/domain/provider/testdata/provider_manifest_nicetry_v0_1.json /app/policy/provider_manifest_nicetry_v0_1.json
+# Flat catalogue dir: Crypto Policies + ProviderManifests (scanned at boot).
+COPY --from=build /app/internal/domain/policy/testdata/ /app/policy/
+COPY --from=build /app/internal/domain/provider/testdata/ /app/policy/
 EXPOSE 8082
 ENTRYPOINT ["/usr/local/bin/cafe-cpm"]

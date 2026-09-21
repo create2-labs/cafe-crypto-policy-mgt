@@ -20,7 +20,10 @@ var (
 )
 
 // ReadStoreOptions configures catalogue loading for Crypto Policies and providers.
+// Prefer CatalogueDir (scan all *.json, skip incompatible with logs). Explicit
+// path lists remain for unit tests that need an isolated fixture set.
 type ReadStoreOptions struct {
+	CatalogueDir          string
 	CryptoPolicyPaths     []string
 	ProviderManifestPaths []string
 }
@@ -33,11 +36,14 @@ type ReadStore struct {
 }
 
 func LoadReadStore(opts ReadStoreOptions) (*ReadStore, error) {
+	if dir := strings.TrimSpace(opts.CatalogueDir); dir != "" {
+		return loadReadStoreFromCatalogueDir(dir, log.Default())
+	}
 	if len(opts.CryptoPolicyPaths) == 0 {
-		return nil, errors.New("at least one crypto policy path is required")
+		return nil, errors.New("at least one crypto policy path is required (or set CatalogueDir)")
 	}
 	if len(opts.ProviderManifestPaths) == 0 {
-		return nil, errors.New("at least one provider manifest path is required")
+		return nil, errors.New("at least one provider manifest path is required (or set CatalogueDir)")
 	}
 
 	policies := make([]*policy.CryptoPolicy, 0, len(opts.CryptoPolicyPaths))

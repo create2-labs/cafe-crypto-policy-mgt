@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -14,10 +15,11 @@ const (
 	defaultDiscoveryHTTPTimeoutSec     = 5
 	defaultSessionValidationTimeoutSec = 3
 	defaultScanAuthorizationTimeoutSec = 3
-	defaultCryptoPolicyPaths           = "/app/policy/crypto_policy_pq_account_validation_v1.json"
-	defaultProviderManifestPaths       = "/app/policy/provider_manifest_nicetry_v0_1.json"
-	defaultCPMStore                    = "persistence"
-	defaultPersistenceTimeoutSec       = 15
+	// defaultCatalogueDir holds Crypto Policies + ProviderManifests (*.json).
+	// CPM scans the directory; incompatible files are skipped with a log line.
+	defaultCatalogueDir          = "/app/policy"
+	defaultCPMStore              = "persistence"
+	defaultPersistenceTimeoutSec = 15
 )
 
 type Config struct {
@@ -37,11 +39,9 @@ type Config struct {
 	DiscoveryHTTPTimeoutSec int
 	// NATSURL enables publishing policy.assessment.requested from POST …/policies/assessment/request (PR13g).
 	NATSURL string
-	// CryptoPolicyPaths lists catalogued Crypto Policy JSON files (CPM_CRYPTO_POLICY_PATHS).
-	CryptoPolicyPaths []string
-	// ProviderManifestPaths lists ProviderManifest JSON files (CPM_PROVIDER_MANIFEST_PATHS).
-	// Loaded for catalogue /providers and explore hard/soft checks.
-	ProviderManifestPaths []string
+	// CatalogueDir is the directory of catalogue JSON files (CPM_CATALOGUE_DIR).
+	// All *.json are classified as crypto policy or provider manifest; others are skipped.
+	CatalogueDir string
 	// WalletAuthDomain is embedded in CP-PERSIST canonical messages (§12); falls back to request Host.
 	WalletAuthDomain string
 	// Store selects CP storage backend. Runtime (deployed images): persistence only.
@@ -71,8 +71,7 @@ func LoadFromEnv() Config {
 		DiscoveryHTTPBaseURL:          getEnv("CAFE_DISCOVERY_HTTP_BASE", ""),
 		DiscoveryHTTPTimeoutSec:       getEnvInt("CAFE_DISCOVERY_HTTP_TIMEOUT_SEC", defaultDiscoveryHTTPTimeoutSec),
 		NATSURL:                       getEnv("CPM_NATS_URL", ""),
-		CryptoPolicyPaths:             parseCommaList(getEnv("CPM_CRYPTO_POLICY_PATHS", defaultCryptoPolicyPaths)),
-		ProviderManifestPaths:         parseCommaList(getEnv("CPM_PROVIDER_MANIFEST_PATHS", defaultProviderManifestPaths)),
+		CatalogueDir:                  strings.TrimSpace(getEnv("CPM_CATALOGUE_DIR", defaultCatalogueDir)),
 		WalletAuthDomain:              getEnv("CPM_WALLET_AUTH_DOMAIN", ""),
 		Store:                         getEnv("CPM_STORE", defaultCPMStore),
 		PersistenceURL:                getEnv("CPM_PERSISTENCE_URL", ""),
@@ -86,35 +85,6 @@ func getEnv(key string, fallback string) string {
 		return value
 	}
 	return fallback
-}
-
-func parseCommaList(value string) []string {
-	if value == "" {
-		return nil
-	}
-	out := make([]string, 0, 1)
-	current := make([]rune, 0, len(value))
-	flush := func() {
-		if len(current) == 0 {
-			return
-		}
-		out = append(out, string(current))
-		current = current[:0]
-	}
-	for _, r := range value {
-		if r == ',' {
-			flush()
-			continue
-		}
-		if r != ' ' && r != '\t' && r != '\n' && r != '\r' {
-			current = append(current, r)
-		}
-	}
-	flush()
-	if len(out) == 0 {
-		return nil
-	}
-	return out
 }
 
 func getEnvBool(key string, fallback bool) bool {
