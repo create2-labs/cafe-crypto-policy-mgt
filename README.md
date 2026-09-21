@@ -315,10 +315,10 @@ Legacy `selection_request` / couche-B fields are **rejected with HTTP 400**.
 
 and returns `PolicyDecision` with public key **`scan_compatible_providers`** (couche A: posture, wallet type, deployable chain + capabilities including `rotate_signer` when `per_userop`, soft findings, indicative `suggested_user_constraints`) plus optional `rejected_candidates` and `warnings`. Couche B does not influence explore membership.
 
-**Couche A match:** for each provider in `allowed_providers`, resolve solution profiles and apply ADR §5.3 / §7 couche A. Contradictory `suggested_user_constraints` → `compatibility_status=erroneous` (not scan-compatible).
+**Couche A match:** for each provider in `allowed_providers`, resolve solution profiles and apply ADR §5.3 / §7 couche A. Contradictory `suggested_user_constraints` → `compatibility_status=erroneous` (not scan-compatible). **Greenfield** (`policy_context.chain_ids` empty / no positive id): chain gate skipped; posture + wallet type remain hard (CFB-P12).
 ## Explore no-deployable-candidate observability (IMM-OPS-1)
 
-When `POST …/decisions/explore` returns HTTP **200** with **no** scan-compatible provider and **non-empty** `rejected_candidates`, CPM emits platform observability (REQ9). This is **not** an HTTP error — it is the ADR §7.2.1 family-2 signal **aucun scan-compatible** (`adr_signal=runtime.no_scan_compatible`). Discovery context is usable but no catalog route is deployable on the requested chain set. Distinct from persist couche B KO (`adr_signal=runtime.no_provider_after_user_constraints`).
+When `POST …/decisions/explore` returns HTTP **200** with **no** scan-compatible provider and **non-empty** `rejected_candidates`, CPM emits platform observability (REQ9). This is **not** an HTTP error — it is the ADR §7.2.1 family-2 signal **aucun scan-compatible** (`adr_signal=runtime.no_scan_compatible`). Discovery context is usable but no catalog route is deployable on the requested chain set. **Does not apply** to greenfield empty `chain_ids` alone (those scans return posture/wallet-eligible candidates). Distinct from persist couche B KO (`adr_signal=runtime.no_provider_after_user_constraints`).
 
 **Hook:** `internal/api/read_api.go` — after building the explore decision, before `respondJSON(200)`. The explore JSON response uses `scan_compatible_providers`.
 

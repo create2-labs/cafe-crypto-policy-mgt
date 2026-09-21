@@ -178,3 +178,73 @@ func TestDecisionExplore_v02_unsupportedChainRejected(t *testing.T) {
 		t.Fatal("expected rejected_candidates for unsupported chain")
 	}
 }
+
+func TestDecisionExplore_v02_greenfieldEmptyChainsOpensCandidates(t *testing.T) {
+	store, err := LoadReadStore(ReadStoreOptions{
+		CryptoPolicyPaths: []string{
+			fixturePath("crypto_policy_pq_account_validation_v1.json"),
+		},
+		ProviderManifestPaths: []string{
+			providerManifestFixturePath(),
+			providerManifestNicetry2FixturePath(),
+		},
+	})
+	if err != nil {
+		t.Fatalf("LoadReadStore: %v", err)
+	}
+	mux := http.NewServeMux()
+	if err := RegisterReadRoutes(mux, store); err != nil {
+		t.Fatalf("RegisterReadRoutes: %v", err)
+	}
+
+	body := map[string]any{
+		"crypto_policy_id": "cpm_pq_account_validation_v1",
+		"policy_context": map[string]any{
+			"wallet_address":     "0x742d35cc6634c0532925a3b844bc454e4438f44e",
+			"wallet_type":        "eoa",
+			"chain_ids":          []int64{},
+			"current_algorithm":  "secp256k1_ecrecover",
+			"current_pq_posture": "classical_only",
+			"scanned_at":         "2026-08-03T12:00:00Z",
+		},
+	}
+	raw, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, bytes.NewReader(raw))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	var wrapped struct {
+		Decision struct {
+			ScanCompatibleProviders []struct {
+				SolutionProfileRef struct {
+					ProviderID string `json:"provider_id"`
+				} `json:"solution_profile_ref"`
+				CompatibilityFindings []struct {
+					Code string `json:"code"`
+				} `json:"compatibility_findings"`
+			} `json:"scan_compatible_providers"`
+			RejectedCandidates []any `json:"rejected_candidates"`
+		} `json:"decision"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &wrapped); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(wrapped.Decision.ScanCompatibleProviders) < 2 {
+		t.Fatalf("greenfield want N>=2 providers, got %d body=%s",
+			len(wrapped.Decision.ScanCompatibleProviders), rec.Body.String())
+	}
+	seen := map[string]bool{}
+	for _, p := range wrapped.Decision.ScanCompatibleProviders {
+		seen[p.SolutionProfileRef.ProviderID] = true
+		for _, f := range p.CompatibilityFindings {
+			if f.Code == "incompatible.provider.chain" {
+				t.Fatalf("greenfield must not emit incompatible.provider.chain")
+			}
+		}
+	}
+	if !seen["nicetry"] || !seen["nicetry2"] {
+		t.Fatalf("want nicetry+nicetry2, got %#v", seen)
+	}
+}

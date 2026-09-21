@@ -19,8 +19,15 @@ const FindingCodeCapability = "incompatible.provider.capability"
 const FindingCodeErroneousSuggested = "erroneous.suggested_user_constraints"
 
 // EvaluateScanCompatibility applies ADR couche A hard checks only:
-// required_posture, wallet_types, and at least one scan chain with status != planned
-// plus minimum capabilities (deploy, sign_userop, + rotate_signer if per_userop).
+// required_posture, wallet_types, and (for constrained scans) at least one
+// observed chain with status != planned plus minimum capabilities
+// (deploy, sign_userop, + rotate_signer if per_userop).
+//
+// Greenfield scans — no positive chain_id after normalization — skip the
+// chain/capability gate entirely (ADR_20260803 §7 amendement 2026-09-21 /
+// CFB-P12). Posture and wallet type remain hard. Empty chain_ids must not
+// produce incompatible.provider.chain.
+//
 // Couche B fields (allow_new_wallet, address_continuity, user key_rotation_model)
 // must not be consulted here.
 func EvaluateScanCompatibility(obs HardObservation, requiredPosture string, profile *SolutionProfile) []HardFinding {
@@ -54,6 +61,11 @@ func EvaluateScanCompatibility(obs HardObservation, requiredPosture string, prof
 		})
 	}
 
+	if !hasPositiveChainID(obs.ChainIDs) {
+		// Greenfield: footprint unconstrained — do not reject for empty chains.
+		return findings
+	}
+
 	requiredCaps := minimumScanCapabilities(profile.Signature.KeyRotationModel)
 	anyNonPlanned, anyCapable := scanChainDeployability(obs.ChainIDs, profile.ChainSupport, requiredCaps)
 	if !anyCapable {
@@ -79,6 +91,17 @@ func EvaluateScanCompatibility(obs HardObservation, requiredPosture string, prof
 	}
 
 	return findings
+}
+
+// hasPositiveChainID reports whether the observation carries any usable EVM chain id.
+// Zero and negative values are ignored (same filter as scanChainDeployability).
+func hasPositiveChainID(ids []int64) bool {
+	for _, id := range ids {
+		if id > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func minimumScanCapabilities(rotation KeyRotationModel) []string {

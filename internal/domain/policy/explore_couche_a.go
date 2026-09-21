@@ -56,7 +56,7 @@ func (e ExploreCoucheAEvaluator) EvaluateExploreCoucheA(
 
 	obs := provider.HardObservation{
 		AccountKind: observation.AccountKind,
-		ChainIDs:    observation.ChainIDs,
+		ChainIDs:    normalizeChainIDs(observation.ChainIDs),
 	}
 	requiredPosture := string(cp.RequiredPosture)
 

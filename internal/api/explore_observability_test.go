@@ -280,6 +280,69 @@ func TestDecisionExplore_noDeployableCandidateObservabilityIntegration(t *testin
 	}
 }
 
+func TestDecisionExplore_greenfieldEmptyChainsDoesNotEmitNoDeployable(t *testing.T) {
+	store, err := LoadReadStore(ReadStoreOptions{
+		CryptoPolicyPaths: []string{
+			fixturePath("crypto_policy_pq_account_validation_v1.json"),
+		},
+		ProviderManifestPaths: []string{
+			providerManifestFixturePath(),
+			providerManifestNicetry2FixturePath(),
+		},
+	})
+	if err != nil {
+		t.Fatalf("LoadReadStore: %v", err)
+	}
+
+	metrics := &testExploreMetrics{}
+	restore := setExploreObservabilityForTest(exploreObservability{metrics: metrics})
+	defer restore()
+
+	mux := http.NewServeMux()
+	if err := RegisterReadRoutes(mux, store); err != nil {
+		t.Fatalf("RegisterReadRoutes: %v", err)
+	}
+
+	body := map[string]any{
+		"scan_id":          "705c9704-9428-45e0-882d-fae4cb9d2a0b",
+		"crypto_policy_id": "cpm_pq_account_validation_v1",
+		"policy_context": map[string]any{
+			"wallet_address":     "0x742d35cc6634c0532925a3b844bc454e4438f44e",
+			"wallet_type":        "eoa",
+			"chain_ids":          []int64{},
+			"current_algorithm":  "secp256k1_ecrecover",
+			"current_pq_posture": "classical_only",
+			"scanned_at":         "2026-04-17T09:59:58Z",
+		},
+	}
+	raw, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, bytes.NewReader(raw))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var response struct {
+		Decision struct {
+			ScanCompatibleProviders []any `json:"scan_compatible_providers"`
+		} `json:"decision"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(response.Decision.ScanCompatibleProviders) == 0 {
+		t.Fatal("greenfield must return scan_compatible_providers")
+	}
+	if len(metrics.increments) != 0 {
+		t.Fatalf("greenfield alone must not emit IMM-OPS-1 no_deployable, got %d", len(metrics.increments))
+	}
+}
+
 func strconvQuote(s string) string {
 	return `"` + s + `"`
 }

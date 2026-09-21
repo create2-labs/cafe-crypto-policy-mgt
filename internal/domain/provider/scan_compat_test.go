@@ -33,6 +33,36 @@ func TestEvaluateScanCompatibility_table(t *testing.T) {
 			wantCode:        "",
 		},
 		{
+			name:            "greenfield_empty_chains_ok",
+			obs:             HardObservation{AccountKind: "eoa", ChainIDs: []int64{}},
+			requiredPosture: "hybrid",
+			wantCode:        "",
+		},
+		{
+			name:            "greenfield_nil_chains_ok",
+			obs:             HardObservation{AccountKind: "eoa", ChainIDs: nil},
+			requiredPosture: "hybrid",
+			wantCode:        "",
+		},
+		{
+			name:            "greenfield_non_positive_only_ok",
+			obs:             HardObservation{AccountKind: "eoa", ChainIDs: []int64{0, -1}},
+			requiredPosture: "hybrid",
+			wantCode:        "",
+		},
+		{
+			name:            "greenfield_still_rejects_posture",
+			obs:             HardObservation{AccountKind: "eoa", ChainIDs: nil},
+			requiredPosture: "full_pq",
+			wantCode:        FindingCodePosture,
+		},
+		{
+			name:            "greenfield_still_rejects_wallet_type",
+			obs:             HardObservation{AccountKind: "erc4337_smart_account", ChainIDs: nil},
+			requiredPosture: "hybrid",
+			wantCode:        FindingCodeWalletType,
+		},
+		{
 			name:            "mainnet_ok",
 			obs:             HardObservation{AccountKind: "eoa", ChainIDs: []int64{1}},
 			requiredPosture: "hybrid",

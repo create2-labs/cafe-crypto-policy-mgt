@@ -180,6 +180,14 @@ paths:
         view (account_model / signature / constraints) for Expected result (CFB-P3) — not the
         admin ProviderManifest. Couche B does not filter explore membership. Contradictory
         suggestions → candidate `compatibility_status=erroneous`.
+
+        **Greenfield (CFB-P12 / ADR_20260803 §7):** when `policy_context.chain_ids` is empty
+        (no positive chain id after normalization), the couche A **chain gate is skipped**.
+        Eligibility is posture + wallet type only. Empty chains alone must **not** yield
+        `incompatible.provider.chain`, empty `scan_compatible_providers` for that motive, or
+        IMM-OPS-1 `cpm.explore.no_deployable_candidate` / `runtime.no_scan_compatible`.
+        Constrained scans (non-empty observed chains, e.g. BSC-only unsupported) still apply
+        the chain/capability gate unchanged.
       operationId: postPoliciesDecisionsExplore
       requestBody:
         required: true
