@@ -93,6 +93,40 @@ func TestEvaluateExploreCoucheA_unsupportedChainRejected(t *testing.T) {
 	}
 }
 
+func TestEvaluateExploreCoucheA_greenfieldEmptyChainsOpensCandidates(t *testing.T) {
+	reg := mustLoadExploreProviderRegistryBoth(t)
+	cp := &CryptoPolicy{
+		ID:               "cpm_pq_account_validation_v1",
+		RequiredPosture:  vocabulary.PQPostureHybrid,
+		AllowedProviders: []string{"nicetry", "nicetry2"},
+	}
+	obs := walletobserved.Payload{AccountKind: "eoa", ChainIDs: []int64{}}
+
+	decision, err := (ExploreCoucheAEvaluator{Providers: reg}).EvaluateExploreCoucheA(obs, cp)
+	if err != nil {
+		t.Fatalf("EvaluateExploreCoucheA: %v", err)
+	}
+	if len(decision.RankedCandidates) < 2 {
+		t.Fatalf("greenfield want N>=2 scan_compatible (nicetry+nicetry2), got %d rejected=%+v",
+			len(decision.RankedCandidates), decision.RejectedCandidates)
+	}
+	providers := map[string]bool{}
+	for _, c := range decision.RankedCandidates {
+		providers[c.SolutionProfileRef.ProviderID] = true
+		for _, f := range c.CompatibilityFindings {
+			if f.Code == provider.FindingCodeChain {
+				t.Fatalf("greenfield must not emit %s: %+v", provider.FindingCodeChain, c.CompatibilityFindings)
+			}
+		}
+	}
+	if !providers["nicetry"] || !providers["nicetry2"] {
+		t.Fatalf("want nicetry and nicetry2, got %#v", providers)
+	}
+	if len(decision.ObservedWalletSummary.ChainIDs) != 0 {
+		t.Fatalf("observed chain_ids should stay empty, got %#v", decision.ObservedWalletSummary.ChainIDs)
+	}
+}
+
 func TestEvaluateExploreCoucheA_erroneousSuggested(t *testing.T) {
 	reg := mustLoadExploreProviderRegistry(t)
 	resolved, ok := reg.Lookup(provider.ProfileRef{
@@ -173,6 +207,18 @@ func mustLoadExploreProviderRegistry(t *testing.T) *provider.Registry {
 	t.Helper()
 	reg, err := provider.LoadRegistryFromFiles([]string{
 		filepath.Join("..", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
+	})
+	if err != nil {
+		t.Fatalf("LoadRegistryFromFiles: %v", err)
+	}
+	return reg
+}
+
+func mustLoadExploreProviderRegistryBoth(t *testing.T) *provider.Registry {
+	t.Helper()
+	reg, err := provider.LoadRegistryFromFiles([]string{
+		filepath.Join("..", "provider", "testdata", "provider_manifest_nicetry_v0_1.json"),
+		filepath.Join("..", "provider", "testdata", "provider_manifest_nicetry2_v0_1.json"),
 	})
 	if err != nil {
 		t.Fatalf("LoadRegistryFromFiles: %v", err)
