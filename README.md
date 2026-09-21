@@ -176,7 +176,7 @@ Golden JSON: [`internal/domain/walletobserved/testdata/discovery_wallet_observed
 
 `internal/domain/policy/compatibility_result.go` defines `PolicyCompatibilityEvaluator`, which classifies a single validated `CryptoPolicyInstance` against a `walletobserved.Payload` and `PolicySelectionRequest`. It returns `PolicyCompatibilityResult` with one of: `compatible_and_deployable`, `compatible_but_not_deployable` (e.g. empty instance scope `chain_ids`), or `incompatible`, with structured `AssessmentFinding` entries. Template-backed candidates use `required_posture` + `solution_profile_ref` (no graph topology).
 
-When `CPM_PROVIDER_MANIFEST_PATHS` is set (default: Nicetry fixture), explore resolves each instance `solution_profile_ref` and applies ADR §7 **hard** provider checks (`required_posture` / wire `target_posture` vs `solution_profile.resulting_posture`, rotation model, chain support, continuity, wallet type, etc.). Hard fail → `rejected_candidate` with stable codes such as `incompatible.provider.posture`, `incompatible.provider.chain`, `incompatible.provider.rotation`, `incompatible.provider.continuity`, `incompatible.provider.new_wallet`, `incompatible.provider.wallet_type`. Ranked candidates keep ADR §7 **soft** findings `requires_bundler` and `requires_local_signer_state` (`severity: warning`; they do not block ranking). `requires_wallet_control_proof` is persist-only (CP-PERSIST stamp). **`claim_status=declared` remains a declaration, not audited/executed proof.** Ranked/rejected explore candidates expose structured fields (`candidate_id`, `required_posture`, `resulting_posture`, `solution_profile_ref`, `maturity`, `claim_status`) without graph topology arrays. See [Capability Providers](#capability-providers-adr-2026-08-03).
+When provider manifests are loaded from `CPM_CATALOGUE_DIR`, explore resolves each instance `solution_profile_ref` and applies ADR §7 **hard** provider checks (`required_posture` / wire `target_posture` vs `solution_profile.resulting_posture`, rotation model, chain support, continuity, wallet type, etc.). Hard fail → `rejected_candidate` with stable codes such as `incompatible.provider.posture`, `incompatible.provider.chain`, `incompatible.provider.rotation`, `incompatible.provider.continuity`, `incompatible.provider.new_wallet`, `incompatible.provider.wallet_type`. Ranked candidates keep ADR §7 **soft** findings `requires_bundler` and `requires_local_signer_state` (`severity: warning`; they do not block ranking). `requires_wallet_control_proof` is persist-only (CP-PERSIST stamp). **`claim_status=declared` remains a declaration, not audited/executed proof.** Ranked/rejected explore candidates expose structured fields (`candidate_id`, `required_posture`, `resulting_posture`, `solution_profile_ref`, `maturity`, `claim_status`) without graph topology arrays. See [Capability Providers](#capability-providers-adr-2026-08-03).
 
 Normative signed persist (`POST /policies`) requires a closed hashed `cafe.crypto_policy.v0.2` payload with `crypto_policy_id`, `user_constraints`, top-level `accepted_findings`, and `accepted_provider_snapshot`: soft findings listed in `accepted_findings`, provider `references` pinned (not `unpinned_pending_fixture`), and CPM rejeu couche A+B against the snapshot **after** EIP-191 verification. Persistence stores the JSON opaquely — no Nicetry logic in `cafe-persistence`.
 
@@ -273,12 +273,11 @@ Producer behavior is replay-safe and deterministic:
 
 ## Read APIs
 
-CPM exposes read-only catalogue APIs backed by local Crypto Policy and provider manifest files loaded at startup.
+CPM exposes read-only catalogue APIs backed by a **catalogue directory** of JSON files loaded at startup.
 
 Environment variables:
 
-- `CPM_CRYPTO_POLICY_PATHS` (comma-separated, default: `/app/policy/crypto_policy_pq_account_validation_v1.json`) — ships Crypto Policy `cpm_pq_account_validation_v1` (`required_posture` + `allowed_providers: ["nicetry"]`)
-- `CPM_PROVIDER_MANIFEST_PATHS` (comma-separated, default: `/app/policy/provider_manifest_nicetry_v0_1.json`): Capability Provider manifests (`ProviderManifest` v0.1). Loaded for `GET /providers` and explore hard/soft checks. Fixture source: `internal/domain/provider/testdata/provider_manifest_nicetry_v0_1.json` (refs pinned — NiceTry `commit` `40a1286d18dee2a92631da82a52e484fa9a3628c`; Ephemeral-Keys-Protocol `version` `ac140c71d400449adec18884c4fd3373592292f3` = main HEAD SHA, no release tags yet — **CPM-P7**).
+- `CPM_CATALOGUE_DIR` (default: `/app/policy`) — directory of `*.json` files. At boot CPM classifies each file as a **Crypto Policy** (`required_posture` + `allowed_providers`) or a **ProviderManifest** (`schema_version: cafe.provider_manifest.v0.1`). Incompatible / unrelated JSON (e.g. instance fixtures, garbage) is **skipped with a log line**; boot fails only if zero policies or zero providers remain. Image build copies `internal/domain/policy/testdata/*.json` and `internal/domain/provider/testdata/*.json` into `/app/policy/`. **Adding a CP or provider = drop a JSON into the matching testdata folder + rebuild image** — no `config.go` / path-list edits.
 
 Catalogue responses are posture + `allowed_providers` / provider-manifest oriented; they do **not** return templates, instances, or a business policy graph.
 
@@ -536,8 +535,10 @@ With repo test fixtures and auth disabled:
 
 ```bash
 export CPM_AUTH_REQUIRED=false
-export CPM_CRYPTO_POLICY_PATHS=internal/domain/policy/testdata/crypto_policy_pq_account_validation_v1.json
-export CPM_PROVIDER_MANIFEST_PATHS=internal/domain/provider/testdata/provider_manifest_nicetry_v0_1.json
+mkdir -p /tmp/cpm-catalogue
+cp internal/domain/policy/testdata/*.json /tmp/cpm-catalogue/
+cp internal/domain/provider/testdata/*.json /tmp/cpm-catalogue/
+export CPM_CATALOGUE_DIR=/tmp/cpm-catalogue
 go run ./cmd/cafe-cpm
 ```
 

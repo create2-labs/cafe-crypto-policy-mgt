@@ -102,28 +102,7 @@ Mettre à jour les passages « preserve mock mode » / placeholder V1 :
 
 ## Open — Catalogue CP : ne plus lister les templates/instances dans `config.go`
 
-**Contexte :** aujourd’hui le contenu du catalogue vit dans les JSON (`internal/domain/policy/testdata/` → `/app/policy/` dans l’image), mais **quels fichiers charger** est une liste explicite :
-
-- défauts `defaultPolicyTemplatePaths` / `defaultPolicyInstancePaths` dans `internal/config/config.go` ;
-- surcharge possible via `CPM_POLICY_TEMPLATE_PATHS` / `CPM_POLICY_INSTANCE_PATHS` (env), mais `**cafe-deploy` ne les pose pas** — chaque nouvelle CP oblige à toucher les `const` + rebuild image.
-
-**Problème :** la liste des CP actives est de la **config d’exploitation**, pas de la logique Go. Ajouter une 2ᵉ CP (ex. `crypto_policy_template_pq_account_validation_v1.json`) ne devrait pas impliquer de modifier `config.go`.
-
-**Pistes (à trancher) :**
-
-
-| Option | Idée                                                                                                                                                   |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **A**  | Définir `CPM_POLICY_*_PATHS` dans `cafe-deploy` (`compose/25-cpm.yml` / `env/*.env`) ; laisser des défauts minimaux (une CP) ou vides dans `config.go` |
-| **B**  | Fichier manifeste `policy-index.json` à la racine de `/app/policy/` (catalog + liste templates + instances)                                            |
-| **C**  | Convention par répertoire : charger tous les `crypto_policy_template_*.json` / `crypto_policy_instance_*.json` valides (exclure `invalid_*`)           |
-
-
-**Acceptance :** ajouter une CP = nouveaux JSON + rebuild image (ou volume, si un jour adopté) **sans** changement dans `internal/config/config.go` ; tests `LoadReadStore` / explore inchangés en intention ; doc admin (`cafe-documentation/04-cafe-admin-guide.md`) alignée.
-
-**Repos :** `cafe-crypto-policy-mgt` (loader + tests) ; optionnel `cafe-deploy` (env) ; doc `README.md` § Read APIs.
-
-**Priorité :** après validation UI catalogue multi-CP (2ᵉ template de test) ; confort ops / éviter dérive défauts ↔ fichiers embarqués.
+**Statut :** résolu (scan de `CPM_CATALOGUE_DIR`, défaut `/app/policy`). Ajouter une CP ou un provider = JSON dans `testdata/` + rebuild image ; fichiers incompatibles skippés avec log.
 
 ---
 

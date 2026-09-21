@@ -21,7 +21,7 @@ func TestLoadCryptoPolicyFromFile_Valid(t *testing.T) {
 	if cp.RequiredPosture != vocabulary.PQPostureHybrid {
 		t.Fatalf("required_posture: got %q", cp.RequiredPosture)
 	}
-	if !reflect.DeepEqual(cp.AllowedProviders, []string{"nicetry"}) {
+	if !reflect.DeepEqual(cp.AllowedProviders, []string{"nicetry", "nicetry2"}) {
 		t.Fatalf("allowed_providers: %#v", cp.AllowedProviders)
 	}
 }

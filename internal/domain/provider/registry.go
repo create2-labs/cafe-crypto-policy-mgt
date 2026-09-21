@@ -34,13 +34,18 @@ func profileKey(providerID, solutionProfileID string) string {
 	return strings.ToLower(strings.TrimSpace(providerID)) + "\x00" + strings.TrimSpace(solutionProfileID)
 }
 
-// LoadRegistryFromFiles loads and indexes one or more ProviderManifest JSON files.
-// Duplicate (provider_id, solution_profile_id) pairs are rejected.
-func LoadRegistryFromFiles(paths []string) (*Registry, error) {
-	reg := &Registry{
+// NewRegistry returns an empty provider registry.
+func NewRegistry() *Registry {
+	return &Registry{
 		byKey:     make(map[string]*ResolvedProfile),
 		manifests: make(map[string]*ProviderManifest),
 	}
+}
+
+// LoadRegistryFromFiles loads and indexes one or more ProviderManifest JSON files.
+// Duplicate (provider_id, solution_profile_id) pairs are rejected.
+func LoadRegistryFromFiles(paths []string) (*Registry, error) {
+	reg := NewRegistry()
 	for _, path := range paths {
 		path = strings.TrimSpace(path)
 		if path == "" {
@@ -50,11 +55,16 @@ func LoadRegistryFromFiles(paths []string) (*Registry, error) {
 		if err != nil {
 			return nil, fmt.Errorf("provider manifest %q: %w", path, err)
 		}
-		if err := reg.addManifest(m); err != nil {
+		if err := reg.AddManifest(m); err != nil {
 			return nil, fmt.Errorf("provider manifest %q: %w", path, err)
 		}
 	}
 	return reg, nil
+}
+
+// AddManifest indexes a validated ProviderManifest. Duplicate provider_id is rejected.
+func (r *Registry) AddManifest(m *ProviderManifest) error {
+	return r.addManifest(m)
 }
 
 func (r *Registry) addManifest(m *ProviderManifest) error {
