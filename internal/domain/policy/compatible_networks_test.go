@@ -134,6 +134,9 @@ func TestCatalogItemFromCryptoPolicy_IncludesDerivedField(t *testing.T) {
 	if len(item.CompatibleNetworks) == 0 {
 		t.Fatal("compatible_networks must be populated from registry")
 	}
+	if len(item.AllowedProviderSummaries) == 0 {
+		t.Fatal("allowed_provider_summaries must be populated from registry")
+	}
 }
 
 func mustLoadCryptoPolicy(t *testing.T, name string) *CryptoPolicy {
