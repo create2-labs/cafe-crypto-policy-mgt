@@ -30,15 +30,26 @@
       "requires_new_account": true,
       "requires_local_signer_state": true
     },
-    "chain_support_used": {
-      "chain_id": "11155111",
-      "status": "testnet_supported",
-      "capabilities": [
-        "deploy",
-        "sign_userop",
-        "rotate_signer"
-      ]
-    },
+    "chain_support_used": [
+      {
+        "chain_id": "1",
+        "status": "production_supported",
+        "capabilities": [
+          "deploy",
+          "sign_userop",
+          "rotate_signer"
+        ]
+      },
+      {
+        "chain_id": "11155111",
+        "status": "testnet_supported",
+        "capabilities": [
+          "deploy",
+          "sign_userop",
+          "rotate_signer"
+        ]
+      }
+    ],
     "references": [
       {
         "kind": "source_repo",

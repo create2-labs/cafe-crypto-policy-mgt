@@ -26,9 +26,15 @@ func validPersistPayload() CryptoPolicyPersistPayload {
 			Signature:         provider.SignatureProfile{Scheme: "FORS+C", Family: "hash_based", KeyRotationModel: provider.KeyRotationPerUserOp},
 			AccountModel:      provider.AccountModel{Standard: "ERC-4337", ExecutionModel: "erc4337_bundler", RequiresBundler: true},
 			Constraints:       provider.ProfileConstraints{RequiresNewAccount: true, RequiresLocalSignerState: true},
-			ChainSupportUsed: SnapshotChainSupport{
-				ChainID: 11155111, Status: provider.ChainStatusTestnetSupported,
-				Capabilities: []string{provider.CapabilityDeploy, provider.CapabilitySignUserOp, provider.CapabilityRotateSigner},
+			ChainSupportUsed: []SnapshotChainSupport{
+				{
+					ChainID: 1, Status: provider.ChainStatusProduction,
+					Capabilities: []string{provider.CapabilityDeploy, provider.CapabilitySignUserOp, provider.CapabilityRotateSigner},
+				},
+				{
+					ChainID: 11155111, Status: provider.ChainStatusTestnetSupported,
+					Capabilities: []string{provider.CapabilityDeploy, provider.CapabilitySignUserOp, provider.CapabilityRotateSigner},
+				},
 			},
 			References: []provider.Reference{
 				{Kind: provider.ReferenceKindSourceRepo, URL: "https://example.com/a", Commit: "abc123deadbeef"},
@@ -88,7 +94,7 @@ func TestValidateForPersist_rejectsSoftFindingsPlannedSchema(t *testing.T) {
 		t.Fatalf("soft: got %v", err)
 	}
 	p = validPersistPayload()
-	p.AcceptedProviderSnapshot.ChainSupportUsed.Status = provider.ChainStatusPlanned
+	p.AcceptedProviderSnapshot.ChainSupportUsed[0].Status = provider.ChainStatusPlanned
 	if err := p.ValidateForPersist(persistObsEOA()); !errors.Is(err, ErrProviderChainPlanned) {
 		t.Fatalf("planned: got %v", err)
 	}
@@ -113,7 +119,9 @@ func TestValidateForPersist_rejectsCoucheBKO(t *testing.T) {
 
 func TestValidateForPersist_rejectsCoucheAKO(t *testing.T) {
 	p := validPersistPayload()
-	p.AcceptedProviderSnapshot.ChainSupportUsed.Capabilities = []string{provider.CapabilityDeploy}
+	for i := range p.AcceptedProviderSnapshot.ChainSupportUsed {
+		p.AcceptedProviderSnapshot.ChainSupportUsed[i].Capabilities = []string{provider.CapabilityDeploy}
+	}
 	if err := p.ValidateForPersist(persistObsEOA()); !errors.Is(err, ErrProviderScanCompatFailed) {
 		t.Fatalf("couche A: got %v", err)
 	}
@@ -136,9 +144,15 @@ func TestValidatePayloadForPersist_mapRoundTrip(t *testing.T) {
 			"signature":          map[string]any{"scheme": "FORS+C", "family": "hash_based", "key_rotation_model": "per_userop"},
 			"account_model":      map[string]any{"standard": "ERC-4337", "execution_model": "erc4337_bundler", "requires_bundler": true},
 			"constraints":        map[string]any{"requires_new_account": true, "requires_local_signer_state": true},
-			"chain_support_used": map[string]any{
-				"chain_id": float64(11155111), "status": "testnet_supported",
-				"capabilities": []any{"deploy", "sign_userop", "rotate_signer"},
+			"chain_support_used": []any{
+				map[string]any{
+					"chain_id": float64(1), "status": "production_supported",
+					"capabilities": []any{"deploy", "sign_userop", "rotate_signer"},
+				},
+				map[string]any{
+					"chain_id": float64(11155111), "status": "testnet_supported",
+					"capabilities": []any{"deploy", "sign_userop", "rotate_signer"},
+				},
 			},
 			"references": []any{
 				map[string]any{"kind": "source_repo", "url": "https://example.com/a", "commit": "deadbeef"},
@@ -176,9 +190,11 @@ func TestValidatePayloadForPersist_rejectsLegacy(t *testing.T) {
 				"signature":          map[string]any{"scheme": "FORS+C", "family": "hash_based", "key_rotation_model": "per_userop"},
 				"account_model":      map[string]any{"requires_bundler": true},
 				"constraints":        map[string]any{"requires_new_account": true, "requires_local_signer_state": true},
-				"chain_support_used": map[string]any{
-					"chain_id": float64(11155111), "status": "testnet_supported",
-					"capabilities": []any{"deploy", "sign_userop", "rotate_signer"},
+				"chain_support_used": []any{
+					map[string]any{
+						"chain_id": float64(11155111), "status": "testnet_supported",
+						"capabilities": []any{"deploy", "sign_userop", "rotate_signer"},
+					},
 				},
 				"references": []any{
 					map[string]any{"kind": "source_repo", "url": "https://example.com/a", "commit": "deadbeef"},

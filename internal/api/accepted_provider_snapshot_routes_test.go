@@ -15,7 +15,7 @@ import (
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/provider"
 )
 
-func TestAcceptedProviderSnapshotAssist_buildsCanonicalNicetrySnapshot(t *testing.T) {
+func TestAcceptedProviderSnapshotAssist_buildsCanonicalNicetryMultichainSnapshot(t *testing.T) {
 	mux := http.NewServeMux()
 	store := testReadStore(t)
 	if err := RegisterReadRoutes(mux, store); err != nil {
@@ -29,7 +29,6 @@ func TestAcceptedProviderSnapshotAssist_buildsCanonicalNicetrySnapshot(t *testin
 			"solution_profile_id": "nicetry.fors_c.erc4337.v0_1",
 			"manifest_version": "2026-08"
 		},
-		"chain_id": "11155111",
 		"accepted_findings": ["requires_local_signer_state"]
 	}`
 	req := httptest.NewRequest(http.MethodPost, cpmroutes.AcceptedProviderSnapshots, strings.NewReader(body))
@@ -51,18 +50,22 @@ func TestAcceptedProviderSnapshotAssist_buildsCanonicalNicetrySnapshot(t *testin
 	if resp.CryptoPolicyID != "cpm_pq_account_validation_v1" || resp.RequiredPosture != "hybrid" {
 		t.Fatalf("cp fields: %+v", resp)
 	}
-	if resp.AcceptedProviderSnapshot.ChainSupportUsed.ChainID.Int64() != 11155111 {
-		t.Fatalf("chain_id: %+v", resp.AcceptedProviderSnapshot.ChainSupportUsed)
+	if len(resp.AcceptedProviderSnapshot.ChainSupportUsed) < 2 {
+		t.Fatalf("want multi-chain, got %+v", resp.AcceptedProviderSnapshot.ChainSupportUsed)
 	}
-	// Wire must emit chain_id as string (hashed closed set).
+	// Wire must emit chain_support_used as array with string chain_ids.
 	var raw map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &raw); err != nil {
 		t.Fatalf("raw: %v", err)
 	}
 	snap := raw["accepted_provider_snapshot"].(map[string]any)
-	chain := snap["chain_support_used"].(map[string]any)
-	if _, ok := chain["chain_id"].(string); !ok {
-		t.Fatalf("chain_id must be string, got %#v", chain["chain_id"])
+	chains, ok := snap["chain_support_used"].([]any)
+	if !ok || len(chains) < 2 {
+		t.Fatalf("chain_support_used must be multi-entry array, got %#v", snap["chain_support_used"])
+	}
+	first := chains[0].(map[string]any)
+	if _, ok := first["chain_id"].(string); !ok {
+		t.Fatalf("chain_id must be string, got %#v", first["chain_id"])
 	}
 	findings := snap["accepted_findings"].([]any)
 	if len(findings) != 2 {
@@ -79,7 +82,7 @@ func TestAcceptedProviderSnapshotAssist_buildsCanonicalNicetrySnapshot(t *testin
 		"accepted_findings":          resp.AcceptedProviderSnapshot.AcceptedFindings,
 	}
 	if err := policy.ValidatePayloadForPersist(payload); err != nil {
-		t.Fatalf("assist snapshot must be persist-gate clean: %v", err)
+		t.Fatalf("assist snapshot must be persist-gate clean (greenfield path): %v", err)
 	}
 }
 
@@ -98,19 +101,19 @@ func TestAcceptedProviderSnapshotAssist_validationMatrix(t *testing.T) {
 	}{
 		{
 			name:       "unknown_cp",
-			body:       `{"crypto_policy_id":"missing","solution_profile_ref":{"provider_id":"nicetry","solution_profile_id":"nicetry.fors_c.erc4337.v0_1","manifest_version":"2026-08"},"chain_id":11155111}`,
+			body:       `{"crypto_policy_id":"missing","solution_profile_ref":{"provider_id":"nicetry","solution_profile_id":"nicetry.fors_c.erc4337.v0_1","manifest_version":"2026-08"}}`,
 			wantStatus: http.StatusBadRequest,
 			wantSubstr: "unknown crypto_policy_id",
 		},
 		{
-			name:       "chain_planned_or_missing",
-			body:       `{"crypto_policy_id":"cpm_pq_account_validation_v1","solution_profile_ref":{"provider_id":"nicetry","solution_profile_id":"nicetry.fors_c.erc4337.v0_1","manifest_version":"2026-08"},"chain_id":42}`,
-			wantStatus: http.StatusUnprocessableEntity,
-			wantSubstr: "chain",
+			name:       "legacy_chain_id_rejected",
+			body:       `{"crypto_policy_id":"cpm_pq_account_validation_v1","solution_profile_ref":{"provider_id":"nicetry","solution_profile_id":"nicetry.fors_c.erc4337.v0_1","manifest_version":"2026-08"},"chain_id":"11155111"}`,
+			wantStatus: http.StatusBadRequest,
+			wantSubstr: "unknown field chain_id",
 		},
 		{
 			name:       "missing_ref",
-			body:       `{"crypto_policy_id":"cpm_pq_account_validation_v1","chain_id":11155111}`,
+			body:       `{"crypto_policy_id":"cpm_pq_account_validation_v1"}`,
 			wantStatus: http.StatusBadRequest,
 			wantSubstr: "solution_profile_ref",
 		},
@@ -130,16 +133,16 @@ func TestAcceptedProviderSnapshotAssist_validationMatrix(t *testing.T) {
 	}
 }
 
-func TestDecodeAcceptedProviderSnapshotRequest_flexibleChainID(t *testing.T) {
+func TestDecodeAcceptedProviderSnapshotRequest_noChainID(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/", io.NopCloser(bytes.NewBufferString(
-		`{"crypto_policy_id":"cp","solution_profile_ref":{"provider_id":"nicetry","solution_profile_id":"p","manifest_version":"v"},"chain_id":"84532","accepted_findings":["requires_bundler"]}`,
+		`{"crypto_policy_id":"cp","solution_profile_ref":{"provider_id":"nicetry","solution_profile_id":"p","manifest_version":"v"},"accepted_findings":["requires_bundler"]}`,
 	)))
 	got, err := decodeAcceptedProviderSnapshotRequest(req)
 	if err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if got.ChainID != 84532 {
-		t.Fatalf("chain_id=%d", got.ChainID)
+	if got.CryptoPolicyID != "cp" {
+		t.Fatalf("cp=%q", got.CryptoPolicyID)
 	}
 	if len(got.AcceptedFindings) != 1 || got.AcceptedFindings[0] != provider.FindingCodeRequiresBundler {
 		t.Fatalf("findings=%v", got.AcceptedFindings)
