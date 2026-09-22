@@ -712,6 +712,7 @@ func authorizeScanAccess(
 		timeoutSec = 3
 	}
 	endpoint := strings.TrimSuffix(cfg.ScanAuthorizationURL, "/") + "/" + url.PathEscape(scanID) + "/can-read"
+	// #nosec G704 -- URL is config ScanAuthorizationURL + path-escaped scanID
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, http.NoBody)
 	if err != nil {
 		return authz.APIError{
@@ -731,6 +732,7 @@ func authorizeScanAccess(
 		req.Header.Set("Authorization", "Bearer "+cfg.ScanAuthorizationServiceToken)
 	}
 	client := &http.Client{Timeout: time.Duration(timeoutSec) * time.Second}
+	// #nosec G704 -- same trusted ScanAuthorizationURL as request construction above
 	resp, err := client.Do(req)
 	if err != nil {
 		return authz.APIError{

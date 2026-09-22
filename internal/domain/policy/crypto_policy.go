@@ -40,6 +40,7 @@ type CryptoPolicy struct {
 
 // LoadCryptoPolicyFromFile reads, decodes, normalizes, and validates a crypto policy.
 func LoadCryptoPolicyFromFile(path string) (*CryptoPolicy, error) {
+	// #nosec G304 -- path is operator-supplied catalogue / policy file path
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read crypto policy file: %w", err)

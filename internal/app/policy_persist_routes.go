@@ -220,5 +220,6 @@ func logDeleteReasonBestEffort(reason, policyID, userID string) {
 	if reason == "" {
 		return
 	}
+	// #nosec G706 -- reason is logged with %q; policyID/userID are already validated IDs
 	log.Printf("cpm: policy delete reason policy_id=%s user_id=%s reason=%q", strings.TrimSpace(policyID), strings.TrimSpace(userID), reason)
 }

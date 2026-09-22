@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/api"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/config"
@@ -62,8 +63,9 @@ func Run(cfg config.Config) error {
 	}
 
 	server := &http.Server{
-		Addr:    cfg.HTTPAddr,
-		Handler: h,
+		Addr:              cfg.HTTPAddr,
+		Handler:           h,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	// PR0 scope: startup wiring only. Graceful shutdown orchestration comes later.
