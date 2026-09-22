@@ -1,18 +1,35 @@
+##############################
+# Stage CI — Lint / Test / Vuln (use: docker build --target ci)
+##############################
 FROM golang:1.26.6 AS ci
+
 WORKDIR /app
 
-COPY go.mod ./
+# Cache-bust: force reinstall of tools when Go version changes (must match image tag)
+ENV GO_TOOLING_VERSION=1.26.6
+ENV PATH=/go/bin:/usr/local/go/bin:/usr/local/bin:$PATH
+
+COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN go test ./internal/app -run TestNewPolicyStoreRejectsMemoryInProductionBuild && go test -tags dev ./...
 
+RUN go install golang.org/x/vuln/cmd/govulncheck@latest \
+    && go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.8.0
+
+# Preserve CPM-specific test guards: prod memory rejection (!dev) + full suite with -tags dev
+CMD ["sh", "-c", "go mod download && golangci-lint run ./... && go test ./internal/app -run TestNewPolicyStoreRejectsMemoryInProductionBuild && go test -tags dev ./... && govulncheck ./..."]
+
+
+##############################
+# Stage Build
+##############################
 FROM golang:1.26.6 AS build
 WORKDIR /app
 
 ARG APP_VERSION
 ARG TARGETARCH
-COPY go.mod ./
+COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .

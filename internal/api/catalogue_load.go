@@ -104,6 +104,7 @@ func loadReadStoreFromCatalogueDir(dir string, logger catalogueLogger) (*ReadSto
 	reg := provider.NewRegistry()
 
 	for _, path := range files {
+		// #nosec G304 -- path comes from filepath.Walk of configured catalogue dir
 		raw, readErr := os.ReadFile(path)
 		if readErr != nil {
 			logger.Printf("cpm: catalogue skip %q: read error: %v", path, readErr)

@@ -363,6 +363,7 @@ func fetchDiscoveryWalletScanDetail(ctx context.Context, authCfg authConfig, aut
 		timeout = 5
 	}
 	u := strings.TrimSuffix(strings.TrimSpace(authCfg.DiscoveryHTTPBaseURL), "/") + "/discovery/v1/wallets/scans/" + url.PathEscape(scanID)
+	// #nosec G704 -- URL is config DiscoveryHTTPBaseURL + path-escaped scanID
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
 	if err != nil {
 		return nil, 0, err
@@ -374,6 +375,7 @@ func fetchDiscoveryWalletScanDetail(ctx context.Context, authCfg authConfig, aut
 		req.Header.Set("X-Request-Id", requestID)
 	}
 	client := &http.Client{Timeout: time.Duration(timeout) * time.Second}
+	// #nosec G704 -- same trusted Discovery base URL as above
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, 0, err

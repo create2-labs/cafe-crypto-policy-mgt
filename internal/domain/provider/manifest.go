@@ -132,6 +132,7 @@ type Reference struct {
 }
 
 func LoadProviderManifestFromFile(path string) (*ProviderManifest, error) {
+	// #nosec G304 -- path is operator-supplied catalogue / manifest file path
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read provider manifest file: %w", err)
