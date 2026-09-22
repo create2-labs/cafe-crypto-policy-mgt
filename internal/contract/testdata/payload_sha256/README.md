@@ -7,7 +7,8 @@ Golden inputs for the **closed hashed payload** ([ADR_20260824_remove_cp_drafts 
 1. Object fields (closed): `schema_version`, `crypto_policy_id`, `required_posture`, `user_constraints`, `solution_profile_ref`, `accepted_provider_snapshot`, `accepted_findings`.
 2. Canonicalization: **RFC 8785 JCS**, then `payload_sha256 = hex(SHA-256(jcs_bytes))` (lowercase hex).
 3. Hashed subtree types: **string | boolean | object | array only** — **no** JSON `number`, **no** `null`.
-4. Numeric identifiers (e.g. `chain_support_used.chain_id`) are **strings**.
+4. Numeric identifiers (e.g. `chain_support_used[].chain_id`) are **strings**.
+5. `chain_support_used` is a **non-empty array** (CFB-P14 multi-chain; breaking vs CFB-P5 mono-object).
 5. Before JCS, `accepted_findings` is **lexicographically sorted** and **deduplicated** (server authority; clients should pre-normalize).
 6. Files named `*.json` are the **already-normalized** hashed objects (findings sorted+deduped). Companion `*.sha256` holds the expected hex digest.
 

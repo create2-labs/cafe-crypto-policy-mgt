@@ -127,7 +127,8 @@ func TestDigest_RejectCases(t *testing.T) {
 			name: "number_in_subtree",
 			mutate: func(m map[string]any) {
 				snap := m["accepted_provider_snapshot"].(map[string]any)
-				chain := snap["chain_support_used"].(map[string]any)
+				chains := snap["chain_support_used"].([]any)
+				chain := chains[0].(map[string]any)
 				chain["chain_id"] = float64(11155111)
 			},
 			reason: ReasonNumberForbidden,

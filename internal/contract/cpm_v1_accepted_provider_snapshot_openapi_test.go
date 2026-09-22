@@ -35,9 +35,16 @@ func TestCPMV1OpenAPI_AcceptedProviderSnapshotAssistDocumented(t *testing.T) {
 
 	req := schemas["AcceptedProviderSnapshotRequest"].(map[any]any)
 	required := asStringSlice(t, req["required"])
-	for _, field := range []string{"crypto_policy_id", "solution_profile_ref", "chain_id"} {
+	for _, field := range []string{"crypto_policy_id", "solution_profile_ref"} {
 		if !contains(required, field) {
 			t.Fatalf("AcceptedProviderSnapshotRequest.required missing %q", field)
 		}
+	}
+	if contains(required, "chain_id") {
+		t.Fatal("AcceptedProviderSnapshotRequest must not require chain_id (CFB-P14)")
+	}
+	props, _ := req["properties"].(map[any]any)
+	if _, ok := props["chain_id"]; ok {
+		t.Fatal("AcceptedProviderSnapshotRequest must not declare chain_id (CFB-P14)")
 	}
 }

@@ -20,11 +20,13 @@ info:
     **`POST /policies`** (signed body). Maximum signed message validity: **10 minutes**. **EOA-only**.
     **`POST /wallet-challenges/verify` is not a security requirement.**
 
-    **Persist snapshot assist (CFB-P5 Option B):** clients may call
+    **Persist snapshot assist (CFB-P14 / CFB-P5 Option B):** clients may call
     **`POST /accepted-provider-snapshots`** to obtain a registry-authoritative
-    `accepted_provider_snapshot` (CP + solution_profile_ref + chain + soft findings) before
-    hashing/signing. This replaces FE assembly from a provider fixture or `GET /providers`.
-    Persist gates (pins, soft findings, couche A+B) remain unchanged.
+    `accepted_provider_snapshot` (CP + solution_profile_ref + soft findings) with
+    multi-chain `chain_support_used[]` before hashing/signing. No user-picked
+    `chain_id`. This replaces FE assembly from a provider fixture or `GET /providers`.
+    Persist gates (pins, soft findings, couche A+B) remain; chain gate follows
+    greenfield vs constrained scan rules (ADR_20260803 §9).
 
     **W2 (owner-scoped latest completed scan):** `POST /policies/decisions/explore`,
     `POST /wallet-challenges`, and `POST /policies` require `scan_id` to be the latest completed
@@ -387,9 +389,12 @@ paths:
                         requires_new_account: true
                         requires_local_signer_state: true
                       chain_support_used:
-                        chain_id: "11155111"
-                        status: testnet_supported
-                        capabilities: [deploy, sign_userop, rotate_signer]
+                        - chain_id: "1"
+                          status: production_supported
+                          capabilities: [deploy, sign_userop, rotate_signer]
+                        - chain_id: "11155111"
+                          status: testnet_supported
+                          capabilities: [deploy, sign_userop, rotate_signer]
                       references:
                         - kind: source_repo
                           url: https://github.com/RivaLabs-Core/NiceTry
@@ -475,21 +480,28 @@ paths:
   /accepted-provider-snapshots:
     post:
       tags: [wallet-authorization]
-      summary: Build accepted_provider_snapshot from registry (CFB-P5 Option B)
+      summary: Build accepted_provider_snapshot from registry (CFB-P14 multi-chain)
       description: |
         **Read-only construction helper.** Given a catalogue Crypto Policy, a
-        `solution_profile_ref`, a target `chain_id`, and optional soft findings, CPM derives the
+        `solution_profile_ref`, and optional soft findings, CPM derives the
         canonical `accepted_provider_snapshot` from the loaded provider registry.
+
+        **Breaking vs CFB-P5:** clients must **not** send a user-picked `chain_id`.
+        `chain_support_used` is a **non-empty array** of every profile `chain_support`
+        entry with `status ≠ planned` (sorted by `chain_id`). Choosing a provider
+        accepts that full deployable perimeter (ADR_20260803 §9 amendement 2026-09-21).
 
         Clients (Web UI / CLI) use this before assembling the closed hashed payload for
         `POST /wallet-challenges` — they must **not** assemble the snapshot from a local provider
         fixture or from `GET /providers`.
 
         Soft findings required by the profile (`requires_bundler`, `requires_local_signer_state`)
-        are always merged into the snapshot. `chain_support_used.chain_id` is emitted as a
-        **decimal string**. `status: planned` chains are rejected (**422**).
+        are always merged into the snapshot. Each `chain_support_used[].chain_id` is emitted as a
+        **decimal string**. Profiles with no deployable chains → **422**. `status: planned`
+        entries are never included.
 
-        Persist gates at `POST /policies` are unchanged (pins, soft findings, couche A+B).
+        Persist gates at `POST /policies` replay couche A+B against the multi-chain pin
+        (constrained scan = ∃ overlap observation ∩ pinned set; greenfield = chain gate skipped).
         This route does **not** require W2 / wallet address (construction only; no sign).
       operationId: postAcceptedProviderSnapshots
       requestBody:
@@ -499,14 +511,13 @@ paths:
             schema:
               $ref: "#/components/schemas/AcceptedProviderSnapshotRequest"
             examples:
-              nicetrySepolia:
+              nicetryMultichain:
                 value:
                   crypto_policy_id: cpm_pq_account_validation_v1
                   solution_profile_ref:
                     provider_id: nicetry
                     solution_profile_id: nicetry.fors_c.erc4337.v0_1
                     manifest_version: "2026-08"
-                  chain_id: "11155111"
                   accepted_findings: [requires_bundler, requires_local_signer_state]
       responses:
         "200":
@@ -516,7 +527,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/AcceptedProviderSnapshotResponse"
         "400":
-          description: Invalid input (missing fields, unknown crypto_policy_id, unknown finding codes).
+          description: Invalid input (missing fields, unknown crypto_policy_id, unknown finding codes, unknown fields such as legacy chain_id).
           content:
             application/json:
               schema:
@@ -528,8 +539,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "422":
           description: |
-            Profile/chain/provider incompatible with the CP or registry
-            (provider not allowed, profile not found, chain missing/planned).
+            Profile/provider incompatible with the CP or registry
+            (provider not allowed, profile not found, no deployable chain_support).
           content:
             application/json:
               schema:
@@ -602,9 +613,12 @@ paths:
                         requires_new_account: true
                         requires_local_signer_state: true
                       chain_support_used:
-                        chain_id: "11155111"
-                        status: testnet_supported
-                        capabilities: [deploy, sign_userop, rotate_signer]
+                        - chain_id: "1"
+                          status: production_supported
+                          capabilities: [deploy, sign_userop, rotate_signer]
+                        - chain_id: "11155111"
+                          status: testnet_supported
+                          capabilities: [deploy, sign_userop, rotate_signer]
                       references:
                         - kind: source_repo
                           url: https://github.com/RivaLabs-Core/NiceTry
@@ -1389,9 +1403,9 @@ components:
       required: [maturity, claim_status, resulting_posture, signature, account_model, constraints, chain_support_used, references, accepted_findings]
       description: |
         Frozen provider constraints at persist. Nested under hashed payload — **no** `number`/`null`
-        anywhere in this subtree. `chain_support_used.chain_id` is a **string**.
-        Soft findings must be listed when snapshot flags require them. Refs must be pinned.
-        `status: planned` is not persistable.
+        anywhere in this subtree. `chain_support_used` is a **non-empty array** (CFB-P14 breaking vs
+        CFB-P5 mono-object). Each `chain_id` is a **string**. Soft findings must be listed when
+        snapshot flags require them. Refs must be pinned. No `status: planned` entry is persistable.
       properties:
         maturity:
           type: string
@@ -1415,17 +1429,26 @@ components:
           type: object
           additionalProperties: true
         chain_support_used:
-          type: object
-          required: [chain_id, status]
-          additionalProperties: true
-          properties:
-            chain_id:
-              type: string
-              description: Chain id as decimal string (hashed subtree forbids JSON numbers).
-              example: "11155111"
-            status:
-              type: string
-              enum: [testnet_supported, production_supported]
+          type: array
+          minItems: 1
+          description: |
+            All deployable (`status ≠ planned`) chain_support entries for the chosen profile.
+            Sorted by chain_id. Choosing a provider pins this full set — no user chain picker.
+          items:
+            type: object
+            required: [chain_id, status]
+            additionalProperties: true
+            properties:
+              chain_id:
+                type: string
+                description: Chain id as decimal string (hashed subtree forbids JSON numbers).
+                example: "11155111"
+              status:
+                type: string
+                enum: [testnet_supported, production_supported]
+              capabilities:
+                type: array
+                items: {type: string}
         references:
           type: array
           minItems: 1
@@ -1476,25 +1499,17 @@ components:
 
     AcceptedProviderSnapshotRequest:
       type: object
-      required: [crypto_policy_id, solution_profile_ref, chain_id]
+      required: [crypto_policy_id, solution_profile_ref]
       additionalProperties: false
       description: |
-        CFB-P5 Option B — build `accepted_provider_snapshot` from registry facts.
-        `chain_id` may be a JSON number or decimal string; response always uses string.
+        CFB-P14 — build `accepted_provider_snapshot` from registry facts with multi-chain
+        `chain_support_used[]`. **No** user `chain_id` (legacy CFB-P5 field rejected as unknown).
       properties:
         crypto_policy_id:
           type: string
           description: Catalogue Crypto Policy id (provider must be in allowed_providers).
         solution_profile_ref:
           $ref: "#/components/schemas/SolutionProfileRef"
-        chain_id:
-          oneOf:
-            - type: string
-              description: Decimal string chain id (preferred for hashed payload symmetry).
-              example: "11155111"
-            - type: integer
-              format: int64
-              minimum: 1
         accepted_findings:
           type: array
           items:

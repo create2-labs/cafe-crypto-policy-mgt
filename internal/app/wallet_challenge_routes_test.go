@@ -264,9 +264,11 @@ func TestWalletChallenge_validationMatrix(t *testing.T) {
 
 	numberPayload := cloneMap(base)
 	snap := cloneMap(numberPayload["accepted_provider_snapshot"].(map[string]any))
-	chain := cloneMap(snap["chain_support_used"].(map[string]any))
+	chains := snap["chain_support_used"].([]any)
+	chain := cloneMap(chains[0].(map[string]any))
 	chain["chain_id"] = float64(11155111) // forbidden number in hashed subtree
-	snap["chain_support_used"] = chain
+	chains[0] = chain
+	snap["chain_support_used"] = chains
 	numberPayload["accepted_provider_snapshot"] = snap
 	badNumber, err := json.Marshal(map[string]any{
 		"wallet_address": walletChallengeTestWallet,

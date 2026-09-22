@@ -3,6 +3,7 @@ package policy
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/provider"
@@ -15,23 +16,21 @@ var (
 	ErrSnapshotAssistProfileNotFound = errors.New("solution profile not found in provider registry")
 	// ErrSnapshotAssistProviderNotAllowed indicates the provider is not in the CP allowed_providers.
 	ErrSnapshotAssistProviderNotAllowed = errors.New("provider is not allowed by crypto policy")
-	// ErrSnapshotAssistChainNotSupported indicates chain_id is absent or planned on the profile.
+	// ErrSnapshotAssistChainNotSupported indicates the profile has no persistable
+	// (status ≠ planned) chain_support entries for chain_support_used[].
 	ErrSnapshotAssistChainNotSupported = errors.New("chain is not persistable for this solution profile")
-	// ErrSnapshotAssistChainRequired indicates a missing/invalid chain_id.
-	ErrSnapshotAssistChainRequired = errors.New("chain_id is required")
 	// ErrSnapshotAssistCryptoPolicyRequired indicates a missing crypto_policy_id / nil CP.
 	ErrSnapshotAssistCryptoPolicyRequired = errors.New("crypto policy is required")
 	// ErrSnapshotAssistFindingsUnknown indicates a client finding code outside the soft-findings enum.
 	ErrSnapshotAssistFindingsUnknown = errors.New("accepted_findings contains an unknown code")
 )
 
-// BuildAcceptedProviderSnapshotInput is the CFB-P5 assist input (Option B).
+// BuildAcceptedProviderSnapshotInput is the CFB-P14 assist input (evolves CFB-P5 Option B).
 // CPM builds the canonical accepted_provider_snapshot from registry facts so
-// clients need no provider fixture / GET /providers join.
+// clients need no provider fixture / GET /providers join and no user-picked chain_id.
 type BuildAcceptedProviderSnapshotInput struct {
 	CryptoPolicy       *CryptoPolicy
 	SolutionProfileRef SolutionProfileRef
-	ChainID            int64
 	// AcceptedFindings are client-supplied soft findings; required profile soft
 	// findings are always merged in (authoritative).
 	AcceptedFindings []string
@@ -46,7 +45,10 @@ type BuildAcceptedProviderSnapshotResult struct {
 }
 
 // BuildAcceptedProviderSnapshot derives accepted_provider_snapshot from the loaded
-// provider registry (ADR US-PERSIST-SNAP / CFB-P5 Option B).
+// provider registry (ADR US-PERSIST-SNAP / CFB-P14 multi-chain).
+//
+// chain_support_used is the non-empty set of all profile chain_support entries with
+// status ≠ planned (sorted by chain_id). Clients must not supply a chain_id.
 func BuildAcceptedProviderSnapshot(in BuildAcceptedProviderSnapshotInput) (BuildAcceptedProviderSnapshotResult, error) {
 	if in.CryptoPolicy == nil {
 		return BuildAcceptedProviderSnapshotResult{}, ErrSnapshotAssistCryptoPolicyRequired
@@ -58,9 +60,6 @@ func BuildAcceptedProviderSnapshot(in BuildAcceptedProviderSnapshotInput) (Build
 	ref.VerificationDate = strings.TrimSpace(ref.VerificationDate)
 	if err := ref.Validate(); err != nil {
 		return BuildAcceptedProviderSnapshotResult{}, fmt.Errorf("%w: %v", ErrCryptoPolicyPayloadInvalid, err)
-	}
-	if in.ChainID < 1 {
-		return BuildAcceptedProviderSnapshotResult{}, ErrSnapshotAssistChainRequired
 	}
 	if !providerAllowedByCryptoPolicy(in.CryptoPolicy, ref.ProviderID) {
 		return BuildAcceptedProviderSnapshotResult{}, fmt.Errorf(
@@ -83,7 +82,7 @@ func BuildAcceptedProviderSnapshot(in BuildAcceptedProviderSnapshotInput) (Build
 		)
 	}
 
-	chain, err := pickPersistableChainSupport(resolved.Profile.ChainSupport, in.ChainID)
+	chains, err := collectPersistableChainSupport(resolved.Profile.ChainSupport)
 	if err != nil {
 		return BuildAcceptedProviderSnapshotResult{}, err
 	}
@@ -102,13 +101,9 @@ func BuildAcceptedProviderSnapshot(in BuildAcceptedProviderSnapshotInput) (Build
 		Signature:         profile.Signature,
 		AccountModel:      cloneAccountModel(profile.AccountModel),
 		Constraints:       profile.Constraints,
-		ChainSupportUsed: SnapshotChainSupport{
-			ChainID:      FlexibleChainID(chain.ChainID),
-			Status:       chain.Status,
-			Capabilities: append([]string(nil), chain.Capabilities...),
-		},
-		References:       cloneReferences(profile.References),
-		AcceptedFindings: findings,
+		ChainSupportUsed:  chains,
+		References:        cloneReferences(profile.References),
+		AcceptedFindings:  findings,
 		AcceptedRiskNotes: append([]string(nil), profile.RiskNotes...),
 	}
 	if len(snap.AcceptedRiskNotes) == 0 {
@@ -143,19 +138,30 @@ func providerAllowedByCryptoPolicy(cp *CryptoPolicy, providerID string) bool {
 	return false
 }
 
-func pickPersistableChainSupport(entries []provider.ChainSupport, chainID int64) (provider.ChainSupport, error) {
+// collectPersistableChainSupport returns all chain_support entries with
+// status ≠ planned, sorted by chain_id for stable hashed payloads.
+func collectPersistableChainSupport(entries []provider.ChainSupport) ([]SnapshotChainSupport, error) {
+	out := make([]SnapshotChainSupport, 0, len(entries))
 	for _, cs := range entries {
-		if cs.ChainID != chainID {
+		if cs.ChainID <= 0 {
 			continue
 		}
 		if cs.Status == provider.ChainStatusPlanned || strings.TrimSpace(string(cs.Status)) == "" {
-			return provider.ChainSupport{}, fmt.Errorf(
-				"%w: chain_id %d status %q", ErrSnapshotAssistChainNotSupported, chainID, cs.Status,
-			)
+			continue
 		}
-		return cs, nil
+		out = append(out, SnapshotChainSupport{
+			ChainID:      FlexibleChainID(cs.ChainID),
+			Status:       cs.Status,
+			Capabilities: append([]string(nil), cs.Capabilities...),
+		})
 	}
-	return provider.ChainSupport{}, fmt.Errorf("%w: chain_id %d", ErrSnapshotAssistChainNotSupported, chainID)
+	if len(out) == 0 {
+		return nil, fmt.Errorf("%w: no deployable chain_support (status != planned)", ErrSnapshotAssistChainNotSupported)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].ChainID.Int64() < out[j].ChainID.Int64()
+	})
+	return out, nil
 }
 
 func mergeAssistAcceptedFindings(profile *provider.SolutionProfile, client []string) ([]string, error) {

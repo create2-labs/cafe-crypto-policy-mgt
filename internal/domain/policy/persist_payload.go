@@ -49,13 +49,15 @@ type AcceptedProviderSnapshot struct {
 	Signature         provider.SignatureProfile   `json:"signature"`
 	AccountModel      provider.AccountModel       `json:"account_model"`
 	Constraints       provider.ProfileConstraints `json:"constraints"`
-	ChainSupportUsed  SnapshotChainSupport        `json:"chain_support_used"`
+	// ChainSupportUsed is the multi-chain pin (CFB-P14): all profile chain_support
+	// entries with status ≠ planned. Non-empty array; no planned entries.
+	ChainSupportUsed  []SnapshotChainSupport      `json:"chain_support_used"`
 	References        []provider.Reference        `json:"references"`
 	AcceptedFindings  []string                    `json:"accepted_findings"`
 	AcceptedRiskNotes []string                    `json:"accepted_risk_notes,omitempty"`
 }
 
-// SnapshotChainSupport is the chain entry that qualified compatibility for this CP.
+// SnapshotChainSupport is one deployable chain entry pinned in chain_support_used[].
 // ChainID accepts JSON number (legacy draft) or string (hashed closed set / JCS).
 type SnapshotChainSupport struct {
 	ChainID      FlexibleChainID             `json:"chain_id"`
@@ -192,11 +194,16 @@ func (p *CryptoPolicyPersistPayload) validatePersistSnapshot() error {
 	if s.Signature.Scheme == "" || s.Signature.Family == "" {
 		return fmt.Errorf("%w: accepted_provider_snapshot.signature scheme/family required", ErrCryptoPolicyPayloadInvalid)
 	}
-	if s.ChainSupportUsed.ChainID.Int64() <= 0 || s.ChainSupportUsed.Status == "" {
-		return fmt.Errorf("%w: chain_support_used chain_id/status required", ErrCryptoPolicyPayloadInvalid)
+	if len(s.ChainSupportUsed) == 0 {
+		return fmt.Errorf("%w: chain_support_used must be a non-empty array", ErrCryptoPolicyPayloadInvalid)
 	}
-	if s.ChainSupportUsed.Status == provider.ChainStatusPlanned {
-		return ErrProviderChainPlanned
+	for i, cs := range s.ChainSupportUsed {
+		if cs.ChainID.Int64() <= 0 || cs.Status == "" {
+			return fmt.Errorf("%w: chain_support_used[%d] chain_id/status required", ErrCryptoPolicyPayloadInvalid, i)
+		}
+		if cs.Status == provider.ChainStatusPlanned {
+			return ErrProviderChainPlanned
+		}
 	}
 	return nil
 }
@@ -328,7 +335,7 @@ func requirePersistUserConstraints(raw map[string]any) error {
 	return nil
 }
 
-func observationFromPersistRaw(raw map[string]any, chainUsed SnapshotChainSupport) provider.HardObservation {
+func observationFromPersistRaw(raw map[string]any, _ []SnapshotChainSupport) provider.HardObservation {
 	obs := provider.HardObservation{}
 	if pc, ok := raw["policy_context"].(map[string]any); ok {
 		obs.AccountKind = stringFromAny(pc["wallet_type"])
@@ -337,9 +344,10 @@ func observationFromPersistRaw(raw map[string]any, chainUsed SnapshotChainSuppor
 		}
 		obs.ChainIDs = int64SliceFromAny(pc["chain_ids"])
 	}
-	if len(obs.ChainIDs) == 0 && chainUsed.ChainID.Int64() > 0 {
-		obs.ChainIDs = []int64{chainUsed.ChainID.Int64()}
-	}
+	// CFB-P14: do not invent a synthetic constrained footprint from the multi-chain
+	// pin when policy_context is absent. Empty chain_ids → greenfield (couche A
+	// skips the chain gate); constrained scans supply observed chain_ids via
+	// policy_context. Snapshot validation still rejects planned / empty pins.
 	if obs.AccountKind == "" {
 		// Closed hashed payloads have no policy_context; EIP-191 personal_sign is EOA-only.
 		obs.AccountKind = "EOA"
@@ -349,6 +357,14 @@ func observationFromPersistRaw(raw map[string]any, chainUsed SnapshotChainSuppor
 
 func (p *CryptoPolicyPersistPayload) snapshotAsProfile() *provider.SolutionProfile {
 	s := &p.AcceptedProviderSnapshot
+	chains := make([]provider.ChainSupport, 0, len(s.ChainSupportUsed))
+	for _, cs := range s.ChainSupportUsed {
+		chains = append(chains, provider.ChainSupport{
+			ChainID:      cs.ChainID.Int64(),
+			Status:       cs.Status,
+			Capabilities: cs.Capabilities,
+		})
+	}
 	return &provider.SolutionProfile{
 		SolutionProfileID: p.SolutionProfileRef.SolutionProfileID,
 		Maturity:          s.Maturity,
@@ -358,12 +374,8 @@ func (p *CryptoPolicyPersistPayload) snapshotAsProfile() *provider.SolutionProfi
 		Signature:         s.Signature,
 		AccountModel:      s.AccountModel,
 		Constraints:       s.Constraints,
-		ChainSupport: []provider.ChainSupport{{
-			ChainID:      s.ChainSupportUsed.ChainID.Int64(),
-			Status:       s.ChainSupportUsed.Status,
-			Capabilities: s.ChainSupportUsed.Capabilities,
-		}},
-		References: s.References,
+		ChainSupport:      chains,
+		References:        s.References,
 	}
 }
 
@@ -386,7 +398,9 @@ func (p *CryptoPolicyPersistPayload) normalize() {
 	s.Signature.Scheme = strings.TrimSpace(s.Signature.Scheme)
 	s.Signature.Family = strings.TrimSpace(s.Signature.Family)
 	s.Signature.KeyRotationModel = provider.KeyRotationModel(strings.TrimSpace(string(s.Signature.KeyRotationModel)))
-	s.ChainSupportUsed.Status = provider.ChainSupportStatus(strings.TrimSpace(string(s.ChainSupportUsed.Status)))
+	for i := range s.ChainSupportUsed {
+		s.ChainSupportUsed[i].Status = provider.ChainSupportStatus(strings.TrimSpace(string(s.ChainSupportUsed[i].Status)))
+	}
 	for i := range s.References {
 		s.References[i].Kind = provider.ReferenceKind(strings.TrimSpace(string(s.References[i].Kind)))
 		s.References[i].URL = strings.TrimSpace(s.References[i].URL)

@@ -65,13 +65,17 @@ func TestPayloadSHA256Vectors_RealisticNestedPresent(t *testing.T) {
 	if !ok {
 		t.Fatal("missing accepted_provider_snapshot")
 	}
-	chain, ok := snap["chain_support_used"].(map[string]any)
-	if !ok {
-		t.Fatal("missing chain_support_used")
+	chains, ok := snap["chain_support_used"].([]any)
+	if !ok || len(chains) < 1 {
+		t.Fatal("chain_support_used must be a non-empty array")
 	}
-	id, ok := chain["chain_id"].(string)
+	first, ok := chains[0].(map[string]any)
+	if !ok {
+		t.Fatalf("chain_support_used[0] must be object, got %#v", chains[0])
+	}
+	id, ok := first["chain_id"].(string)
 	if !ok || id == "" {
-		t.Fatalf("chain_id must be non-empty string, got %#v", chain["chain_id"])
+		t.Fatalf("chain_id must be non-empty string, got %#v", first["chain_id"])
 	}
 	refs, ok := snap["references"].([]any)
 	if !ok || len(refs) < 2 {

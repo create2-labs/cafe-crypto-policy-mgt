@@ -137,10 +137,14 @@ func TestCPMV1OpenAPI_CP_PersistSchemasDocumented(t *testing.T) {
 	snapshot := schemas["AcceptedProviderSnapshot"].(map[any]any)
 	props := snapshot["properties"].(map[any]any)
 	chain := props["chain_support_used"].(map[any]any)
-	chainProps := chain["properties"].(map[any]any)
+	if chain["type"] != "array" {
+		t.Fatalf("AcceptedProviderSnapshot.chain_support_used must be array, got %#v", chain["type"])
+	}
+	items := chain["items"].(map[any]any)
+	chainProps := items["properties"].(map[any]any)
 	chainID := chainProps["chain_id"].(map[any]any)
 	if chainID["type"] != "string" {
-		t.Fatalf("AcceptedProviderSnapshot.chain_support_used.chain_id must be string, got %#v", chainID["type"])
+		t.Fatalf("AcceptedProviderSnapshot.chain_support_used[].chain_id must be string, got %#v", chainID["type"])
 	}
 }
 

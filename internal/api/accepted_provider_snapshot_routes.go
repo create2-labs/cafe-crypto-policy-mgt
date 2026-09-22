@@ -13,8 +13,9 @@ import (
 )
 
 // registerAcceptedProviderSnapshotRoute registers POST /accepted-provider-snapshots
-// (CFB-P5 Option B): read-only construction of accepted_provider_snapshot from the
-// provider registry so clients need no FE provider fixture.
+// (CFB-P14 / CFB-P5 Option B): read-only construction of accepted_provider_snapshot
+// from the provider registry so clients need no FE provider fixture and no
+// user-picked chain_id (multi-chain chain_support_used[]).
 func registerAcceptedProviderSnapshotRoute(mux *http.ServeMux, store *ReadStore) {
 	mux.HandleFunc("POST "+cpmroutes.AcceptedProviderSnapshots, func(w http.ResponseWriter, r *http.Request) {
 		req, err := decodeAcceptedProviderSnapshotRequest(r)
@@ -31,7 +32,6 @@ func registerAcceptedProviderSnapshotRoute(mux *http.ServeMux, store *ReadStore)
 		result, err := policy.BuildAcceptedProviderSnapshot(policy.BuildAcceptedProviderSnapshotInput{
 			CryptoPolicy:       cp,
 			SolutionProfileRef: req.SolutionProfileRef,
-			ChainID:            req.ChainID,
 			AcceptedFindings:   req.AcceptedFindings,
 			Registry:           store.providers,
 		})
@@ -42,19 +42,18 @@ func registerAcceptedProviderSnapshotRoute(mux *http.ServeMux, store *ReadStore)
 		}
 
 		respondJSON(w, http.StatusOK, map[string]any{
-			"crypto_policy_id":             cp.ID,
-			"required_posture":             cp.RequiredPosture,
-			"solution_profile_ref":         result.SolutionProfileRef,
-			"accepted_provider_snapshot":   result.AcceptedProviderSnapshot,
+			"crypto_policy_id":           cp.ID,
+			"required_posture":           cp.RequiredPosture,
+			"solution_profile_ref":       result.SolutionProfileRef,
+			"accepted_provider_snapshot": result.AcceptedProviderSnapshot,
 		})
 	})
 }
 
 type acceptedProviderSnapshotRequest struct {
-	CryptoPolicyID     string                   `json:"crypto_policy_id"`
+	CryptoPolicyID     string                    `json:"crypto_policy_id"`
 	SolutionProfileRef policy.SolutionProfileRef `json:"solution_profile_ref"`
-	ChainID            int64                    `json:"-"`
-	AcceptedFindings   []string                 `json:"accepted_findings"`
+	AcceptedFindings   []string                  `json:"accepted_findings"`
 }
 
 func decodeAcceptedProviderSnapshotRequest(r *http.Request) (*acceptedProviderSnapshotRequest, error) {
@@ -72,7 +71,7 @@ func decodeAcceptedProviderSnapshotRequest(r *http.Request) (*acceptedProviderSn
 	}
 	for key := range raw {
 		switch key {
-		case "crypto_policy_id", "solution_profile_ref", "chain_id", "accepted_findings":
+		case "crypto_policy_id", "solution_profile_ref", "accepted_findings":
 		default:
 			return nil, fmt.Errorf("unknown field %s", key)
 		}
@@ -100,18 +99,6 @@ func decodeAcceptedProviderSnapshotRequest(r *http.Request) (*acceptedProviderSn
 		return nil, fmt.Errorf("solution_profile_ref: %w", err)
 	}
 
-	chainRaw, ok := raw["chain_id"]
-	if !ok || len(bytesTrimSpaceJSON(chainRaw)) == 0 {
-		return nil, errors.New("chain_id is required")
-	}
-	var chainID policy.FlexibleChainID
-	if err := json.Unmarshal(chainRaw, &chainID); err != nil {
-		return nil, fmt.Errorf("chain_id: %w", err)
-	}
-	if chainID.Int64() < 1 {
-		return nil, errors.New("chain_id is required")
-	}
-
 	var findings []string
 	if v, ok := raw["accepted_findings"]; ok && len(bytesTrimSpaceJSON(v)) > 0 && string(v) != "null" {
 		if err := json.Unmarshal(v, &findings); err != nil {
@@ -122,7 +109,6 @@ func decodeAcceptedProviderSnapshotRequest(r *http.Request) (*acceptedProviderSn
 	return &acceptedProviderSnapshotRequest{
 		CryptoPolicyID:     cryptoPolicyID,
 		SolutionProfileRef: ref,
-		ChainID:            chainID.Int64(),
 		AcceptedFindings:   findings,
 	}, nil
 }
@@ -134,7 +120,6 @@ func mapSnapshotAssistError(err error) (int, string) {
 		errors.Is(err, policy.ErrSnapshotAssistProfileNotFound):
 		return http.StatusUnprocessableEntity, err.Error()
 	case errors.Is(err, policy.ErrSnapshotAssistFindingsUnknown),
-		errors.Is(err, policy.ErrSnapshotAssistChainRequired),
 		errors.Is(err, policy.ErrSnapshotAssistCryptoPolicyRequired),
 		errors.Is(err, policy.ErrCryptoPolicyPayloadInvalid):
 		return http.StatusBadRequest, err.Error()
