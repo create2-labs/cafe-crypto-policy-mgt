@@ -19,6 +19,11 @@ var (
 	ErrStoreNil = errors.New("api read store is nil")
 )
 
+// cryptoPolicyNotOfferedError is the product refusal for a loaded Crypto Policy
+// with no usable provider (US-ORPHAN-CP / CFB-P19). It is not
+// runtime.no_scan_compatible: couche A is not run.
+const cryptoPolicyNotOfferedError = "crypto policy is not offered"
+
 // ReadStoreOptions configures catalogue loading for Crypto Policies and providers.
 // Prefer CatalogueDir (scan all *.json, skip incompatible with logs). Explicit
 // path lists remain for unit tests that need an isolated fixture set.
@@ -105,6 +110,9 @@ func registerCatalogRoutes(mux *http.ServeMux, store *ReadStore) {
 	mux.HandleFunc("GET "+cpmroutes.CryptoPolicies, func(w http.ResponseWriter, _ *http.Request) {
 		items := make([]policy.CryptoPolicyCatalogItem, 0, len(store.cryptoPolicies))
 		for _, cp := range store.cryptoPolicies {
+			if !policy.HasPostureCompatibleProvider(cp, store.providers) {
+				continue
+			}
 			items = append(items, policy.CatalogItemFromCryptoPolicy(cp, store.providers))
 		}
 		respondJSON(w, http.StatusOK, map[string]any{"items": items})
@@ -114,6 +122,10 @@ func registerCatalogRoutes(mux *http.ServeMux, store *ReadStore) {
 		cp, ok := store.cryptoPolicyByID[id]
 		if !ok {
 			respondJSON(w, http.StatusNotFound, map[string]any{"error": "crypto policy not found"})
+			return
+		}
+		if !policy.HasPostureCompatibleProvider(cp, store.providers) {
+			respondJSON(w, http.StatusNotFound, map[string]any{"error": cryptoPolicyNotOfferedError})
 			return
 		}
 		respondJSON(w, http.StatusOK, policy.CatalogItemFromCryptoPolicy(cp, store.providers))
@@ -144,6 +156,10 @@ func registerExploreRoute(mux *http.ServeMux, store *ReadStore) {
 		cp, ok := store.cryptoPolicyByID[req.CryptoPolicyID]
 		if !ok {
 			respondJSON(w, http.StatusBadRequest, map[string]any{"error": "unknown crypto_policy_id"})
+			return
+		}
+		if !policy.HasPostureCompatibleProvider(cp, store.providers) {
+			respondJSON(w, http.StatusBadRequest, map[string]any{"error": cryptoPolicyNotOfferedError})
 			return
 		}
 

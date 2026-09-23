@@ -86,6 +86,11 @@ paths:
             Catalogue Crypto Policies with derived `compatible_networks`
             (deployable union of allowed providers' chain_support; status ≠ planned)
             and `allowed_provider_summaries` (per-provider signature + networks).
+
+            A Crypto Policy with no usable provider is omitted (US-ORPHAN-CP /
+            CFB-P19). Usable means at least one allowed profile whose
+            `resulting_posture` equals `required_posture`. A planned-only chain
+            is still listed. The policy stays loaded for the admin orphanage signal.
           content:
             application/json:
               schema:
@@ -116,7 +121,10 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
-          description: Unknown crypto_policy_id
+          description: |
+            Unknown `crypto_policy_id`, or a loaded Crypto Policy that is not
+            offered because it has no usable provider (US-ORPHAN-CP). This is
+            not `runtime.no_scan_compatible`.
 
   /providers:
     get:
@@ -190,6 +198,11 @@ paths:
         IMM-OPS-1 `cpm.explore.no_deployable_candidate` / `runtime.no_scan_compatible`.
         Constrained scans (non-empty observed chains, e.g. BSC-only unsupported) still apply
         the chain/capability gate unchanged.
+
+        A Crypto Policy with no usable provider (US-ORPHAN-CP / CFB-P19) is
+        refused with **400** `crypto policy is not offered` before couche A.
+        That refusal is not `runtime.no_scan_compatible` and does not emit
+        `cpm.explore.no_deployable_candidate`.
       operationId: postPoliciesDecisionsExplore
       requestBody:
         required: true
@@ -527,7 +540,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/AcceptedProviderSnapshotResponse"
         "400":
-          description: Invalid input (missing fields, unknown crypto_policy_id, unknown finding codes, unknown fields such as legacy chain_id).
+          description: |
+            Invalid input (missing fields, unknown crypto_policy_id, crypto policy
+            not offered because it has no usable provider, unknown finding codes,
+            unknown fields such as legacy chain_id). A not-offered Crypto Policy
+            is refused before snapshot construction (US-ORPHAN-CP); this is not
+            `runtime.no_scan_compatible`.
           content:
             application/json:
               schema:

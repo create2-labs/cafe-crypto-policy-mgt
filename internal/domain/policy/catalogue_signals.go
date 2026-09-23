@@ -12,33 +12,12 @@ type catalogueSignalsLogger interface {
 	Printf(format string, v ...any)
 }
 
-// CheckPostureOrphanage reports ADR §7.2.1 posture-only orphanage for each CP:
-// empty allowed_providers, or no allowed provider profile with
-// resulting_posture == required_posture. Intentionally ignores chain status
-// (planned-only) and wallet type — those remain explore couche A rejections.
-// Returns the number of orphan CPs logged.
-func CheckPostureOrphanage(cps []*CryptoPolicy, reg *provider.Registry, logger catalogueSignalsLogger) int {
-	if logger == nil {
-		logger = log.Default()
-	}
-	n := 0
-	for _, cp := range cps {
-		if cp == nil {
-			continue
-		}
-		if hasPostureCompatibleProvider(cp, reg) {
-			continue
-		}
-		n++
-		logger.Printf(
-			"WARN catalogue: posture orphanage crypto_policy_id=%s required_posture=%s allowed_providers=%v",
-			cp.ID, cp.RequiredPosture, cp.AllowedProviders,
-		)
-	}
-	return n
-}
-
-func hasPostureCompatibleProvider(cp *CryptoPolicy, reg *provider.Registry) bool {
+// HasPostureCompatibleProvider is the catalogue orphanage predicate (ADR §7.2.1 /
+// US-ORPHAN-CP): at least one allowed provider profile has
+// resulting_posture == required_posture. Empty allowed_providers, an unknown
+// provider, or a posture mismatch is false. Chain status (including a
+// planned-only chain) and wallet type are ignored.
+func HasPostureCompatibleProvider(cp *CryptoPolicy, reg *provider.Registry) bool {
 	if cp == nil {
 		return false
 	}
@@ -64,4 +43,30 @@ func hasPostureCompatibleProvider(cp *CryptoPolicy, reg *provider.Registry) bool
 		}
 	}
 	return false
+}
+
+// CheckPostureOrphanage reports ADR §7.2.1 posture-only orphanage for each CP:
+// empty allowed_providers, or no allowed provider profile with
+// resulting_posture == required_posture. Intentionally ignores chain status
+// (planned-only) and wallet type — those remain explore couche A rejections.
+// Returns the number of orphan CPs logged.
+func CheckPostureOrphanage(cps []*CryptoPolicy, reg *provider.Registry, logger catalogueSignalsLogger) int {
+	if logger == nil {
+		logger = log.Default()
+	}
+	n := 0
+	for _, cp := range cps {
+		if cp == nil {
+			continue
+		}
+		if HasPostureCompatibleProvider(cp, reg) {
+			continue
+		}
+		n++
+		logger.Printf(
+			"WARN catalogue: posture orphanage crypto_policy_id=%s required_posture=%s allowed_providers=%v",
+			cp.ID, cp.RequiredPosture, cp.AllowedProviders,
+		)
+	}
+	return n
 }
