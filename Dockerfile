@@ -51,8 +51,8 @@ FROM gcr.io/distroless/base-debian12:nonroot
 ARG APP_VERSION
 LABEL org.opencontainers.image.version="${APP_VERSION}"
 COPY --from=build /out/cafe-cpm /usr/local/bin/cafe-cpm
-# Flat catalogue dir: Crypto Policies + ProviderManifests (scanned at boot).
-COPY --from=build /app/internal/domain/policy/testdata/ /app/policy/
-COPY --from=build /app/internal/domain/provider/testdata/ /app/policy/
+# Runtime image ships the binary only. Catalogue JSON is not baked.
+# Deploy must mount CPM_CATALOGUE_DIR (default /app/policy). A container
+# started without that mount exits at catalogue load. Tests keep using testdata/.
 EXPOSE 8082
 ENTRYPOINT ["/usr/local/bin/cafe-cpm"]
