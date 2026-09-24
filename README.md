@@ -277,7 +277,7 @@ CPM exposes read-only catalogue APIs backed by a **catalogue directory** of JSON
 
 Environment variables:
 
-- `CPM_CATALOGUE_DIR` (default: `/app/policy`) — directory of `*.json` files. At boot CPM classifies each file as a **Crypto Policy** (`required_posture` + `allowed_providers`) or a **ProviderManifest** (`schema_version: cafe.provider_manifest.v0.1`). Incompatible / unrelated JSON (e.g. instance fixtures, garbage) is **skipped with a log line**; boot fails only if zero policies or zero providers remain. Image build copies `internal/domain/policy/testdata/*.json` and `internal/domain/provider/testdata/*.json` into `/app/policy/`. **Adding a CP or provider = drop a JSON into the matching testdata folder + rebuild image** — no `config.go` / path-list edits.
+- `CPM_CATALOGUE_DIR` (default: `/app/policy`) — directory of `*.json` files **supplied at run** (compose or Helm mount). The runtime image does **not** contain a catalogue and does not copy `testdata/` into `/app/policy`. A container started without that directory exits at catalogue load. At boot CPM classifies each file as a **Crypto Policy** (`required_posture` + `allowed_providers`) or a **ProviderManifest** (`schema_version: cafe.provider_manifest.v0.1`). Incompatible / unrelated JSON (e.g. instance fixtures, garbage) is **skipped with a log line**; boot fails if the directory is missing, contains no `*.json`, or loads zero policies or zero providers. `internal/domain/policy/testdata/` and `internal/domain/provider/testdata/` stay **test fixtures** for `go test`. Publishing a CP or provider is a deploy-catalogue change, not an image rebuild.
 
 Catalogue responses include intention fields (`required_posture`, `allowed_providers`) plus derived catalogue facts (`compatible_networks`, `allowed_provider_summaries`). They do **not** return templates, instances, or a business policy graph.
 
@@ -525,10 +525,10 @@ Integrators use Discovery **`/discovery/v1/wallets/scans`** (edge: **`/api/disco
 
 ## Run locally
 
+`go test` reads `testdata/` from the module and does not need the deploy catalogue mount. The runtime image does not bake those files; a process (or container) still needs `CPM_CATALOGUE_DIR` pointing at a directory with at least one valid Crypto Policy and one valid ProviderManifest.
+
 ```bash
 go test ./...
-# Default bind: :8082 (override with CPM_HTTP_ADDR)
-go run ./cmd/cafe-cpm
 ```
 
 With repo test fixtures and auth disabled:

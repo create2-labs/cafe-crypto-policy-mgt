@@ -102,7 +102,7 @@ Mettre à jour les passages « preserve mock mode » / placeholder V1 :
 
 ## Open — Catalogue CP : ne plus lister les templates/instances dans `config.go`
 
-**Statut :** résolu (scan de `CPM_CATALOGUE_DIR`, défaut `/app/policy`). Ajouter une CP ou un provider = JSON dans `testdata/` + rebuild image ; fichiers incompatibles skippés avec log.
+**Statut :** résolu (scan de `CPM_CATALOGUE_DIR`, défaut `/app/policy`). Le catalogue servi est monté au déploiement ; l’image ne copie plus `testdata/`. Ces répertoires restent les fixtures de `go test`. Fichiers incompatibles skippés avec log.
 
 ---
 

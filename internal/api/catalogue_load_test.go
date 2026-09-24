@@ -83,6 +83,22 @@ func TestLoadReadStore_CatalogueDir_SkipsIncompatible(t *testing.T) {
 	}
 }
 
+func TestLoadReadStore_MissingOrEmptyCatalogueDirFails(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "absent")
+	if _, err := LoadReadStore(ReadStoreOptions{CatalogueDir: missing}); err == nil {
+		t.Fatal("expected catalogue load to fail when the directory is missing")
+	}
+
+	empty := t.TempDir()
+	_, err := LoadReadStore(ReadStoreOptions{CatalogueDir: empty})
+	if err == nil {
+		t.Fatal("expected catalogue load to fail when the directory has no json")
+	}
+	if !strings.Contains(err.Error(), "no .json") {
+		t.Fatalf("unexpected empty-dir error: %v", err)
+	}
+}
+
 func TestClassifyCatalogueJSON(t *testing.T) {
 	if got := classifyCatalogueJSON([]byte(`{"schema_version":"cafe.provider_manifest.v0.1","provider_id":"x","solution_profiles":[]}`)); got != catalogueKindProviderManifest {
 		t.Fatalf("provider: got %s", got)
