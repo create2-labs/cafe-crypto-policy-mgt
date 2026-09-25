@@ -28,6 +28,10 @@ func registerAcceptedProviderSnapshotRoute(mux *http.ServeMux, store *ReadStore)
 			respondJSON(w, http.StatusBadRequest, map[string]any{"error": "unknown crypto_policy_id"})
 			return
 		}
+		if !policy.HasPostureCompatibleProvider(cp, store.providers) {
+			respondJSON(w, http.StatusBadRequest, map[string]any{"error": cryptoPolicyNotOfferedError})
+			return
+		}
 
 		result, err := policy.BuildAcceptedProviderSnapshot(policy.BuildAcceptedProviderSnapshotInput{
 			CryptoPolicy:       cp,

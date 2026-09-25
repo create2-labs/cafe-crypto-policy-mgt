@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/cpmroutes"
+	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/policy"
 	"github.com/create2-labs/cafe-crypto-policy-mgt/internal/domain/vocabulary"
 )
 
@@ -335,6 +337,198 @@ func assertCompatibleNetworksMultichain(t *testing.T, networks []struct {
 	if _, ok := seen[11155111]; !ok {
 		t.Fatalf("missing sepolia: %+v", networks)
 	}
+}
+
+func TestCryptoPolicies_omitsPostureOrphanFromProductMatching(t *testing.T) {
+	dir := t.TempDir()
+	orphanPath := filepath.Join(dir, "cp_orphan.json")
+	plannedCPPath := filepath.Join(dir, "cp_planned_only.json")
+	plannedManifestPath := filepath.Join(dir, "planned_only.json")
+	const orphanCP = `{
+  "id": "cp_orphan",
+  "name": "Orphan",
+  "version": "v0.1",
+  "required_posture": "full_pq",
+  "allowed_providers": ["nicetry"]
+}`
+	const plannedCP = `{
+  "id": "cp_planned_only",
+  "name": "Planned only",
+  "version": "v0.1",
+  "required_posture": "hybrid",
+  "allowed_providers": ["plannedonly"]
+}`
+	const plannedManifest = `{
+  "schema_version": "cafe.provider_manifest.v0.1",
+  "provider_id": "plannedonly",
+  "provider_name": "Planned Only",
+  "provider_version": "2026-08",
+  "provider_maturity": "research",
+  "solution_profiles": [{
+    "solution_profile_id": "plannedonly.profile.v0_1",
+    "display_name": "Planned only",
+    "maturity": "research",
+    "claim_status": "declared",
+    "resulting_posture": "hybrid",
+    "input_requirements": { "wallet_types": ["EOA"], "requires_wallet_control_proof": true },
+    "signature": { "scheme": "FORS+C", "family": "hash_based", "key_rotation_model": "per_userop" },
+    "account_model": {
+      "standard": "ERC-4337",
+      "execution_model": "erc4337_bundler",
+      "requires_bundler": true,
+      "requires_entrypoint": true,
+      "entrypoint_versions": ["0.7"]
+    },
+    "constraints": {
+      "requires_new_account": true,
+      "address_continuity_supported": false,
+      "requires_local_signer_state": true
+    },
+    "chain_support": [
+      { "chain_id": 1, "network": "ethereum-mainnet", "status": "planned", "capabilities": [] }
+    ]
+  }]
+}`
+	for path, body := range map[string]string{
+		orphanPath:          orphanCP,
+		plannedCPPath:       plannedCP,
+		plannedManifestPath: plannedManifest,
+	} {
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+	}
+
+	store, err := LoadReadStore(ReadStoreOptions{
+		CryptoPolicyPaths: []string{
+			fixturePath("crypto_policy_pq_account_validation_v1.json"),
+			orphanPath,
+			plannedCPPath,
+		},
+		ProviderManifestPaths: []string{
+			providerManifestFixturePath(),
+			plannedManifestPath,
+		},
+	})
+	if err != nil {
+		t.Fatalf("LoadReadStore: %v", err)
+	}
+	if len(store.cryptoPolicies) != 3 {
+		t.Fatalf("orphan must stay loaded, got %d policies", len(store.cryptoPolicies))
+	}
+	logger := &orphanageCaptureLogger{}
+	if n := policy.CheckPostureOrphanage(store.cryptoPolicies, store.providers, logger); n != 1 {
+		t.Fatalf("want 1 admin orphan signal, got %d logs=%v", n, logger.lines)
+	}
+	if len(logger.lines) != 1 || !strings.Contains(logger.lines[0], "WARN catalogue: posture orphanage") || !strings.Contains(logger.lines[0], "cp_orphan") {
+		t.Fatalf("admin signal: %#v", logger.lines)
+	}
+
+	mux := http.NewServeMux()
+	if err := RegisterReadRoutes(mux, store); err != nil {
+		t.Fatalf("RegisterReadRoutes: %v", err)
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies, nil)
+	listRec := httptest.NewRecorder()
+	mux.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("list status: got %d body=%s", listRec.Code, listRec.Body.String())
+	}
+	var listResp struct {
+		Items []struct {
+			ID string `json:"id"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(listRec.Body.Bytes(), &listResp); err != nil {
+		t.Fatalf("decode list: %v", err)
+	}
+	ids := map[string]bool{}
+	for _, item := range listResp.Items {
+		ids[item.ID] = true
+	}
+	if ids["cp_orphan"] {
+		t.Fatalf("orphan listed: %+v", listResp.Items)
+	}
+	if !ids["cpm_pq_account_validation_v1"] || !ids["cp_planned_only"] {
+		t.Fatalf("usable and planned-only must stay listed: %+v", listResp.Items)
+	}
+	if len(listResp.Items) != 2 {
+		t.Fatalf("list items: got %d", len(listResp.Items))
+	}
+
+	getOrphan := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies+"/cp_orphan", nil)
+	getOrphanRec := httptest.NewRecorder()
+	mux.ServeHTTP(getOrphanRec, getOrphan)
+	if getOrphanRec.Code != http.StatusNotFound {
+		t.Fatalf("get orphan status: got %d body=%s", getOrphanRec.Code, getOrphanRec.Body.String())
+	}
+	if !strings.Contains(getOrphanRec.Body.String(), "crypto policy is not offered") || strings.Contains(getOrphanRec.Body.String(), "runtime.no_scan_compatible") {
+		t.Fatalf("get orphan body: %s", getOrphanRec.Body.String())
+	}
+
+	getPlanned := httptest.NewRequest(http.MethodGet, cpmroutes.CryptoPolicies+"/cp_planned_only", nil)
+	getPlannedRec := httptest.NewRecorder()
+	mux.ServeHTTP(getPlannedRec, getPlanned)
+	if getPlannedRec.Code != http.StatusOK {
+		t.Fatalf("planned-only get: got %d body=%s", getPlannedRec.Code, getPlannedRec.Body.String())
+	}
+
+	metrics := &testExploreMetrics{}
+	restore := setExploreObservabilityForTest(exploreObservability{metrics: metrics})
+	defer restore()
+	exploreBody := map[string]any{
+		"crypto_policy_id": "cp_orphan",
+		"policy_context": map[string]any{
+			"wallet_type":        "eoa",
+			"chain_ids":          []int64{1},
+			"current_pq_posture": "classical_only",
+			"scanned_at":         "2026-04-17T09:59:58Z",
+		},
+	}
+	raw, _ := json.Marshal(exploreBody)
+	exploreReq := httptest.NewRequest(http.MethodPost, cpmroutes.PoliciesDecisionsExplore, bytes.NewReader(raw))
+	exploreRec := httptest.NewRecorder()
+	mux.ServeHTTP(exploreRec, exploreReq)
+	if exploreRec.Code != http.StatusBadRequest {
+		t.Fatalf("explore orphan status: got %d body=%s", exploreRec.Code, exploreRec.Body.String())
+	}
+	if !strings.Contains(exploreRec.Body.String(), "crypto policy is not offered") ||
+		strings.Contains(exploreRec.Body.String(), "runtime.no_scan_compatible") ||
+		strings.Contains(exploreRec.Body.String(), "scan_compatible_providers") {
+		t.Fatalf("explore orphan body: %s", exploreRec.Body.String())
+	}
+	if len(metrics.increments) != 0 {
+		t.Fatalf("explore must not emit no_deployable for an orphan: %+v", metrics.increments)
+	}
+
+	assistBody := `{
+		"crypto_policy_id": "cp_orphan",
+		"solution_profile_ref": {
+			"provider_id": "nicetry",
+			"solution_profile_id": "nicetry.fors_c.erc4337.v0_1",
+			"manifest_version": "2026-08"
+		}
+	}`
+	assistReq := httptest.NewRequest(http.MethodPost, cpmroutes.AcceptedProviderSnapshots, strings.NewReader(assistBody))
+	assistRec := httptest.NewRecorder()
+	mux.ServeHTTP(assistRec, assistReq)
+	if assistRec.Code != http.StatusBadRequest {
+		t.Fatalf("assist orphan status: got %d body=%s", assistRec.Code, assistRec.Body.String())
+	}
+	if !strings.Contains(assistRec.Body.String(), "crypto policy is not offered") ||
+		strings.Contains(assistRec.Body.String(), "accepted_provider_snapshot") ||
+		strings.Contains(assistRec.Body.String(), "runtime.no_scan_compatible") {
+		t.Fatalf("assist orphan body: %s", assistRec.Body.String())
+	}
+}
+
+type orphanageCaptureLogger struct {
+	lines []string
+}
+
+func (c *orphanageCaptureLogger) Printf(format string, v ...any) {
+	c.lines = append(c.lines, fmt.Sprintf(format, v...))
 }
 
 func TestDecisionExplore_v02_sepoliaScanCompatibleProviders(t *testing.T) {
