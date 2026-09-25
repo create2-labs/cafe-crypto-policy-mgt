@@ -1,0 +1,40 @@
+# Changelog
+
+## [0.2.0](https://github.com/create2-labs/cafe-crypto-policy-mgt/compare/0.1.0...v0.2.0) (2026-09-25)
+
+
+### Features
+
+* **cpm:** add ProviderManifest v0.1 loader and Nicetry fixture ([#64](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/64)) ([5864563](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/586456316372692bbfa82292b8fde4af7028b9e8))
+* **cpm:** apply explore couche A match with suggested_user_constraints ([#76](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/76)) ([e427af5](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/e427af532bbd6a14e7ac0bd9ea4f7105a113d77c))
+* **cpm:** apply Nicetry ADR §7 hard provider compatibility ([#68](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/68)) ([9906276](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/9906276cc8ddcf49340af28ebfe3200fa627a6c7))
+* **cpm:** assist accepted_provider_snapshot from registry (CFB-P5) ([#94](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/94)) ([1d53262](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/1d5326261eca09197ce9aacf59fe0469f2373e6e))
+* **cpm:** drop policy graph contracts from explore and catalogue ([#69](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/69)) ([d57dad7](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/d57dad7c132be516c7d33389390fc08810f0061b))
+* **cpm:** emit catalogue startup signals for orphanage and malformed manifests ([#78](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/78)) ([c9ff51c](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/c9ff51c2b1ee761c2acf469b68c9a77de0bb7fb5))
+* **cpm:** emit distinct runtime signals for empty scan-compatible and couche B KO ([#79](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/79)) ([e1c7019](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/e1c701912419d3e14605cb37c83931dde796bda1))
+* **cpm:** explore composition view (CFB-P3) ([#93](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/93)) ([38f7f4b](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/38f7f4b34ec7094b2b12c184b864f4b4306b475c))
+* **cpm:** explore/assessment wire v0.2 with crypto_policy_id ([#75](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/75)) ([5aa343f](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/5aa343fd72e67fbc035472353f07c1a249f7c185))
+* **cpm:** expose ADR §7 soft findings on ranked explore candidates ([#71](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/71)) ([1ae9a97](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/1ae9a974a347bfc0a9e6c6937e0744bde17b5d2b))
+* **cpm:** expose allowed_provider_summaries on crypto-policies catalogue ([#96](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/96)) ([d226784](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/d226784cb3a3119a09f54c5932e18c6939579cef))
+* **cpm:** expose compatible_networks on crypto-policies catalogue ([#92](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/92)) ([748e555](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/748e555e70029b896983c89df34fa3d6fc237662))
+* **cpm:** gate persist on accepted provider snapshot and pinned refs ([#72](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/72)) ([6add548](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/6add548f7ba8481ac52f41b2f68536c14ffb0fd9))
+* **cpm:** load catalogue from directory scan ([#95](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/95)) ([36581cf](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/36581cfc614f32b6daf5f8ef88fc26f65593703f))
+* **cpm:** multi-chain chain_support_used[] on persist snapshot (CFB-P14) ([#98](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/98)) ([f4dc8b8](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/f4dc8b89171aadb265977cfbc1a00c1942db3396))
+* **cpm:** omit crypto policies with no usable provider from product matching ([#101](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/101)) ([91bf051](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/91bf0519d55dfb247c2a86a0b541f67ec9f045de))
+* **cpm:** RAZ catalogue with solution_profile_ref for Nicetry ([#65](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/65)) ([44d19fd](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/44d19fddf19268b56b11b5f794374b9ffaef6d30))
+* **cpm:** RD-P2 payload_sha256 JCS lib (internal/payloadhash) ([#82](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/82)) ([c9585dc](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/c9585dc914b92a801505a0e0cdabae862cff32f4))
+* **cpm:** RD-P4 wallet-challenges stateless with payload_sha256 ([#83](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/83)) ([f4c47f0](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/f4c47f0d54074fb38c6e962c1ba5be76f121aaf1))
+* **cpm:** RD-P5 signed POST /policies + W2 engagement (no drafts) ([#84](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/84)) ([c6dc6d1](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/c6dc6d1aff2508354d05fff54c1b37303ed74b6c))
+* **cpm:** RD-P6 harmonize owner-scoped W2 on explore ([#85](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/85)) ([ad8ac3e](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/ad8ac3e7b87bfe23882fdcdedcde73c8baf888ad))
+* **cpm:** replace key_rotation_required with key_rotation_model ([#67](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/67)) ([9f70231](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/9f7023126f851a354d659773728826c776389134))
+* **cpm:** replace template/instance catalogue with crypto-policies and providers ([#74](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/74)) ([48753a9](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/48753a9014986fd5f81fc607d3d11942ee1ab498))
+* **cpm:** require user_constraints and replay A+B at persist ([#77](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/77)) ([a4d6062](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/a4d60622d99b7834c76bf2f98fe3845db3585b59))
+* **cpm:** ship the runtime image without a baked catalogue ([#100](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/100)) ([416ae3a](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/416ae3a09dc4a1c35be8628fa3f868838ecfc2b4))
+* **cpm:** skip explore chain gate for greenfield empty chain_ids (CFB-P12) ([#97](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/97)) ([131edfe](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/131edfee05b3ad1eb9b80017d5a4589e90c8ef8d))
+* releazse please ([a064b5a](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/a064b5afeacc1c14efe66ade28d698236ee33b16))
+
+
+### Bug Fixes
+
+* renamed test files to be more explicit ([#90](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/90)) ([ffa7ec7](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/ffa7ec767d6e48c7575cff819ea53c24cc64e59a))
+* **security:** bump Go deps to clear Docker Scout criticals ([#89](https://github.com/create2-labs/cafe-crypto-policy-mgt/issues/89)) ([fb3ea4e](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/fb3ea4e8921819d0de8165ea229bf46037ee099b))
