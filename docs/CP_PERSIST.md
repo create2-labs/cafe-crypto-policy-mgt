@@ -302,7 +302,7 @@ The following gap is **expected** after PR7 documentation delivery. It is **not*
 
 **CP-PERSIST V1 is signed off independently through this document** (Part VI frozen decisions). [`workplans/WORKPLAN_API.md`](../workplans/WORKPLAN_API.md) remains a broader API workplan and may keep its global proposal status.
 
-**E2E documentation (PR7):** [cafe-documentation `docs/security/cp-persist-v1.md`](https://github.com/create2-labs/cafe-documentation/blob/main/docs/security/cp-persist-v1.md), [cafe-frontend `docs/cpm-developer.md`](../../cafe-frontend/docs/cpm-developer.md), [cafe-deploy README — CP-PERSIST E2E](https://github.com/create2-labs/cafe-deploy/blob/main/README.md#cp-persist-v1--manual-e2e-and-troubleshooting).
+**E2E documentation (PR7):** [cafe-documentation `docs/architecture/cpm-v1-flow.md`](https://github.com/create2-labs/cafe-documentation/blob/main/docs/architecture/cpm-v1-flow.md), [cafe-frontend `docs/cpm-developer.md`](../../cafe-frontend/docs/cpm-developer.md), [cafe-deploy README — CP-PERSIST E2E](https://github.com/create2-labs/cafe-deploy/blob/main/README.md#cp-persist-v1--manual-e2e-and-troubleshooting).
 
 **Not a V1 gap:** Redis, `CPM_REDIS_URL`, `ChallengeStore` / `ProofStore` or `wallet_control_proof_id` — these are **V2 optional** hardening, not required for CP-PERSIST V1.
 
@@ -521,7 +521,7 @@ POST /api/cpm/v1/drafts/{draft_id}/persist
 }
 ```
 
-`cafe-deploy/scripts/test-discovery-v1-wallet-scans-to-cpm.sh` uses CP-PERSIST V1 when `SKIP_PERSIST=0` (platform draft → wallet-challenges → sign → normative persist). The compliant backend reference smoke is `cafe-deploy/scripts/test-cpm-cp-persist-t4-draft-persist.sh`. CLI smoke: `cafe-deploy/scripts/test-cpm-cp-persist-t6-cli-flow.sh` (`cafe-frontend/scripts/cafe.sh`). Consolidated E2E product docs: [cafe-documentation `docs/security/cp-persist-v1.md`](https://github.com/create2-labs/cafe-documentation/blob/main/docs/security/cp-persist-v1.md) (**PR7**).
+`cafe-deploy/scripts/test-discovery-v1-wallet-scans-to-cpm.sh` uses CP-PERSIST V1 when `SKIP_PERSIST=0` (platform draft → wallet-challenges → sign → normative persist). The compliant backend reference smoke is `cafe-deploy/scripts/test-cpm-cp-persist-t4-draft-persist.sh`. CLI smoke: `cafe-deploy/scripts/test-cpm-cp-persist-t6-cli-flow.sh` (`cafe-frontend/scripts/cafe.sh`). Consolidated E2E product docs: [cafe-documentation `docs/architecture/cpm-v1-flow.md`](https://github.com/create2-labs/cafe-documentation/blob/main/docs/architecture/cpm-v1-flow.md) (**PR7**).
 
 The backend verifies at persist time (clients are **not** trusted):
 
@@ -1327,7 +1327,7 @@ Stories: **CP-PERSIST-S5**
 
 Stories: **CP-PERSIST-S10**, **CP-PERSIST-S1**, **CP-PERSIST-S2**, **CP-PERSIST-S3**
 
-**Status:** ✅ done — cross-repo E2E runbook [cafe-documentation `docs/security/cp-persist-v1.md`](https://github.com/create2-labs/cafe-documentation/blob/main/docs/security/cp-persist-v1.md); maintainer/troubleshooting in `cafe-frontend/docs/cpm-developer.md` and `cafe-deploy` README.
+**Status:** ✅ done — cross-repo E2E runbook [cafe-documentation `docs/architecture/cpm-v1-flow.md`](https://github.com/create2-labs/cafe-documentation/blob/main/docs/architecture/cpm-v1-flow.md); maintainer/troubleshooting in `cafe-frontend/docs/cpm-developer.md` and `cafe-deploy` README.
 
 ```text
 [x] Confirm README and WORKPLAN_API remain aligned with the implemented V1 contract

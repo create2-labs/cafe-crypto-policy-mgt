@@ -283,7 +283,7 @@ Normative spec: [`docs/CP_PERSIST.md`](../docs/CP_PERSIST.md).
 
 **Sign-off scope (English):** CP-PERSIST V1 decisions are frozen in [`CP_PERSIST.md`](../docs/CP_PERSIST.md) Part VI, independently of this document's global proposal status.
 
-**Expected implementation gaps after PR4 (English):** Backend enforcement is deployed (PR3 + PR4). **Web UI** CP-PERSIST V1 is deployed in **`cafe-frontend` PR #84** (PR5). **CLI** CP-PERSIST V1 is deployed in **`cafe-frontend` `scripts/cafe.sh`** (PR6 / CP-PERSIST-T6). **E2E documentation** is deployed in **PR7** ([`cafe-documentation/docs/security/cp-persist-v1.md`](https://github.com/create2-labs/cafe-documentation/blob/main/docs/security/cp-persist-v1.md)). Remaining gap: non-EOA wallet types (Part V). Full list: [`CP_PERSIST.md`](../docs/CP_PERSIST.md#expected-implementation-gaps-after-pr4).
+**Expected implementation gaps after PR4 (English):** Backend enforcement is deployed (PR3 + PR4). **Web UI** CP-PERSIST V1 is deployed in **`cafe-frontend` PR #84** (PR5). **CLI** CP-PERSIST V1 is deployed in **`cafe-frontend` `scripts/cafe.sh`** (PR6 / CP-PERSIST-T6). **E2E documentation** is deployed in **PR7** ([`cafe-documentation/docs/architecture/cpm-v1-flow.md`](https://github.com/create2-labs/cafe-documentation/blob/main/docs/architecture/cpm-v1-flow.md)). Remaining gap: non-EOA wallet types (Part V). Full list: [`CP_PERSIST.md`](../docs/CP_PERSIST.md#expected-implementation-gaps-after-pr4).
 
 ---
 

@@ -1,6 +1,6 @@
 # CPM Option A — Integrated narrative (Discovery v1 ↔ CPM v1 ↔ frontend)
 
-**What is Option A?** Option A is the **post-V1 CPM integration path**: connect the Crypto Policy Management experience to **real authenticated wallet scans** through the **Discovery backend** (data stored via Persistence Service / DB today—Discovery is not DB-free yet). The frontend must not call the database or an unauthenticated Persistence Service; CPM consumes normalized scan context from Discovery HTTP APIs. **Option B** (later) would front scan data with an extracted Persistence Service boundary; Option A is the deliberate short-term choice aligned with existing AuthN/AuthZ in Discovery. Product definition and intended flows: [`workplans/CPM_post_v_1_option_a_scan_context.md`](../workplans/CPM_post_v_1_option_a_scan_context.md).
+**What is Option A?** Option A is the **post-V1 CPM integration path**: connect the Crypto Policy Management experience to **real wallet scans** through the **Discovery HTTP API**. `cafe-persistence` writes the scan rows. The frontend does not call the database or Persistence Service; CPM consumes normalized scan context from Discovery HTTP APIs. Product definition and intended flows: [`workplans/CPM_post_v_1_option_a_scan_context.md`](../workplans/CPM_post_v_1_option_a_scan_context.md).
 
 End-to-end product and integration story for **Option A** (reconciled with **v1** APIs): authenticated wallet scans from **Discovery v1**, synchronous policy preview via **CPM explore**, optional **persist**, and a separate **async assessment** path. This document is the **integrated** entry point after the multi-repo PR sequence (**A1–C2**, **F1–F5**, **D1**); it does not replace normative contracts.
 
@@ -13,7 +13,7 @@ End-to-end product and integration story for **Option A** (reconciled with **v1*
 | Frontend V1 + post-V1 F\* | [`workplans/CPM_FRONTEND_PR_PLAN_V1.md`](../workplans/CPM_FRONTEND_PR_PLAN_V1.md) |
 | Maintainer mapping (A2) | [Discovery `CPM_OPTION_A_DISCOVERY_V1_CONTRACT.md`](https://github.com/create2-labs/cafe-discovery/blob/main/docs/CPM_OPTION_A_DISCOVERY_V1_CONTRACT.md) |
 | Public developer guide | [CAFE `03-cafe-developer-guide.md`](https://github.com/create2-labs/cafe-documentation/blob/main/03-cafe-developer-guide.md) |
-| Option A architecture (public) | [CAFE `docs/architecture/cpm-option-a-v1-flow.md`](https://github.com/create2-labs/cafe-documentation/blob/main/docs/architecture/cpm-option-a-v1-flow.md) |
+| Option A architecture (public) | [CAFE `docs/architecture/cpm-v1-flow.md`](https://github.com/create2-labs/cafe-documentation/blob/main/docs/architecture/cpm-v1-flow.md) |
 | Discovery OpenAPI | [`cafe-discovery/openapi/discovery-v1.yaml`](https://github.com/create2-labs/cafe-discovery/blob/main/openapi/discovery-v1.yaml) |
 | CPM OpenAPI | [`openapi/cpm-v1.yaml`](../openapi/cpm-v1.yaml) |
 
@@ -23,15 +23,15 @@ End-to-end product and integration story for **Option A** (reconciled with **v1*
 
 ## 1. System flow (data ownership)
 
-Today, wallet scan rows and renderable **`result`** payloads live in **Discovery’s database** (interim). **Persistence Service** is the long-term authoritative owner for scan artifacts; Discovery remains the **HTTP owner** for list/detail until that migration completes. CPM never reads Discovery SQL; the frontend never calls Persistence Service or SQL directly.
+`cafe-persistence` is the single writer of wallet scan rows and renderable **`result`** payloads. Discovery remains the **HTTP owner** for list/detail. CPM never reads SQL; the frontend never calls Persistence Service or SQL directly.
 
 ```mermaid
 flowchart LR
   subgraph scan_origin [Scan origin]
     UI[Wallet scan UI / POST v1 scan]
-    DB[(Discovery DB today — PS target long term)]
+    DB[(Postgres via cafe-persistence)]
   end
-  subgraph discovery_v1 [Discovery v1 JWT APIs]
+  subgraph discovery_v1 [Discovery v1 APIs]
     LIST[GET wallets/scans]
     DETAIL[GET wallets/scans/scan_id]
   end
@@ -46,7 +46,7 @@ flowchart LR
     PERSIST[POST policies]
     ASSESS[POST policies/assessment/request]
   end
-  UI --> DB
+  UI --> LIST
   DB --> LIST
   DB --> DETAIL
   LIST --> DS
@@ -138,7 +138,7 @@ Active bash smoke (v1 only):
 
 ```bash
 cd cafe-crypto-policy-mgt
-export DISCOVERY_EMAIL='user@example.com' DISCOVERY_PASSWORD='secret'
+export DISCOVERY_EMAIL='user@example.com' DISCOVERY_PASSWORD='changeme'
 # Direct backends (defaults): DISCOVERY_BASE=http://localhost:8080 CPM_BASE=http://localhost:8082
 SKIP_PERSIST=1 ./scripts/test-discovery-v1-wallet-scans-to-cpm.sh
 ```
