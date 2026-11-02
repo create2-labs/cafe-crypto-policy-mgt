@@ -1,7 +1,7 @@
 ##############################
 # Stage CI — Lint / Test / Vuln (use: docker build --target ci)
 ##############################
-FROM golang:1.26.6 AS ci
+FROM golang:1.27.3 AS ci
 
 WORKDIR /app
 
@@ -24,7 +24,7 @@ CMD ["sh", "-c", "go mod download && golangci-lint run ./... && go test ./intern
 ##############################
 # Stage Build
 ##############################
-FROM golang:1.26.6 AS build
+FROM golang:1.27.3 AS build
 WORKDIR /app
 
 ARG APP_VERSION
