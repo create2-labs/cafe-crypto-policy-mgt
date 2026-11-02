@@ -15,7 +15,7 @@ RUN go mod download
 COPY . .
 
 RUN go install golang.org/x/vuln/cmd/govulncheck@latest \
-    && go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.8.0
+    && go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
 
 # Preserve CPM-specific test guards: prod memory rejection (!dev) + full suite with -tags dev
 CMD ["sh", "-c", "go mod download && golangci-lint run ./... && go test ./internal/app -run TestNewPolicyStoreRejectsMemoryInProductionBuild && go test -tags dev ./... && govulncheck ./..."]
