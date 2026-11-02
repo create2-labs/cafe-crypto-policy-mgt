@@ -1,7 +1,7 @@
 ##############################
 # Stage CI — Lint / Test / Vuln (use: docker build --target ci)
 ##############################
-FROM golang:1.26.6 AS ci
+FROM golang:1.27.3 AS ci
 
 WORKDIR /app
 
@@ -15,7 +15,7 @@ RUN go mod download
 COPY . .
 
 RUN go install golang.org/x/vuln/cmd/govulncheck@latest \
-    && go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.8.0
+    && go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
 
 # Preserve CPM-specific test guards: prod memory rejection (!dev) + full suite with -tags dev
 CMD ["sh", "-c", "go mod download && golangci-lint run ./... && go test ./internal/app -run TestNewPolicyStoreRejectsMemoryInProductionBuild && go test -tags dev ./... && govulncheck ./..."]
@@ -24,7 +24,7 @@ CMD ["sh", "-c", "go mod download && golangci-lint run ./... && go test ./intern
 ##############################
 # Stage Build
 ##############################
-FROM golang:1.26.6 AS build
+FROM golang:1.27.3 AS build
 WORKDIR /app
 
 ARG APP_VERSION
