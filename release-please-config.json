@@ -22,7 +22,6 @@
     ".": {
       "include-component-in-tag": false,
       "release-type": "go",
-      "release-as": "1.1.0",
       "changelog-path": "CHANGELOG.md"
     }
   }
