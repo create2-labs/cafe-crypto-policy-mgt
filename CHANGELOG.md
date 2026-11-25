@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/create2-labs/cafe-crypto-policy-mgt/compare/v1.1.0...v1.1.1) (2026-11-25)
+
+
+### 🐞 Bug Fixes
+
+* release plase will promote versions bu itself ([8066151](https://github.com/create2-labs/cafe-crypto-policy-mgt/commit/806615165827069ed0d217308fbef1bb4e4bc622))
+
 ## [1.1.0](https://github.com/create2-labs/cafe-crypto-policy-mgt/compare/v1.0.0...v1.1.0) (2026-11-25)
 
 
